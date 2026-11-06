@@ -46,44 +46,44 @@ async function printRecord(id){
  const html='<style>'+
  '#print{background:#fff!important;color:#202830!important;font-family:Tahoma,Arial,sans-serif}'+
  '#print .invoice-sheet{max-width:1000px;margin:0 auto;background:#fff;border:1px solid #cbd2d8;color:#202830}'+
- '#print .accent{height:9px;background:linear-gradient(90deg,#202a33 0%,#65727d 62%,#e85b36 100%)}'+
+ '#print .accent{height:10px;background:linear-gradient(90deg,#171717 0%,#b89450 48%,#171717 100%)}'+
  '#print .inner{padding:30px 38px 24px}'+
- '#print .head{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;border-bottom:1px solid #cbd2d8;padding-bottom:12px}'+
+ '#print .head{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;border-bottom:2px solid #b89450;padding-bottom:14px}'+
  '#print .brandline{display:flex;align-items:center;gap:14px}'+
  '#print .brandlogo{width:86px;height:72px;object-fit:contain}'+
- '#print .brandname{font-size:22px;font-weight:900;color:#202a33}'+
- '#print .tagline{margin-top:6px;color:#68747e;font-size:11px;line-height:1.7}'+
- '#print .companydata{margin-top:10px;color:#59656f;font-size:11px;line-height:1.9}'+
- '#print .contact{background:linear-gradient(135deg,#20252b,#343b43);border-right:4px solid #e66b2e;padding:12px 15px;font-size:11px;line-height:2;color:#f1f3f5}'+
- '#print .contact b{color:#d7dde2;font-size:12px}'+
- '#print .dochead{display:flex;justify-content:space-between;align-items:center;margin:16px 0 11px;padding:10px 13px;background:linear-gradient(110deg,#171b20,#3b434b);border-right:5px solid #e66b2e}'+
- '#print .doctitle{font-size:21px;font-weight:900;color:#f5f6f7}'+
- '#print .docno{background:#26323c;color:#fff;padding:10px 16px;border-radius:5px;font-size:13px}'+
- '#print .details{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 14px;background:linear-gradient(135deg,#f4f5f6,#e8ebee);border:1px solid #bfc6cc;padding:7px 11px}'+
- '#print .details div{padding:7px 2px;border-bottom:1px solid #dfe4e7;font-size:12px;min-height:32px}'+
- '#print .details b{color:#596671;margin-left:5px}'+
+ '#print .brandname{font-size:24px;font-weight:900;color:#8d6a2e}'+
+ '#print .tagline{margin-top:6px;color:#5f5a50;font-size:11px;line-height:1.8}'+
+ '#print .companydata{margin-top:10px;color:#3e3a33;font-size:11px;line-height:2.0}'+
+ '#print .contact{background:linear-gradient(135deg,#171717,#29251d);border-right:5px solid #b89450;padding:13px 16px;font-size:11px;line-height:2.05;color:#fff}'+
+ '#print .contact b{color:#e5c987;font-size:13px}'+
+ '#print .dochead{display:flex;justify-content:space-between;align-items:center;margin:17px 0 12px;padding:11px 14px;background:linear-gradient(110deg,#171717,#30291c);border-right:5px solid #b89450}'+
+ '#print .doctitle{font-size:22px;font-weight:900;color:#f7edda}'+
+ '#print .docno{background:#b89450;color:#171717;padding:10px 16px;border-radius:3px;font-size:13px;font-weight:900}'+
+ '#print .details{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 14px;background:#fffdf8;border:1px solid #d8c69d;padding:8px 12px}'+
+ '#print .details div{padding:7px 2px;border-bottom:1px solid #eee5d2;font-size:12px;min-height:32px}'+
+ '#print .details b{color:#80652e;margin-left:5px}'+
  '#print table{width:100%;border-collapse:collapse;margin-top:12px;font-size:11px}'+
- '#print th{background:linear-gradient(110deg,#171b20,#3a424a);color:#fff;padding:10px 6px;border:1px solid #454e56}'+
- '#print td{padding:9px 6px;border:1px solid #d9dfe3;text-align:center;color:#202830}'+
- '#print tbody tr:nth-child(even){background:#f6f8f9}'+
+ '#print th{background:linear-gradient(110deg,#171717,#3a3020);color:#f7edda;padding:11px 6px;border:1px solid #8f7542}'+
+ '#print td{padding:10px 6px;border:1px solid #e3dccd;text-align:center;color:#25221c}'+
+ '#print tbody tr:nth-child(even){background:#fbf8f0}'+
  '#print .summary{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}'+
- '#print .grand{min-width:175px;background:linear-gradient(135deg,#171b20,#343b43);color:#fff;padding:12px 14px;border-right:5px solid #e66b2e;box-shadow:inset 0 0 0 1px #59616a;font-size:16px;font-weight:bold}'+
- '#print .grand small{display:block;font-size:10px;color:#cbd4da;margin-bottom:5px}'+
+ '#print .grand{min-width:175px;background:linear-gradient(135deg,#171717,#30291c);color:#fff;padding:13px 15px;border-right:5px solid #b89450;box-shadow:inset 0 0 0 1px #806a3e;font-size:16px;font-weight:bold}'+
+ '#print .grand small{display:block;font-size:10px;color:#e5d3a8;margin-bottom:5px}'+
  '#print .payment-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}'+
- '#print .payment-card{border:1px solid #bfc6cc;border-top:3px solid #737d86;padding:12px;background:linear-gradient(145deg,#f7f8f9,#eceff1);font-size:11px;line-height:1.9}'+
- '#print .payment-card h3{margin:0 0 7px;color:#20262c;font-size:13px;border-bottom:1px solid #c7cdd2;padding-bottom:5px}'+
+ '#print .payment-card{border:1px solid #d8c69d;border-top:3px solid #b89450;padding:12px;background:linear-gradient(145deg,#fffdf8,#f5f0e5);font-size:11px;line-height:1.9}'+
+ '#print .payment-card h3{margin:0 0 7px;color:#6e5425;font-size:13px;border-bottom:1px solid #dfd1b2;padding-bottom:5px}'+
  '#print .qr{width:160px;height:160px;object-fit:contain;image-rendering:pixelated;display:block;margin:10px auto 5px;padding:8px;background:#fff;border:2px solid #aeb7bf;border-radius:4px}'+
- '#print .notes{margin-top:10px;padding:8px 10px;border:1px solid #e0e5e8;border-right:3px solid #9aa6af;color:#59636b;font-size:11px}'+
+ '#print .notes{margin-top:10px;padding:9px 11px;border:1px solid #e3d7bf;border-right:3px solid #b89450;color:#514a3c;font-size:11px}'+
  '#print .bottom{display:grid;grid-template-columns:1fr 1fr;align-items:end;gap:12px;margin-top:20px}'+
- '#print .seal{text-align:right;color:#20262c;font-weight:bold;border:2px solid #737d86;border-radius:5px;padding:18px;text-align:center;max-width:260px;background:linear-gradient(145deg,#f1f3f4,#e2e6e9)}'+
- '#print .signbox{text-align:center;color:#53606a;font-size:12px}'+
- '#print .signline{border-top:1px solid #aeb8c1;padding-top:8px;max-width:220px;margin:42px auto 0}'+
- '#print .footer{margin-top:14px;padding-top:9px;border-top:2px solid #29343e;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;color:#53606a;font-size:10px}'+
- '#print .thanks{text-align:center;margin-top:8px;color:#87929a;font-size:10px}'+
+ '#print .seal{text-align:right;color:#6d5425;font-weight:bold;border:2px solid #b89450;border-radius:2px;padding:18px;text-align:center;max-width:260px;background:linear-gradient(145deg,#fffdf8,#f0e7d3)}'+
+ '#print .signbox{text-align:center;color:#514a3c;font-size:12px}'+
+ '#print .signline{border-top:1px solid #b89450;padding-top:8px;max-width:220px;margin:42px auto 0}'+
+ '#print .footer{margin-top:14px;padding-top:10px;border-top:2px solid #b89450;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;color:#514a3c;font-size:10px}'+
+ '#print .thanks{text-align:center;margin-top:9px;color:#8d6a2e;font-size:10px}'+
  '@media(max-width:650px){#print .inner{padding:18px}#print .head{grid-template-columns:1fr}#print .details{grid-template-columns:1fr}#print .payment-grid{grid-template-columns:1fr}#print .bottom{grid-template-columns:1fr}}'+
- '@media print{body>*:not(#print){display:none!important}#print{display:block!important;background:#fff!important}#print .invoice-sheet{border:0;max-width:none}#print .inner{padding:8mm 9mm}#print .accent,#print th,#print .grand,#print .docno{-webkit-print-color-adjust:exact;print-color-adjust:exact}@page{size:A4 portrait;margin:0}}'+
+ '@media print{body>*:not(#print){display:none!important}#print{display:block!important;background:#fff!important}#print .invoice-sheet{border:0;max-width:none}#print .inner{padding:8mm 9mm}#print .accent,#print th,#print .grand,#print .docno,#print .contact{-webkit-print-color-adjust:exact;print-color-adjust:exact}@page{size:A4 portrait;margin:0}}'+
  '</style><main class="invoice-sheet"><div class="accent"></div><div class="inner">'+
- '<header class="head"><div><div class="brandline"><img class="brandlogo" src="/logo.png" alt="AIB"><div><div class="brandname">مجموعة AIB التجارية</div><div class="tagline">استيراد وبيع السيارات وقطع الغيار للسيارات والشاحنات</div></div></div><div class="companydata">السجل التجاري: 96133/2025<br>العنوان: كفر كرمين / باب الهوى / حلب</div></div>'+
+ '<header class="head"><div><div class="brandline"><img class="brandlogo" src="/logo.png" alt="AIB"><div><div class="brandname">مجموعة AIB التجارية</div><div class="tagline">استيراد وبيع السيارات وقطع الغيار للسيارات والشاحنات</div></div></div><div class="companydata">السجل التجاري: 96133/2025<br>العنوان: طريق حلب – باب الهوى، منطقة كفر كرمين، جنوب كازية الشمال والجنوبي، 150 متراً على يمين الطريق باتجاه حلب</div></div>'+
  '<div class="contact"><b>بيانات التواصل</b><br>الهاتف: <span dir="ltr">+963997439627</span><br>البريد: <span dir="ltr">Mmhnn1918@gmail.com</span><br>عضوية غرفة تجارة حلب: 24879</div></header>'+
  '<div class="dochead"><div class="doctitle">'+esc(sectionName(r.section))+'</div><div class="docno"><b>رقم الفاتورة:</b> '+esc(invoiceNo)+'</div></div>'+
  '<section class="details"><div><b>التاريخ:</b> '+esc(date)+'</div><div><b>العملة:</b> '+currency+'</div><div><b>اسم العميل / المورد:</b> '+esc(d.customer||d.source||'—')+'</div><div><b>رقم الهاتف:</b> '+esc(d.customer_phone||d.customerPhone||'—')+'</div><div><b>العنوان:</b> '+esc(d.customer_address||d.customerAddress||'—')+'</div><div><b>القسم:</b> '+esc(sectionName(r.section))+'</div></section>'+
@@ -92,7 +92,7 @@ async function printRecord(id){
  '<h3 style="margin:16px 0 5px;color:#29343e;font-size:14px">سجل الدفعات</h3><table><thead><tr><th>المبلغ</th><th>طريقة الدفع</th><th>تاريخ الدفعة</th></tr></thead><tbody>'+paymentRows+'</tbody></table>'+
  '<div class="payment-grid"><section class="payment-card"><h3>بيانات التحويل البنكي – بنك البركة</h3>رقم الحساب: <b dir="ltr">1433022</b><br>صاحب الحساب: عبد الكريم خيرو محمد<br>الفرع: الفرقان</section><section class="payment-card"><h3>شام كاش</h3>معرّف الحساب: <b dir="ltr">f0948590adaf306d77d5d2b73b2e4c68</b><img class="qr" src="/sham_cash_qr.png" alt="QR شام كاش"><div style="text-align:center">امسح الرمز للتحويل عبر شام كاش</div></section><section class="payment-card"><h3>سيريتل كاش</h3>رقم المحفظة: <b dir="ltr">0997439627</b></section><section class="payment-card"><h3>ملاحظات</h3>'+esc(d.notes||'شكراً لثقتكم بمجموعة AIB التجارية')+'</section></div>'+
  '<div class="bottom"><div class="seal">مجموعة AIB التجارية<br>ختم الشركة<br>السجل التجاري 96133/2025</div><div class="signbox"><div class="signline">توقيع المسؤول المعتمد</div></div></div>'+
- '<footer class="footer"><span>مجموعة AIB التجارية</span><span>كفر كرمين / باب الهوى / حلب</span><span dir="ltr">+963997439627</span><span dir="ltr">Mmhnn1918@gmail.com</span></footer><div class="thanks">نشكركم على ثقتكم بمجموعة AIB التجارية</div></div></main>';
+ '<footer class="footer"><span>مجموعة AIB التجارية</span><span>طريق حلب – باب الهوى، منطقة كفر كرمين، جنوب كازية الشمال والجنوبي، 150 متراً على يمين الطريق باتجاه حلب</span><span dir="ltr">+963997439627</span><span dir="ltr">Mmhnn1918@gmail.com</span></footer><div class="thanks">نشكركم على ثقتكم بمجموعة AIB التجارية</div></div></main>';
  const p=document.getElementById('print');p.innerHTML=html;const qr=p.querySelector('.qr');if(qr){try{if(!qr.complete)await new Promise(resolve=>{qr.onload=resolve;qr.onerror=resolve});if(qr.decode)await qr.decode();}catch(e){const hint=qr.nextElementSibling;if(hint)hint.textContent='تعذر تحميل الرمز؛ استخدم معرّف شام كاش أعلاه';}}window.print();
 }
 </script></body></html>
