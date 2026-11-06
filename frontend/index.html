@@ -31,7 +31,7 @@ function renderPaymentRows(){const box=document.getElementById('paymentRows');if
 function addPaymentRow(){draftPayments.push({amount:'',method:'cash',paid_at:new Date().toISOString().slice(0,10)});renderPaymentRows()}
 function collectPaymentRows(){const rows=[...document.querySelectorAll('[data-pay-amount]')];return rows.map(el=>{const i=Number(el.dataset.payAmount);return {amount:Number(el.value),method:document.querySelector(`[data-pay-method="${i}"]`).value,paid_at:document.querySelector(`[data-pay-date="${i}"]`).value+'T12:00:00Z'}}).filter(x=>x.amount>0)}
 function closeModal(){document.getElementById('modal').classList.add('hidden')}async function saveCash(e){e.preventDefault();let f=Object.fromEntries(new FormData(e.target));f.amount=Number(f.amount);try{await api('/cash-movements',{method:'POST',body:f});await renderPage('cash')}catch(e){alert(e.message)}}async function saveUser(e){e.preventDefault();let f=Object.fromEntries(new FormData(e.target));try{await api('/users',{method:'POST',body:f});await renderPage('users')}catch(e){alert(e.message)}}async function userActive(id,a){try{await api('/users/'+id+'/active?active='+a,{method:'PATCH'});await renderPage('users')}catch(e){alert(e.message)}}async function editRecord(id){let r=records.find(x=>x.id===id);if(!r){await load();r=records.find(x=>x.id===id)}recordForm(r)}async function deleteRecord(id){if(!confirm('تأكيد الحذف؟'))return;try{await api('/records/'+id,{method:'DELETE'});await renderPage('records')}catch(e){alert(e.message)}}async function requestRecordChange(id,action){let reason=prompt(tr('reason'));if(!reason)return;let proposed_data=null;if(action==='update'){let r=records.find(x=>x.id===id);let raw=prompt('أدخل البيانات المقترحة بصيغة JSON',JSON.stringify(r?.data||{}));if(!raw)return;try{proposed_data=JSON.parse(raw)}catch{alert('JSON غير صالح');return}}try{await api('/records/'+id+'/change-requests',{method:'POST',body:{action,reason,proposed_data}});alert('تم إرسال الطلب للمدير');}catch(e){alert(e.message)}}async function review(id,approve){try{await api('/change-requests/'+id+'/approve?approve='+approve,{method:'POST'});await renderPage('requests')}catch(e){alert(e.message)}}function filterRows(){let q=document.getElementById('filter').value.toLowerCase();document.getElementById('recordsTable').innerHTML=tableRecords(records.filter(r=>JSON.stringify(r).toLowerCase().includes(q)))}
-async function printRecord(id){
+async async function printRecord(id){
  let r=records.find(x=>x.id===id)||(await api('/records')).find(x=>x.id===id);
  if(!r)return;
  const d=r.data||{}, currency=esc(r.currency||'USD');
@@ -54,27 +54,27 @@ async function printRecord(id){
  '#print .brandname{font-size:22px;font-weight:900;color:#202a33}'+
  '#print .tagline{margin-top:6px;color:#68747e;font-size:11px;line-height:1.7}'+
  '#print .companydata{margin-top:10px;color:#59656f;font-size:11px;line-height:1.9}'+
- '#print .contact{background:#f2f4f5;border-right:3px solid #e85b36;padding:10px 13px;font-size:11px;line-height:2}'+
- '#print .dochead{display:flex;justify-content:space-between;align-items:center;margin:14px 0 10px}'+
- '#print .doctitle{font-size:21px;font-weight:900;color:#26323c}'+
+ '#print .contact{background:linear-gradient(135deg,#20252b,#343b43);border-right:4px solid #e66b2e;padding:12px 15px;font-size:11px;line-height:2;color:#f1f3f5}'+\n '#print .contact b{color:#d7dde2;font-size:12px}'+
+ '#print .dochead{display:flex;justify-content:space-between;align-items:center;margin:16px 0 11px;padding:10px 13px;background:linear-gradient(110deg,#171b20,#3b434b);border-right:5px solid #e66b2e}'+
+ '#print .doctitle{font-size:21px;font-weight:900;color:#f5f6f7}'+
  '#print .docno{background:#26323c;color:#fff;padding:10px 16px;border-radius:5px;font-size:13px}'+
- '#print .details{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 14px;background:#f4f6f7;border:1px solid #d7dde1;padding:6px 10px}'+
+ '#print .details{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 14px;background:linear-gradient(135deg,#f4f5f6,#e8ebee);border:1px solid #bfc6cc;padding:7px 11px}'+
  '#print .details div{padding:7px 2px;border-bottom:1px solid #dfe4e7;font-size:12px;min-height:32px}'+
  '#print .details b{color:#596671;margin-left:5px}'+
  '#print table{width:100%;border-collapse:collapse;margin-top:12px;font-size:11px}'+
- '#print th{background:#29343e;color:#fff;padding:9px 6px;border:1px solid #29343e}'+
+ '#print th{background:linear-gradient(110deg,#171b20,#3a424a);color:#fff;padding:10px 6px;border:1px solid #454e56}'+
  '#print td{padding:9px 6px;border:1px solid #d9dfe3;text-align:center;color:#202830}'+
  '#print tbody tr:nth-child(even){background:#f6f8f9}'+
  '#print .summary{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}'+
- '#print .grand{min-width:175px;background:#29343e;color:#fff;padding:10px 13px;border-right:5px solid #e85b36;font-size:16px;font-weight:bold}'+
+ '#print .grand{min-width:175px;background:linear-gradient(135deg,#171b20,#343b43);color:#fff;padding:12px 14px;border-right:5px solid #e66b2e;box-shadow:inset 0 0 0 1px #59616a;font-size:16px;font-weight:bold}'+
  '#print .grand small{display:block;font-size:10px;color:#cbd4da;margin-bottom:5px}'+
  '#print .payment-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}'+
- '#print .payment-card{border:1px solid #d9dfe3;padding:12px;background:#fafbfc;font-size:11px;line-height:1.9}'+
- '#print .payment-card h3{margin:0 0 7px;color:#29343e;font-size:13px}'+
- '#print .qr{width:116px;height:116px;object-fit:contain;display:block;margin:8px auto 2px}'+
+ '#print .payment-card{border:1px solid #bfc6cc;border-top:3px solid #737d86;padding:12px;background:linear-gradient(145deg,#f7f8f9,#eceff1);font-size:11px;line-height:1.9}'+
+ '#print .payment-card h3{margin:0 0 7px;color:#20262c;font-size:13px;border-bottom:1px solid #c7cdd2;padding-bottom:5px}'+
+ '#print .qr{width:160px;height:160px;object-fit:contain;image-rendering:pixelated;display:block;margin:10px auto 5px;padding:8px;background:#fff;border:2px solid #aeb7bf;border-radius:4px}'+
  '#print .notes{margin-top:10px;padding:8px 10px;border:1px solid #e0e5e8;border-right:3px solid #9aa6af;color:#59636b;font-size:11px}'+
  '#print .bottom{display:grid;grid-template-columns:1fr 1fr;align-items:end;gap:12px;margin-top:20px}'+
- '#print .seal{text-align:right;color:#26343d;font-weight:bold;border:2px solid #9aa6af;border-radius:9px;padding:18px;text-align:center;max-width:260px}'+
+ '#print .seal{text-align:right;color:#20262c;font-weight:bold;border:2px solid #737d86;border-radius:5px;padding:18px;text-align:center;max-width:260px;background:linear-gradient(145deg,#f1f3f4,#e2e6e9)}'+
  '#print .signbox{text-align:center;color:#53606a;font-size:12px}'+
  '#print .signline{border-top:1px solid #aeb8c1;padding-top:8px;max-width:220px;margin:42px auto 0}'+
  '#print .footer{margin-top:14px;padding-top:9px;border-top:2px solid #29343e;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;color:#53606a;font-size:10px}'+
@@ -92,6 +92,6 @@ async function printRecord(id){
  '<div class="payment-grid"><section class="payment-card"><h3>بيانات التحويل البنكي – بنك البركة</h3>رقم الحساب: <b dir="ltr">1433022</b><br>صاحب الحساب: عبد الكريم خيرو محمد<br>الفرع: الفرقان</section><section class="payment-card"><h3>شام كاش</h3>معرّف الحساب: <b dir="ltr">f0948590adaf306d77d5d2b73b2e4c68</b><img class="qr" src="/sham_cash_qr.png" alt="QR شام كاش"><div style="text-align:center">امسح الرمز للتحويل عبر شام كاش</div></section><section class="payment-card"><h3>سيريتل كاش</h3>رقم المحفظة: <b dir="ltr">0997439627</b></section><section class="payment-card"><h3>ملاحظات</h3>'+esc(d.notes||'شكراً لثقتكم بمجموعة AIB التجارية')+'</section></div>'+
  '<div class="bottom"><div class="seal">مجموعة AIB التجارية<br>ختم الشركة<br>السجل التجاري 96133/2025</div><div class="signbox"><div class="signline">توقيع المسؤول المعتمد</div></div></div>'+
  '<footer class="footer"><span>مجموعة AIB التجارية</span><span>كفر كرمين / باب الهوى / حلب</span><span dir="ltr">+963997439627</span><span dir="ltr">Mmhnn1918@gmail.com</span></footer><div class="thanks">نشكركم على ثقتكم بمجموعة AIB التجارية</div></div></main>';
- const p=document.getElementById('print');p.innerHTML=html;window.print();
+ const p=document.getElementById('print');p.innerHTML=html;const qr=p.querySelector('.qr');if(qr){try{if(!qr.complete)await new Promise(resolve=>{qr.onload=resolve;qr.onerror=resolve});if(qr.decode)await qr.decode();}catch(e){const hint=qr.nextElementSibling;if(hint)hint.textContent='تعذر تحميل الرمز؛ استخدم معرّف شام كاش أعلاه';}}window.print();
 }
 </script></body></html>
