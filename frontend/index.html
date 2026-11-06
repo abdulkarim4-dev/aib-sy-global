@@ -31,7 +31,7 @@ function renderPaymentRows(){const box=document.getElementById('paymentRows');if
 function addPaymentRow(){draftPayments.push({amount:'',method:'cash',paid_at:new Date().toISOString().slice(0,10)});renderPaymentRows()}
 function collectPaymentRows(){const rows=[...document.querySelectorAll('[data-pay-amount]')];return rows.map(el=>{const i=Number(el.dataset.payAmount);return {amount:Number(el.value),method:document.querySelector(`[data-pay-method="${i}"]`).value,paid_at:document.querySelector(`[data-pay-date="${i}"]`).value+'T12:00:00Z'}}).filter(x=>x.amount>0)}
 function closeModal(){document.getElementById('modal').classList.add('hidden')}async function saveCash(e){e.preventDefault();let f=Object.fromEntries(new FormData(e.target));f.amount=Number(f.amount);try{await api('/cash-movements',{method:'POST',body:f});await renderPage('cash')}catch(e){alert(e.message)}}async function saveUser(e){e.preventDefault();let f=Object.fromEntries(new FormData(e.target));try{await api('/users',{method:'POST',body:f});await renderPage('users')}catch(e){alert(e.message)}}async function userActive(id,a){try{await api('/users/'+id+'/active?active='+a,{method:'PATCH'});await renderPage('users')}catch(e){alert(e.message)}}async function editRecord(id){let r=records.find(x=>x.id===id);if(!r){await load();r=records.find(x=>x.id===id)}recordForm(r)}async function deleteRecord(id){if(!confirm('تأكيد الحذف؟'))return;try{await api('/records/'+id,{method:'DELETE'});await renderPage('records')}catch(e){alert(e.message)}}async function requestRecordChange(id,action){let reason=prompt(tr('reason'));if(!reason)return;let proposed_data=null;if(action==='update'){let r=records.find(x=>x.id===id);let raw=prompt('أدخل البيانات المقترحة بصيغة JSON',JSON.stringify(r?.data||{}));if(!raw)return;try{proposed_data=JSON.parse(raw)}catch{alert('JSON غير صالح');return}}try{await api('/records/'+id+'/change-requests',{method:'POST',body:{action,reason,proposed_data}});alert('تم إرسال الطلب للمدير');}catch(e){alert(e.message)}}async function review(id,approve){try{await api('/change-requests/'+id+'/approve?approve='+approve,{method:'POST'});await renderPage('requests')}catch(e){alert(e.message)}}function filterRows(){let q=document.getElementById('filter').value.toLowerCase();document.getElementById('recordsTable').innerHTML=tableRecords(records.filter(r=>JSON.stringify(r).toLowerCase().includes(q)))}
-async async function printRecord(id){
+async function printRecord(id){
  let r=records.find(x=>x.id===id)||(await api('/records')).find(x=>x.id===id);
  if(!r)return;
  const d=r.data||{}, currency=esc(r.currency||'USD');
@@ -54,7 +54,8 @@ async async function printRecord(id){
  '#print .brandname{font-size:22px;font-weight:900;color:#202a33}'+
  '#print .tagline{margin-top:6px;color:#68747e;font-size:11px;line-height:1.7}'+
  '#print .companydata{margin-top:10px;color:#59656f;font-size:11px;line-height:1.9}'+
- '#print .contact{background:linear-gradient(135deg,#20252b,#343b43);border-right:4px solid #e66b2e;padding:12px 15px;font-size:11px;line-height:2;color:#f1f3f5}'+\n '#print .contact b{color:#d7dde2;font-size:12px}'+
+ '#print .contact{background:linear-gradient(135deg,#20252b,#343b43);border-right:4px solid #e66b2e;padding:12px 15px;font-size:11px;line-height:2;color:#f1f3f5}'+
+ '#print .contact b{color:#d7dde2;font-size:12px}'+
  '#print .dochead{display:flex;justify-content:space-between;align-items:center;margin:16px 0 11px;padding:10px 13px;background:linear-gradient(110deg,#171b20,#3b434b);border-right:5px solid #e66b2e}'+
  '#print .doctitle{font-size:21px;font-weight:900;color:#f5f6f7}'+
  '#print .docno{background:#26323c;color:#fff;padding:10px 16px;border-radius:5px;font-size:13px}'+
