@@ -45,6 +45,15 @@ class Record(Base):
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
     updated_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
     deleted: Mapped[bool]=mapped_column(Boolean, default=False)
+class InvoicePayment(Base):
+    __tablename__="invoice_payments"
+    id: Mapped[int]=mapped_column(primary_key=True)
+    record_id: Mapped[int]=mapped_column(ForeignKey("records.id"), index=True)
+    amount: Mapped[Any]=mapped_column(Numeric(18,2))
+    method: Mapped[str]=mapped_column(String(40))
+    paid_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
+    created_by: Mapped[int]=mapped_column(ForeignKey("users.id"))
+
 class CashMove(Base):
     __tablename__="cash_moves"
     id: Mapped[int]=mapped_column(primary_key=True)
@@ -158,7 +167,36 @@ def create_record(p:RecordCreate, request:Request, s:Session=Depends(db), u:User
 def list_records(section:Optional[str]=None, s:Session=Depends(db), u:User=Depends(current_user)):
     q=select(Record).where(Record.deleted==False)
     if section: q=q.where(Record.section==section)
-    return [{"id":r.id,"section":r.section,"invoice_no":r.invoice_no,"currency":r.currency,"data":r.data,"created_by":r.created_by,"created_at":r.created_at,"updated_at":r.updated_at} for r in s.scalars(q.order_by(Record.id.desc())).all()]
+    out=[]
+    for r in s.scalars(q.order_by(Record.id.desc())).all():
+        pays=s.scalars(select(InvoicePayment).where(InvoicePayment.record_id==r.id).order_by(InvoicePayment.id)).all()
+        total=float(r.data.get("amount",r.data.get("price",r.data.get("sale",0))) or 0)
+        paid=sum(float(x.amount) for x in pays)
+        out.append({"id":r.id,"section":r.section,"invoice_no":r.invoice_no,"currency":r.currency,"data":r.data,"created_by":r.created_by,"created_at":r.created_at,"updated_at":r.updated_at,"payments":[{"id":x.id,"amount":float(x.amount),"method":x.method,"paid_at":x.paid_at} for x in pays],"paid_total":round(paid,2),"remaining":round(max(total-paid,0),2),"payment_status":"paid" if total>0 and paid>=total else "partial" if paid>0 else "unpaid"})
+    return out
+class PaymentPayload(BaseModel):
+    amount: float = Field(gt=0)
+    method: str
+    paid_at: Optional[datetime] = None
+
+@app.post("/records/{record_id}/payments")
+def add_invoice_payment(record_id:int,p:PaymentPayload,request:Request,s:Session=Depends(db),u:User=Depends(can_add)):
+    r=s.get(Record,record_id)
+    if not r or r.deleted: raise HTTPException(404,"الفاتورة غير موجودة")
+    if p.method not in {"cash","baraka_bank","sham_cash","syriatel_cash"}: raise HTTPException(400,"طريقة الدفع غير صالحة")
+    total=float(r.data.get("amount",r.data.get("price",r.data.get("sale",0))) or 0)
+    paid=float(s.scalar(select(func.coalesce(func.sum(InvoicePayment.amount),0)).where(InvoicePayment.record_id==record_id)) or 0)
+    if round(paid+p.amount,2)>round(total,2): raise HTTPException(400,"مجموع الدفعات يتجاوز إجمالي الفاتورة")
+    x=InvoicePayment(record_id=record_id,amount=p.amount,method=p.method,paid_at=p.paid_at or datetime.now(timezone.utc),created_by=u.id)
+    s.add(x); s.flush(); audit(s,u,"invoice_payment_created","invoice_payment",x.id,{"record_id":record_id,"amount":p.amount,"method":p.method},request); s.commit()
+    return {"id":x.id,"record_id":record_id,"amount":float(x.amount),"method":x.method,"paid_at":x.paid_at}
+
+@app.get("/records/{record_id}/payments")
+def list_invoice_payments(record_id:int,s:Session=Depends(db),u:User=Depends(current_user)):
+    r=s.get(Record,record_id)
+    if not r or r.deleted: raise HTTPException(404,"الفاتورة غير موجودة")
+    return [{"id":x.id,"amount":float(x.amount),"method":x.method,"paid_at":x.paid_at} for x in s.scalars(select(InvoicePayment).where(InvoicePayment.record_id==record_id).order_by(InvoicePayment.id)).all()]
+
 class ChangePayload(BaseModel): action:str; proposed_data:Optional[dict]=None; reason:str=Field(min_length=3)
 @app.post("/records/{record_id}/change-requests")
 def request_change(record_id:int,p:ChangePayload,request:Request,s:Session=Depends(db),u:User=Depends(current_user)):
@@ -170,6 +208,12 @@ def request_change(record_id:int,p:ChangePayload,request:Request,s:Session=Depen
 @app.get("/change-requests")
 def requests(s:Session=Depends(db),_:User=Depends(manager)):
     return [{"id":x.id,"record_id":x.record_id,"requested_by":x.requested_by,"action":x.action,"proposed_data":x.proposed_data,"reason":x.reason,"status":x.status,"created_at":x.created_at} for x in s.scalars(select(ChangeRequest).where(ChangeRequest.status=="pending")).all()]
+def ensure_total_covers_payments(s:Session, record_id:int, new_data:dict):
+    total=float(new_data.get("amount",new_data.get("price",new_data.get("sale",0))) or 0)
+    paid=float(s.scalar(select(func.coalesce(func.sum(InvoicePayment.amount),0)).where(InvoicePayment.record_id==record_id)) or 0)
+    if round(total,2)<round(paid,2):
+        raise HTTPException(400,"لا يمكن تخفيض إجمالي الفاتورة إلى أقل من مجموع الدفعات المسجلة")
+
 @app.post("/change-requests/{request_id}/approve")
 def approve(request_id:int,approve:bool,request:Request,s:Session=Depends(db),u:User=Depends(manager)):
     cr=s.get(ChangeRequest,request_id)
@@ -177,7 +221,9 @@ def approve(request_id:int,approve:bool,request:Request,s:Session=Depends(db),u:
     rec=s.get(Record,cr.record_id)
     if approve:
         if cr.action=="delete": rec.deleted=True
-        else: rec.data=cr.proposed_data; rec.updated_at=datetime.now(timezone.utc)
+        else:
+            ensure_total_covers_payments(s,rec.id,cr.proposed_data)
+            rec.data=cr.proposed_data; rec.updated_at=datetime.now(timezone.utc)
     cr.status="approved" if approve else "rejected"; cr.reviewed_by=u.id; cr.reviewed_at=datetime.now(timezone.utc)
     audit(s,u,"change_request_"+cr.status,"record",cr.record_id,{"request_id":cr.id},request); s.commit(); return {"status":cr.status}
 class CashPayload(BaseModel): box_name:str; movement:str; amount:float=Field(gt=0); currency:str="USD"; description:str=""
@@ -204,6 +250,7 @@ def update_record(record_id:int, p:RecordUpdate, request:Request, s:Session=Depe
     r=s.get(Record,record_id)
     if not r or r.deleted: raise HTTPException(404,"السجل غير موجود")
     if p.currency not in ("USD","SYP"): raise HTTPException(400,"عملة غير مدعومة")
+    ensure_total_covers_payments(s,r.id,p.data)
     r.data=p.data; r.invoice_no=p.invoice_no; r.currency=p.currency; r.updated_at=datetime.now(timezone.utc)
     audit(s,u,"record_updated","record",r.id,{"section":r.section,"invoice_no":r.invoice_no},request); s.commit(); return {"ok":True}
 
@@ -235,6 +282,10 @@ FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 @app.get("/", include_in_schema=False)
 def home():
     return FileResponse(FRONTEND_DIR / "index.html")
+
+@app.get("/sham_cash_qr.png", include_in_schema=False)
+def sham_cash_qr():
+    return FileResponse(FRONTEND_DIR / "sham_cash_qr.png", media_type="image/png")
 
 @app.get("/logo.png", include_in_schema=False)
 def logo():
