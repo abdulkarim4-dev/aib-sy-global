@@ -65,7 +65,7 @@ class CashMove(Base):
     created_by: Mapped[int]=mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
 class ChangeRequest(Base):
-    __tablename__="change_requests"
+    __tablename__="record_change_requests"
     id: Mapped[int]=mapped_column(primary_key=True)
     record_id: Mapped[int]=mapped_column(ForeignKey("records.id"))
     requested_by: Mapped[int]=mapped_column(ForeignKey("users.id"))
