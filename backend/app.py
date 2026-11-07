@@ -212,8 +212,13 @@ class RecordCreate(BaseModel): section:str; invoice_no:Optional[str]=None; curre
 def create_record(p:RecordCreate, request:Request, s:Session=Depends(db), u:User=Depends(can_add)):
     if p.section not in {"deposit","purchase","consignSale","directSale","repair","carPurchase","carSale"}: raise HTTPException(400,"قسم غير معروف")
     if p.currency not in {"USD","SYP"}: raise HTTPException(400,"عملة غير مدعومة")
-    r=Record(section=p.section,invoice_no=p.invoice_no,currency=p.currency,data=p.data,created_by=u.id)
-    s.add(r); s.flush(); audit(s,u,"record_created","record",r.id,{"section":r.section,"invoice_no":r.invoice_no},request); s.commit(); return {"id":r.id,"created_at":r.created_at}
+    section_codes={"directSale":"A","purchase":"B","consignSale":"C","deposit":"D","repair":"E","carPurchase":"F","carSale":"G"}
+    # Serialize numbering per section so simultaneous users cannot receive the same sequence.
+    s.execute(text("SELECT pg_advisory_xact_lock(hashtext(:key))"), {"key":"aib-invoice:"+p.section})
+    serial=int(s.scalar(select(func.count(Record.id)).where(Record.section==p.section)) or 0)+1
+    invoice_no=f"{section_codes[p.section]}-{serial:05d}-B"
+    r=Record(section=p.section,invoice_no=invoice_no,currency=p.currency,data=p.data,created_by=u.id)
+    s.add(r); s.flush(); audit(s,u,"record_created","record",r.id,{"section":r.section,"invoice_no":r.invoice_no},request); s.commit(); return {"id":r.id,"invoice_no":r.invoice_no,"created_at":r.created_at}
 @app.get("/records")
 def list_records(section:Optional[str]=None, s:Session=Depends(db), u:User=Depends(current_user)):
     q=select(Record).where(Record.deleted==False)
