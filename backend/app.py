@@ -404,7 +404,7 @@ def next_inventory_sku(s:Session)->str:
             return sku
         serial+=1
 
-def prepare_record_inventory(s:Session, section:str, raw_data:dict)->dict:
+def prepare_record_inventory(s:Session, section:str, raw_data:dict, allow_legacy:bool=False)->dict:
     data=dict(raw_data or {})
     items=data.get("items") if isinstance(data.get("items"),list) else []
     prepared=[]
@@ -422,6 +422,9 @@ def prepare_record_inventory(s:Session, section:str, raw_data:dict)->dict:
         product=s.scalar(select(InventoryProduct).where(InventoryProduct.sku==sku)) if sku else None
         if not sku:
             if section not in {"purchase","deposit"}:
+                if allow_legacy:
+                    prepared.append(item)
+                    continue
                 raise HTTPException(400,"أدخل رقم القطعة أو اختر قطعة موجودة عند المبيع. لا يمكن إنشاء رقم جديد لقطعة مباعة دون رصيد سابق.")
             sku=next_inventory_sku(s)
         if not product:
@@ -642,7 +645,7 @@ def apply_approved_change(request_id:int,p:ApprovedChangeApplyPayload,request:Re
         currency=p.currency or rec.currency
         if currency not in {"USD","SYP"}: raise HTTPException(400,"عملة غير مدعومة")
         ensure_total_covers_payments(s,rec.id,p.data)
-        rec.data=prepare_record_inventory(s,rec.section,p.data); rec.currency=currency; rec.updated_at=datetime.now(timezone.utc)
+        rec.data=prepare_record_inventory(s,rec.section,p.data,allow_legacy=True); rec.currency=currency; rec.updated_at=datetime.now(timezone.utc)
         recalculate_inventory(s)
     elif cr.action=="delete":
         rec.deleted=True; rec.updated_at=datetime.now(timezone.utc)
@@ -810,7 +813,7 @@ def update_record(record_id:int, p:RecordUpdate, request:Request, s:Session=Depe
     if not r or r.deleted: raise HTTPException(404,"السجل غير موجود")
     if p.currency not in ("USD","SYP"): raise HTTPException(400,"عملة غير مدعومة")
     ensure_total_covers_payments(s,r.id,p.data)
-    r.data=prepare_record_inventory(s,r.section,p.data); r.invoice_no=p.invoice_no; r.currency=p.currency; r.updated_at=datetime.now(timezone.utc)
+    r.data=prepare_record_inventory(s,r.section,p.data,allow_legacy=True); r.invoice_no=p.invoice_no; r.currency=p.currency; r.updated_at=datetime.now(timezone.utc)
     recalculate_inventory(s)
     audit(s,u,"record_updated","record",r.id,{"section":r.section,"invoice_no":r.invoice_no},request); s.commit(); return {"ok":True}
 
