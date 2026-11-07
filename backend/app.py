@@ -35,6 +35,7 @@ class User(Base):
     username: Mapped[str]=mapped_column(String(80), unique=True, index=True)
     full_name: Mapped[str]=mapped_column(String(160))
     email: Mapped[Optional[str]]=mapped_column(String(254), nullable=True, unique=True, index=True)
+    email_verified: Mapped[bool]=mapped_column(Boolean, default=False, nullable=False)
     password_hash: Mapped[str]=mapped_column(String(300))
     role: Mapped[str]=mapped_column(String(20), default="employee")
     active: Mapped[bool]=mapped_column(Boolean, default=True)
@@ -158,6 +159,7 @@ def startup():
     # Migrate existing cash_moves before any ORM query selects the new columns.
     with engine.begin() as conn:
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(254)"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT FALSE"))
         conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_email_unique ON users (email) WHERE email IS NOT NULL"))
         conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS voided BOOLEAN NOT NULL DEFAULT FALSE"))
         conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS record_id INTEGER REFERENCES records(id)"))
@@ -211,7 +213,7 @@ def startup():
 def health(): return {"status":"ok","service":"AIB Accounting API"}
 @app.post("/auth/login")
 def login(form:OAuth2PasswordRequestForm=Depends(), request:Request=None, s:Session=Depends(db)):
-    u=s.scalar(select(User).where(or_(User.username==form.username,User.email==form.username)))
+    u=s.scalar(select(User).where(or_(User.username==form.username, (User.email==form.username) & (User.email_verified==True))))
     now=datetime.now(timezone.utc)
     if not u:
         audit(s,None,"login_failed","user",None,{"username":form.username},request); s.commit(); raise HTTPException(401,"اسم المستخدم أو كلمة المرور غير صحيحة")
@@ -222,7 +224,7 @@ def login(form:OAuth2PasswordRequestForm=Depends(), request:Request=None, s:Sess
         audit(s,u,"login_failed","user",u.id,{},request); s.commit(); raise HTTPException(401,"اسم المستخدم أو كلمة المرور غير صحيحة")
     if not u.active: raise HTTPException(403,"الحساب غير فعال")
     u.failed_logins=0; u.locked_until=None; audit(s,u,"login","user",u.id,{},request); s.commit()
-    return {"access_token":token_for(u),"token_type":"bearer","user":{"id":u.id,"username":u.username,"name":u.full_name,"email":u.email,"role":u.role}}
+    return {"access_token":token_for(u),"token_type":"bearer","user":{"id":u.id,"username":u.username,"name":u.full_name,"email":u.email if u.email_verified else None,"role":u.role}}
 @app.get("/auth/me")
 def me(u:User=Depends(current_user)): return {"id":u.id,"username":u.username,"name":u.full_name,"email":u.email,"role":u.role}
 
@@ -239,7 +241,7 @@ class EmailVerificationConfirmPayload(BaseModel):
     code: str = Field(min_length=6, max_length=6)
 @app.get("/account-settings")
 def get_account_settings(u:User=Depends(current_user)):
-    return {"id":u.id,"username":u.username,"full_name":u.full_name,"email":u.email,"role":u.role}
+    return {"id":u.id,"username":u.username,"full_name":u.full_name,"email":u.email if u.email_verified else None,"email_verified":u.email_verified,"role":u.role}
 @app.patch("/account-settings")
 def update_account_settings(p:AccountSettingsPayload, request:Request, s:Session=Depends(db), u:User=Depends(current_user)):
     if p.email is not None: raise HTTPException(400,"لا يمكن اعتماد البريد مباشرة. اطلب رمز تحقق وأكده أولاً")
@@ -292,6 +294,7 @@ def confirm_email_verification(p:EmailVerificationConfirmPayload, request:Reques
     duplicate=s.scalar(select(User).where(User.email==email,User.id!=u.id))
     if duplicate: raise HTTPException(409,"البريد الإلكتروني مستخدم لحساب آخر")
     u.email=email
+    u.email_verified=True
     s.query(EmailVerification).filter(EmailVerification.user_id==u.id).delete(synchronize_session=False)
     audit(s,u,"email_verified","user",u.id,{"email":email},request)
     s.commit()
