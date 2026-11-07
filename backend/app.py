@@ -266,6 +266,31 @@ class PaymentPayload(BaseModel):
     paid_at: Optional[datetime] = None
     cash_box: str = "صندوق المبيع"
 
+def invoice_cash_description(record:Record, action:str="دفعة فاتورة")->str:
+    data=record.data or {}
+    section=record.section or ""
+    invoice=record.invoice_no or str(record.id)
+    section_names={"directSale":"مبيع مباشر","consignSale":"مبيع أمانة","purchase":"شراء","deposit":"وديعة أمانة","repair":"تصليح","carPurchase":"شراء سيارة","carSale":"مبيع سيارة"}
+    item_label="المشتريات" if section in {"purchase","carPurchase"} else "المباع" if section in {"directSale","consignSale","carSale"} else "البنود"
+    items=data.get("items") if isinstance(data.get("items"),list) else []
+    names=[]
+    for item in items:
+        if not isinstance(item,dict): continue
+        name=str(item.get("description") or item.get("model") or item.get("chassis") or "").strip()
+        if name:
+            qty=item.get("quantity")
+            names.append((f"{name} (عدد {qty})" if qty not in (None,"",1,"1") else name))
+    if not names:
+        fallback=data.get("description") or data.get("details") or data.get("model")
+        if fallback: names=[str(fallback).strip()]
+        elif data.get("car_make") or data.get("car_model"):
+            names=[" ".join(str(data.get(k) or "").strip() for k in ("car_make","car_model","car_year") if data.get(k))]
+    parts=[f"{action} رقم {invoice}",section_names.get(section,section)]
+    if names: parts.append(item_label+": "+ "، ".join(names))
+    party=data.get("customer") or data.get("supplier")
+    if party: parts.append(("المورد: " if section in {"purchase","carPurchase"} else "العميل: ")+str(party).strip())
+    return " | ".join(x for x in parts if x)
+
 @app.post("/records/{record_id}/payments")
 def add_invoice_payment(record_id:int,p:PaymentPayload,request:Request,s:Session=Depends(db),u:User=Depends(can_add)):
     r=s.get(Record,record_id)
@@ -279,7 +304,7 @@ def add_invoice_payment(record_id:int,p:PaymentPayload,request:Request,s:Session
     s.add(x); s.flush()
     movement="withdrawal" if r.section in {"purchase","carPurchase"} else "deposit"
     if movement=="withdrawal": ensure_cash_balance(s,p.cash_box,r.currency,p.amount)
-    s.add(CashMove(box_name=p.cash_box,movement=movement,amount=p.amount,currency=r.currency,description=("دفعة فاتورة "+(r.invoice_no or str(r.id))),created_by=u.id,record_id=r.id))
+    s.add(CashMove(box_name=p.cash_box,movement=movement,amount=p.amount,currency=r.currency,description=invoice_cash_description(r,"قبض" if movement=="deposit" else "صرف"),created_by=u.id,record_id=r.id))
     audit(s,u,"invoice_payment_created","invoice_payment",x.id,{"record_id":record_id,"amount":p.amount,"method":p.method,"cash_box":p.cash_box,"cash_movement":movement},request); s.commit()
     return {"id":x.id,"record_id":record_id,"amount":float(x.amount),"method":x.method,"cash_box":x.cash_box,"paid_at":x.paid_at}
 
@@ -299,7 +324,7 @@ def reverse_payment_cash_move(s:Session, r:Record, payment:InvoicePayment, u:Use
     movement="withdrawal" if r.section in {"purchase","carPurchase"} else "deposit"
     reverse="deposit" if movement=="withdrawal" else "withdrawal"
     if reverse=="withdrawal": ensure_cash_balance(s,payment.cash_box,r.currency,float(payment.amount))
-    s.add(CashMove(box_name=payment.cash_box,movement=reverse,amount=payment.amount,currency=r.currency,description=f"تسوية عكسية للدفعة رقم {payment.id} - فاتورة {r.invoice_no or r.id} ({reason})",created_by=u.id,record_id=r.id))
+    s.add(CashMove(box_name=payment.cash_box,movement=reverse,amount=payment.amount,currency=r.currency,description=invoice_cash_description(r,f"تسوية عكسية للدفعة {payment.id} ({reason})"),created_by=u.id,record_id=r.id))
 
 @app.put("/records/{record_id}/payments/{payment_id}")
 def update_invoice_payment(record_id:int,payment_id:int,p:PaymentUpdatePayload,request:Request,s:Session=Depends(db),u:User=Depends(manager)):
@@ -315,7 +340,7 @@ def update_invoice_payment(record_id:int,payment_id:int,p:PaymentUpdatePayload,r
     reverse_payment_cash_move(s,r,x,u,"تعديل")
     movement="withdrawal" if r.section in {"purchase","carPurchase"} else "deposit"
     if movement=="withdrawal": ensure_cash_balance(s,p.cash_box,r.currency,p.amount)
-    s.add(CashMove(box_name=p.cash_box,movement=movement,amount=p.amount,currency=r.currency,description=f"تسجيل بديل للدفعة رقم {x.id} - فاتورة {r.invoice_no or r.id}",created_by=u.id,record_id=r.id))
+    s.add(CashMove(box_name=p.cash_box,movement=movement,amount=p.amount,currency=r.currency,description=invoice_cash_description(r,f"تسجيل بديل للدفعة {x.id}"),created_by=u.id,record_id=r.id))
     old={"amount":float(x.amount),"method":x.method,"cash_box":x.cash_box,"paid_at":str(x.paid_at)}
     x.amount=p.amount; x.method=p.method; x.cash_box=p.cash_box
     if p.paid_at: x.paid_at=p.paid_at
