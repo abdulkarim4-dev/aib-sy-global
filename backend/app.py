@@ -1,7 +1,8 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Any
-import os, secrets, smtplib
-from email.message import EmailMessage
+import os, secrets, json
+from urllib.request import Request as UrlRequest, urlopen
+from urllib.error import HTTPError, URLError
 import jwt
 from fastapi import FastAPI, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -23,6 +24,9 @@ class Settings(BaseSettings):
     smtp_user: str = ""
     smtp_password: str = ""
     smtp_from: str = ""
+    brevo_api_key: str = ""
+    brevo_sender_email: str = ""
+    brevo_sender_name: str = "مجموعة AIB التجارية"
     class Config: env_file = ".env"
 settings = Settings()
 engine = create_engine(settings.database_url, pool_pre_ping=True)
@@ -254,20 +258,28 @@ def update_account_settings(p:AccountSettingsPayload, request:Request, s:Session
     return {"ok":True,"email":u.email,"full_name":u.full_name}
 
 def send_verification_email(email:str, code:str):
-    if not settings.smtp_host or not settings.smtp_user or not settings.smtp_password or not settings.smtp_from:
-        raise HTTPException(503,"خدمة إرسال البريد غير مهيأة بعد. يجب ضبط إعدادات SMTP في Render أولاً")
-    msg=EmailMessage()
-    msg["Subject"]="رمز التحقق من البريد الإلكتروني - AIB"
-    msg["From"]=settings.smtp_from
-    msg["To"]=email
-    msg.set_content(f"رمز التحقق الخاص بك في تطبيق AIB هو: {code}\nصلاحية الرمز 10 دقائق. لا تشاركه مع أحد.")
+    if not settings.brevo_api_key or not settings.brevo_sender_email:
+        raise HTTPException(503,"خدمة إرسال البريد غير مهيأة. أضف BREVO_API_KEY وBREVO_SENDER_EMAIL إلى Render")
+    payload = {
+        "sender": {"name": settings.brevo_sender_name, "email": settings.brevo_sender_email},
+        "to": [{"email": email}],
+        "subject": "رمز التحقق من البريد الإلكتروني - AIB",
+        "textContent": f"رمز التحقق الخاص بك في تطبيق AIB هو: {code}\\nصلاحية الرمز 10 دقائق. لا تشاركه مع أحد."
+    }
+    req = UrlRequest(
+        "https://api.brevo.com/v3/smtp/email",
+        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        headers={"api-key": settings.brevo_api_key, "accept": "application/json", "content-type": "application/json"},
+        method="POST"
+    )
     try:
-        with smtplib.SMTP(settings.smtp_host,settings.smtp_port,timeout=15) as server:
-            server.starttls()
-            server.login(settings.smtp_user,settings.smtp_password)
-            server.send_message(msg)
-    except Exception:
-        raise HTTPException(502,"تعذر إرسال رمز التحقق. تحقق من إعدادات البريد في Render")
+        with urlopen(req, timeout=20) as response:
+            if response.status not in (200, 201, 202):
+                raise HTTPException(502, f"رفض مزود البريد إرسال الرسالة (HTTP {response.status})")
+    except HTTPError as exc:
+        raise HTTPException(502, f"رفض مزود البريد إرسال الرسالة (HTTP {exc.code})")
+    except (URLError, TimeoutError, OSError):
+        raise HTTPException(502,"تعذر الاتصال بخدمة البريد عبر HTTPS. تحقق من إعدادات BREVO في Render")
 
 @app.post("/account-settings/email-verification")
 def start_email_verification(p:EmailVerificationStartPayload, request:Request, s:Session=Depends(db), u:User=Depends(current_user)):
