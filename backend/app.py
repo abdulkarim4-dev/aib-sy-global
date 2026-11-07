@@ -459,6 +459,7 @@ def void_cash_movement(move_id:int,request:Request,s:Session=Depends(db),u:User=
 def delete_cash_movement(move_id:int,request:Request,s:Session=Depends(db),u:User=Depends(manager)):
     move=s.get(CashMove,move_id)
     if not move: raise HTTPException(404,"حركة الصندوق غير موجودة")
+    if is_sale_cash_move(s,move): raise HTTPException(403,"لا يمكن حذف واردات المبيعات منفردة؛ احذف البيعة كاملة")
     related=[move]
     if move.transfer_group:
         related=s.scalars(select(CashMove).where(CashMove.transfer_group==move.transfer_group)).all()
