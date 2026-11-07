@@ -7,7 +7,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
 from pwdlib import PasswordHash
-from sqlalchemy import create_engine, String, Boolean, DateTime, Integer, ForeignKey, JSON, Text, Numeric, select, func, text
+from sqlalchemy import create_engine, String, Boolean, DateTime, Integer, ForeignKey, JSON, Text, Numeric, select, func, text, or_
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker, Session
 
 class Settings(BaseSettings):
@@ -358,6 +358,7 @@ def approve(request_id:int,approve:bool,request:Request,s:Session=Depends(db),u:
         if cr.action=="delete":
             rec.deleted=True
             for payment in s.scalars(select(InvoicePayment).where(InvoicePayment.record_id==rec.id)).all(): s.delete(payment)
+            for cash_move in sale_cash_moves_for_record(s,rec): s.delete(cash_move)
             for cash_move in s.scalars(select(CashMove).where(CashMove.record_id==rec.id)).all(): s.delete(cash_move)
         else:
             ensure_total_covers_payments(s,rec.id,cr.proposed_data)
@@ -490,7 +491,16 @@ def update_record(record_id:int, p:RecordUpdate, request:Request, s:Session=Depe
 def delete_record(record_id:int, request:Request, s:Session=Depends(db), u:User=Depends(manager)):
     r=s.get(Record,record_id)
     if not r or r.deleted: raise HTTPException(404,"السجل غير موجود")
-undefined
+    r.deleted=True; r.updated_at=datetime.now(timezone.utc)
+    for payment in s.scalars(select(InvoicePayment).where(InvoicePayment.record_id==r.id)).all():
+        s.delete(payment)
+    for cash_move in sale_cash_moves_for_record(s,r):
+        s.delete(cash_move)
+    for cash_move in s.scalars(select(CashMove).where(CashMove.record_id==r.id)).all():
+        s.delete(cash_move)
+    audit(s,u,"record_deleted","record",r.id,{"section":r.section,"related_payments_and_cash_movements_deleted":True},request)
+    s.commit()
+    return {"ok":True}
 
 @app.get("/my-change-requests")
 def my_requests(s:Session=Depends(db),u:User=Depends(current_user)):
