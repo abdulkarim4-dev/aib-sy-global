@@ -802,7 +802,7 @@ def cash_list(s:Session=Depends(db),u:User=Depends(require_permission("cash","vi
     return [{"id":m.id,"box_name":m.box_name,"movement":m.movement,"amount":float(m.amount),"currency":m.currency,"description":cash_move_display_description(s,m),"created_by":m.created_by,"created_at":m.created_at,"transfer_group":m.transfer_group,"voided":m.voided,"voided_by":m.voided_by,"voided_at":m.voided_at,"sale_locked":is_sale_cash_move(s,m),"purchase_locked":is_purchase_cash_move(s,m)} for m in rows]
 
 @app.patch("/cash-movements/{move_id}/void")
-def void_cash_movement(move_id:int,request:Request,s:Session=Depends(db),u:User=Depends(manager)):
+def void_cash_movement(move_id:int,request:Request,s:Session=Depends(db),u:User=Depends(require_permission("cash","edit"))):
     move=s.get(CashMove,move_id)
     if not move: raise HTTPException(404,"حركة الصندوق غير موجودة")
     if is_sale_cash_move(s,move): raise HTTPException(403,"واردات المبيعات مرتبطة بالبيعة ولا يمكن إلغاؤها أو حذفها منفردة")
@@ -819,7 +819,7 @@ def void_cash_movement(move_id:int,request:Request,s:Session=Depends(db),u:User=
     s.commit(); return {"ok":True,"voided_ids":[x.id for x in related]}
 
 @app.delete("/cash-movements/{move_id}")
-def delete_cash_movement(move_id:int,request:Request,s:Session=Depends(db),u:User=Depends(manager)):
+def delete_cash_movement(move_id:int,request:Request,s:Session=Depends(db),u:User=Depends(require_permission("cash","delete"))):
     move=s.get(CashMove,move_id)
     if not move: raise HTTPException(404,"حركة الصندوق غير موجودة")
     if is_sale_cash_move(s,move): raise HTTPException(403,"لا يمكن حذف واردات المبيعات منفردة؛ احذف البيعة كاملة")
