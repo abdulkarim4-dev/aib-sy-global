@@ -28,6 +28,7 @@ class User(Base):
     id: Mapped[int]=mapped_column(primary_key=True)
     username: Mapped[str]=mapped_column(String(80), unique=True, index=True)
     full_name: Mapped[str]=mapped_column(String(160))
+    email: Mapped[Optional[str]]=mapped_column(String(254), nullable=True, unique=True, index=True)
     password_hash: Mapped[str]=mapped_column(String(300))
     role: Mapped[str]=mapped_column(String(20), default="employee")
     active: Mapped[bool]=mapped_column(Boolean, default=True)
@@ -89,6 +90,16 @@ class ChangeRequest(Base):
     reviewed_by: Mapped[Optional[int]]=mapped_column(ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
     reviewed_at: Mapped[Optional[datetime]]=mapped_column(DateTime(timezone=True), nullable=True)
+class PasswordChangeRequest(Base):
+    __tablename__="password_change_requests"
+    id: Mapped[int]=mapped_column(primary_key=True)
+    user_id: Mapped[int]=mapped_column(ForeignKey("users.id"), index=True)
+    requested_by: Mapped[int]=mapped_column(ForeignKey("users.id"))
+    new_password_hash: Mapped[str]=mapped_column(String(300))
+    status: Mapped[str]=mapped_column(String(20), default="pending")
+    reviewed_by: Mapped[Optional[int]]=mapped_column(ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
+    reviewed_at: Mapped[Optional[datetime]]=mapped_column(DateTime(timezone=True), nullable=True)
 class AuditEvent(Base):
     __tablename__="audit_events"
     id: Mapped[int]=mapped_column(primary_key=True)
@@ -131,6 +142,8 @@ def startup():
     Base.metadata.create_all(engine)
     # Migrate existing cash_moves before any ORM query selects the new columns.
     with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(254)"))
+        conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_email_unique ON users (email) WHERE email IS NOT NULL"))
         conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS voided BOOLEAN NOT NULL DEFAULT FALSE"))
         conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS record_id INTEGER REFERENCES records(id)"))
         conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS voided_by INTEGER REFERENCES users(id)"))
@@ -183,7 +196,7 @@ def startup():
 def health(): return {"status":"ok","service":"AIB Accounting API"}
 @app.post("/auth/login")
 def login(form:OAuth2PasswordRequestForm=Depends(), request:Request=None, s:Session=Depends(db)):
-    u=s.scalar(select(User).where(User.username==form.username))
+    u=s.scalar(select(User).where(or_(User.username==form.username,User.email==form.username)))
     now=datetime.now(timezone.utc)
     if not u:
         audit(s,None,"login_failed","user",None,{"username":form.username},request); s.commit(); raise HTTPException(401,"اسم المستخدم أو كلمة المرور غير صحيحة")
@@ -194,11 +207,66 @@ def login(form:OAuth2PasswordRequestForm=Depends(), request:Request=None, s:Sess
         audit(s,u,"login_failed","user",u.id,{},request); s.commit(); raise HTTPException(401,"اسم المستخدم أو كلمة المرور غير صحيحة")
     if not u.active: raise HTTPException(403,"الحساب غير فعال")
     u.failed_logins=0; u.locked_until=None; audit(s,u,"login","user",u.id,{},request); s.commit()
-    return {"access_token":token_for(u),"token_type":"bearer","user":{"id":u.id,"username":u.username,"name":u.full_name,"role":u.role}}
+    return {"access_token":token_for(u),"token_type":"bearer","user":{"id":u.id,"username":u.username,"name":u.full_name,"email":u.email,"role":u.role}}
 @app.get("/auth/me")
-def me(u:User=Depends(current_user)): return {"id":u.id,"username":u.username,"name":u.full_name,"role":u.role}
+def me(u:User=Depends(current_user)): return {"id":u.id,"username":u.username,"name":u.full_name,"email":u.email,"role":u.role}
 
-class UserCreate(BaseModel): username:str=Field(min_length=3,max_length=80); full_name:str; password:str=Field(min_length=12); role:str="employee"
+class AccountSettingsPayload(BaseModel):
+    email: Optional[str] = None
+    full_name: Optional[str] = None
+class PasswordChangePayload(BaseModel):
+    new_password: str = Field(min_length=12, max_length=256)
+@app.get("/account-settings")
+def get_account_settings(u:User=Depends(current_user)):
+    return {"id":u.id,"username":u.username,"full_name":u.full_name,"email":u.email,"role":u.role}
+@app.patch("/account-settings")
+def update_account_settings(p:AccountSettingsPayload, request:Request, s:Session=Depends(db), u:User=Depends(current_user)):
+    if p.email is not None:
+        email=p.email.strip().lower()
+        if email and ("@" not in email or "." not in email.rsplit("@",1)[-1] or len(email)>254):
+            raise HTTPException(400,"البريد الإلكتروني غير صالح")
+        duplicate=s.scalar(select(User).where(User.email==email,User.id!=u.id)) if email else None
+        if duplicate: raise HTTPException(409,"البريد الإلكتروني مستخدم لحساب آخر")
+        u.email=email or None
+    if p.full_name is not None:
+        name=p.full_name.strip()
+        if not name: raise HTTPException(400,"الاسم لا يمكن أن يكون فارغاً")
+        u.full_name=name
+    audit(s,u,"account_settings_updated","user",u.id,{"email_updated":p.email is not None,"name_updated":p.full_name is not None},request)
+    s.commit()
+    return {"ok":True,"email":u.email,"full_name":u.full_name}
+
+@app.post("/password-change-requests")
+def create_password_change_request(p:PasswordChangePayload, request:Request, s:Session=Depends(db), u:User=Depends(current_user)):
+    pending=s.scalar(select(PasswordChangeRequest).where(PasswordChangeRequest.user_id==u.id,PasswordChangeRequest.status=="pending"))
+    if pending: raise HTTPException(409,"لديك طلب تغيير كلمة مرور قيد انتظار موافقة المالك")
+    row=PasswordChangeRequest(user_id=u.id,requested_by=u.id,new_password_hash=password_hash.hash(p.new_password))
+    s.add(row); s.flush()
+    audit(s,u,"password_change_requested","user",u.id,{"request_id":row.id},request)
+    s.commit()
+    return {"id":row.id,"status":"pending"}
+@app.get("/password-change-requests")
+def list_password_change_requests(s:Session=Depends(db), _:User=Depends(manager)):
+    rows=s.scalars(select(PasswordChangeRequest).order_by(PasswordChangeRequest.id.desc()).limit(200)).all()
+    return [{"id":x.id,"user_id":x.user_id,"username":(s.get(User,x.user_id).username if s.get(User,x.user_id) else "—"),"status":x.status,"created_at":x.created_at} for x in rows]
+@app.get("/my-password-change-requests")
+def my_password_change_requests(s:Session=Depends(db), u:User=Depends(current_user)):
+    rows=s.scalars(select(PasswordChangeRequest).where(PasswordChangeRequest.user_id==u.id).order_by(PasswordChangeRequest.id.desc()).limit(100)).all()
+    return [{"id":x.id,"status":x.status,"created_at":x.created_at} for x in rows]
+@app.post("/password-change-requests/{request_id}/review")
+def review_password_change_request(request_id:int, approve:bool, request:Request, s:Session=Depends(db), u:User=Depends(manager)):
+    row=s.get(PasswordChangeRequest,request_id)
+    if not row or row.status!="pending": raise HTTPException(404,"طلب تغيير كلمة المرور غير موجود أو تمت معالجته")
+    target=s.get(User,row.user_id)
+    if not target or not target.active: raise HTTPException(404,"حساب الموظف غير موجود أو غير فعال")
+    if approve: target.password_hash=row.new_password_hash
+    row.status="approved" if approve else "rejected"
+    row.reviewed_by=u.id; row.reviewed_at=datetime.now(timezone.utc)
+    audit(s,u,"password_change_"+row.status,"user",target.id,{"request_id":row.id},request)
+    s.commit()
+    return {"status":row.status}
+
+class UserCreate(BaseModel): username:str=Field(min_length=3,max_length=80); full_name:str; email:Optional[str]=None; password:str=Field(min_length=12); role:str="employee"
 class CompanyProfilePayload(BaseModel):
     data: dict
 
@@ -223,12 +291,15 @@ def update_company_profile(p:CompanyProfilePayload, request:Request, s:Session=D
 
 @app.get("/users")
 def list_users(s:Session=Depends(db), _:User=Depends(manager)):
-    return [{"id":u.id,"username":u.username,"name":u.full_name,"role":u.role,"active":u.active} for u in s.scalars(select(User)).all()]
+    return [{"id":u.id,"username":u.username,"name":u.full_name,"email":u.email,"role":u.role,"active":u.active} for u in s.scalars(select(User)).all()]
 @app.post("/users")
 def add_user(payload:UserCreate, request:Request, s:Session=Depends(db), u:User=Depends(manager)):
     if payload.role not in ("employee","owner"): raise HTTPException(400,"دور غير صالح")
     if s.scalar(select(User).where(User.username==payload.username)): raise HTTPException(409,"اسم المستخدم مستخدم")
-    nu=User(username=payload.username,full_name=payload.full_name,password_hash=password_hash.hash(payload.password),role="employee")
+    email=(payload.email or "").strip().lower() or None
+    if email and (("@" not in email) or ("." not in email.rsplit("@",1)[-1]) or len(email)>254): raise HTTPException(400,"البريد الإلكتروني غير صالح")
+    if email and s.scalar(select(User).where(User.email==email)): raise HTTPException(409,"البريد الإلكتروني مستخدم لحساب آخر")
+    nu=User(username=payload.username,full_name=payload.full_name,email=email,password_hash=password_hash.hash(payload.password),role="employee")
     s.add(nu); s.flush(); audit(s,u,"user_created","user",nu.id,{"username":nu.username},request); s.commit(); return {"id":nu.id,"username":nu.username}
 @app.patch("/users/{user_id}/active")
 def set_user_active(user_id:int, active:bool, request:Request, s:Session=Depends(db), u:User=Depends(manager)):
@@ -367,7 +438,12 @@ def request_change(record_id:int,p:ChangePayload,request:Request,s:Session=Depen
     s.add(cr); s.flush(); audit(s,u,"change_requested","record",record_id,{"request_id":cr.id,"action":p.action},request); s.commit(); return {"request_id":cr.id,"status":"pending"}
 @app.get("/change-requests")
 def requests(s:Session=Depends(db),_:User=Depends(manager)):
-    return [{"id":x.id,"record_id":x.record_id,"requested_by":x.requested_by,"action":x.action,"proposed_data":x.proposed_data,"reason":x.reason,"status":x.status,"created_at":x.created_at} for x in s.scalars(select(ChangeRequest).where(ChangeRequest.status=="pending")).all()]
+    rows=s.scalars(select(ChangeRequest).order_by(ChangeRequest.id.desc()).limit(200)).all()
+    out=[]
+    for x in rows:
+        rec=s.get(Record,x.record_id); requester=s.get(User,x.requested_by)
+        out.append({"id":x.id,"record_id":x.record_id,"section":rec.section if rec else None,"invoice_no":rec.invoice_no if rec else None,"requested_by":x.requested_by,"requester_name":requester.full_name if requester else "—","action":x.action,"proposed_data":x.proposed_data,"reason":x.reason,"status":x.status,"created_at":x.created_at})
+    return out
 def ensure_total_covers_payments(s:Session, record_id:int, new_data:dict):
     total=float(new_data.get("amount",new_data.get("price",new_data.get("sale",0))) or 0)
     paid=float(s.scalar(select(func.coalesce(func.sum(InvoicePayment.amount),0)).where(InvoicePayment.record_id==record_id)) or 0)
@@ -378,18 +454,39 @@ def ensure_total_covers_payments(s:Session, record_id:int, new_data:dict):
 def approve(request_id:int,approve:bool,request:Request,s:Session=Depends(db),u:User=Depends(manager)):
     cr=s.get(ChangeRequest,request_id)
     if not cr or cr.status!="pending": raise HTTPException(404,"الطلب غير موجود أو تمت معالجته")
+    if approve and cr.action not in {"update","delete"}: raise HTTPException(400,"نوع الطلب غير صالح")
+    cr.status="approved" if approve else "rejected"
+    cr.reviewed_by=u.id; cr.reviewed_at=datetime.now(timezone.utc)
+    audit(s,u,"change_request_"+cr.status,"record",cr.record_id,{"request_id":cr.id,"action":cr.action},request)
+    s.commit()
+    return {"status":cr.status}
+
+class ApprovedChangeApplyPayload(BaseModel):
+    data: Optional[dict] = None
+    currency: Optional[str] = None
+@app.post("/change-requests/{request_id}/apply")
+def apply_approved_change(request_id:int,p:ApprovedChangeApplyPayload,request:Request,s:Session=Depends(db),u:User=Depends(current_user)):
+    cr=s.get(ChangeRequest,request_id)
+    if not cr or cr.requested_by!=u.id or cr.status!="approved":
+        raise HTTPException(403,"لا يوجد طلب موافق عليه ومتاح لهذا الحساب")
     rec=s.get(Record,cr.record_id)
-    if approve:
-        if cr.action=="delete":
-            rec.deleted=True
-            for payment in s.scalars(select(InvoicePayment).where(InvoicePayment.record_id==rec.id)).all(): s.delete(payment)
-            for cash_move in sale_cash_moves_for_record(s,rec): s.delete(cash_move)
-            for cash_move in s.scalars(select(CashMove).where(CashMove.record_id==rec.id)).all(): s.delete(cash_move)
-        else:
-            ensure_total_covers_payments(s,rec.id,cr.proposed_data)
-            rec.data=cr.proposed_data; rec.updated_at=datetime.now(timezone.utc)
-    cr.status="approved" if approve else "rejected"; cr.reviewed_by=u.id; cr.reviewed_at=datetime.now(timezone.utc)
-    audit(s,u,"change_request_"+cr.status,"record",cr.record_id,{"request_id":cr.id},request); s.commit(); return {"status":cr.status}
+    if not rec or rec.deleted: raise HTTPException(404,"السجل غير موجود")
+    if cr.action=="update":
+        if p.data is None: raise HTTPException(400,"بيانات التعديل مطلوبة")
+        currency=p.currency or rec.currency
+        if currency not in {"USD","SYP"}: raise HTTPException(400,"عملة غير مدعومة")
+        ensure_total_covers_payments(s,rec.id,p.data)
+        rec.data=p.data; rec.currency=currency; rec.updated_at=datetime.now(timezone.utc)
+    elif cr.action=="delete":
+        rec.deleted=True; rec.updated_at=datetime.now(timezone.utc)
+        for payment in s.scalars(select(InvoicePayment).where(InvoicePayment.record_id==rec.id)).all(): s.delete(payment)
+        for cash_move in sale_cash_moves_for_record(s,rec): s.delete(cash_move)
+        for cash_move in s.scalars(select(CashMove).where(CashMove.record_id==rec.id)).all(): s.delete(cash_move)
+    else: raise HTTPException(400,"نوع الطلب غير صالح")
+    cr.status="completed"
+    audit(s,u,"change_request_completed","record",rec.id,{"request_id":cr.id,"action":cr.action},request)
+    s.commit()
+    return {"ok":True,"status":"completed"}
 class CashPayload(BaseModel): box_name:str; movement:str; amount:float=Field(gt=0); currency:str="USD"; description:str=""
 class CashTransferPayload(BaseModel):
     source_box:str
@@ -575,7 +672,11 @@ def delete_record(record_id:int, request:Request, s:Session=Depends(db), u:User=
 @app.get("/my-change-requests")
 def my_requests(s:Session=Depends(db),u:User=Depends(current_user)):
     rows=s.scalars(select(ChangeRequest).where(ChangeRequest.requested_by==u.id).order_by(ChangeRequest.id.desc()).limit(200)).all()
-    return [{"id":x.id,"record_id":x.record_id,"action":x.action,"reason":x.reason,"status":x.status,"created_at":x.created_at} for x in rows]
+    out=[]
+    for x in rows:
+        rec=s.get(Record,x.record_id)
+        out.append({"id":x.id,"record_id":x.record_id,"section":rec.section if rec else None,"invoice_no":rec.invoice_no if rec else None,"action":x.action,"reason":x.reason,"status":x.status,"created_at":x.created_at})
+    return out
 
 @app.get("/cash-summary")
 def cash_summary(s:Session=Depends(db),u:User=Depends(current_user)):
