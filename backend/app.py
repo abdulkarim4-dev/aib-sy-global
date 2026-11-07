@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Any
-import os, secrets, json
+import os, secrets, json, base64, binascii
 from urllib.request import Request as UrlRequest, urlopen
 from urllib.error import HTTPError, URLError
 import jwt
@@ -74,6 +74,7 @@ class InventoryProduct(Base):
     owned_stock: Mapped[Any]=mapped_column(Numeric(18,3), default=0)
     consigned_stock: Mapped[Any]=mapped_column(Numeric(18,3), default=0)
     active: Mapped[bool]=mapped_column(Boolean, default=True)
+    images: Mapped[list]=mapped_column(JSON, default=list, nullable=False)
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
 
 class InvoicePayment(Base):
@@ -189,6 +190,7 @@ def startup():
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(254)"))
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT FALSE"))
         conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_email_unique ON users (email) WHERE email IS NOT NULL"))
+        conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS images JSONB NOT NULL DEFAULT '[]'::jsonb"))
         conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS voided BOOLEAN NOT NULL DEFAULT FALSE"))
         conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS record_id INTEGER REFERENCES records(id)"))
         conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS voided_by INTEGER REFERENCES users(id)"))
@@ -543,7 +545,29 @@ def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=
             price=float(item.get("price") or 0)
             if sku and price>0 and sku not in latest_purchase:
                 latest_purchase[sku]={"purchase_price":round(price,2),"sale_price":round(price*1.35,2),"currency":currency}
-    return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owned_stock":float(p.owned_stock or 0),"consigned_stock":float(p.consigned_stock or 0),**latest_purchase.get(p.sku,{"purchase_price":0,"sale_price":0,"currency":"—"})} for p in rows]
+    return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owned_stock":float(p.owned_stock or 0),"consigned_stock":float(p.consigned_stock or 0),"images":p.images or [],**latest_purchase.get(p.sku,{"purchase_price":0,"sale_price":0,"currency":"—"})} for p in rows]
+
+class InventoryImagesPayload(BaseModel):
+    images: list[str] = Field(default_factory=list, max_length=20)
+
+@app.put("/inventory/products/{product_id}/images")
+def update_inventory_product_images(product_id:int, p:InventoryImagesPayload, request:Request, s:Session=Depends(db), u:User=Depends(require_permission("inventory","edit"))):
+    product=s.get(InventoryProduct,product_id)
+    if not product or not product.active: raise HTTPException(404,"القطعة غير موجودة في المخزون")
+    total_bytes=0
+    for image_data in p.images:
+        if not isinstance(image_data,str) or "," not in image_data: raise HTTPException(400,"صيغة إحدى الصور غير صالحة")
+        header,encoded=image_data.split(",",1)
+        if header not in ("data:image/jpeg;base64","data:image/png;base64","data:image/webp;base64"): raise HTTPException(400,"يسمح فقط بصور JPG أو PNG أو WEBP")
+        try: raw=base64.b64decode(encoded,validate=True)
+        except (binascii.Error,ValueError): raise HTTPException(400,"بيانات إحدى الصور غير صالحة")
+        if not raw or len(raw)>1024*1024: raise HTTPException(413,"يجب ألا يتجاوز حجم الصورة الواحدة 1 ميغابايت بعد الضغط")
+        total_bytes+=len(raw)
+    if total_bytes>8*1024*1024: raise HTTPException(413,"الحجم الإجمالي للصور يتجاوز 8 ميغابايت")
+    product.images=p.images
+    audit(s,u,"inventory_images_updated","inventory_product",product.id,{"sku":product.sku,"image_count":len(p.images)},request)
+    s.commit()
+    return {"ok":True,"images":product.images,"count":len(product.images)}
 
 class RecordCreate(BaseModel): section:str; invoice_no:Optional[str]=None; currency:str="USD"; data:dict
 @app.post("/records")
