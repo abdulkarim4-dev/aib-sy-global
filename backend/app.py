@@ -197,7 +197,7 @@ def add_invoice_payment(record_id:int,p:PaymentPayload,request:Request,s:Session
     if not p.cash_box.strip(): raise HTTPException(400,"اختر الصندوق الذي ستدخل إليه الدفعة")
     x=InvoicePayment(record_id=record_id,amount=p.amount,method=p.method,cash_box=p.cash_box,paid_at=p.paid_at or datetime.now(timezone.utc),created_by=u.id)
     s.add(x); s.flush()
-    movement="withdrawal" if r.section=="purchase" else "deposit"
+    movement="withdrawal" if r.section in {"purchase","carPurchase"} else "deposit"
     s.add(CashMove(box_name=p.cash_box,movement=movement,amount=p.amount,currency=r.currency,description=("دفعة فاتورة "+(r.invoice_no or str(r.id))),created_by=u.id))
     audit(s,u,"invoice_payment_created","invoice_payment",x.id,{"record_id":record_id,"amount":p.amount,"method":p.method,"cash_box":p.cash_box,"cash_movement":movement},request); s.commit()
     return {"id":x.id,"record_id":record_id,"amount":float(x.amount),"method":x.method,"cash_box":x.cash_box,"paid_at":x.paid_at}
@@ -215,7 +215,7 @@ class PaymentUpdatePayload(BaseModel):
     cash_box: str
 
 def reverse_payment_cash_move(s:Session, r:Record, payment:InvoicePayment, u:User, reason:str):
-    movement="withdrawal" if r.section=="purchase" else "deposit"
+    movement="withdrawal" if r.section in {"purchase","carPurchase"} else "deposit"
     reverse="deposit" if movement=="withdrawal" else "withdrawal"
     s.add(CashMove(box_name=payment.cash_box,movement=reverse,amount=payment.amount,currency=r.currency,description=f"تسوية عكسية للدفعة رقم {payment.id} - فاتورة {r.invoice_no or r.id} ({reason})",created_by=u.id))
 
