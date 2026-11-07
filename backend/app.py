@@ -7,7 +7,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
 from pwdlib import PasswordHash
-from sqlalchemy import create_engine, String, Boolean, DateTime, Integer, ForeignKey, JSON, Text, Numeric, select, func
+from sqlalchemy import create_engine, String, Boolean, DateTime, Integer, ForeignKey, JSON, Text, Numeric, select, func, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker, Session
 
 class Settings(BaseSettings):
@@ -64,6 +64,7 @@ class CashMove(Base):
     description: Mapped[str]=mapped_column(Text, default="")
     created_by: Mapped[int]=mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
+    transfer_group: Mapped[Optional[str]]=mapped_column(String(36), nullable=True, index=True)
 class ChangeRequest(Base):
     __tablename__="record_change_requests"
     id: Mapped[int]=mapped_column(primary_key=True)
@@ -116,6 +117,8 @@ def startup():
     if settings.jwt_secret.startswith("CHANGE_THIS") and os.getenv("ENVIRONMENT")=="production":
         raise RuntimeError("Set a strong JWT_SECRET before production")
     Base.metadata.create_all(engine)
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS transfer_group VARCHAR(36)"))
     if settings.owner_password:
         with SessionLocal() as s:
             if not s.scalar(select(User).where(User.username==settings.owner_username)):
@@ -154,6 +157,7 @@ def add_user(payload:UserCreate, request:Request, s:Session=Depends(db), u:User=
 def set_user_active(user_id:int, active:bool, request:Request, s:Session=Depends(db), u:User=Depends(manager)):
     target=s.get(User,user_id)
     if not target: raise HTTPException(404,"المستخدم غير موجود")
+    if target.role=="owner": raise HTTPException(400,"لا يمكن تعطيل حساب المالك")
     target.active=active; audit(s,u,"user_status_changed","user",user_id,{"active":active},request); s.commit(); return {"ok":True}
 
 class RecordCreate(BaseModel): section:str; invoice_no:Optional[str]=None; currency:str="USD"; data:dict
@@ -227,17 +231,45 @@ def approve(request_id:int,approve:bool,request:Request,s:Session=Depends(db),u:
     cr.status="approved" if approve else "rejected"; cr.reviewed_by=u.id; cr.reviewed_at=datetime.now(timezone.utc)
     audit(s,u,"change_request_"+cr.status,"record",cr.record_id,{"request_id":cr.id},request); s.commit(); return {"status":cr.status}
 class CashPayload(BaseModel): box_name:str; movement:str; amount:float=Field(gt=0); currency:str="USD"; description:str=""
+class CashTransferPayload(BaseModel):
+    source_box:str
+    destination_box:str
+    amount:float=Field(gt=0)
+    currency:str="USD"
+    description:str=""
 @app.post("/cash-movements")
 def cash_move(p:CashPayload,request:Request,s:Session=Depends(db),u:User=Depends(can_add)):
     if p.movement not in ("deposit","withdrawal","transfer_in","transfer_out"): raise HTTPException(400,"نوع الحركة غير صالح")
     if p.currency not in ("USD","SYP"): raise HTTPException(400,"عملة غير مدعومة")
     m=CashMove(**p.model_dump(),created_by=u.id); s.add(m); s.flush(); audit(s,u,"cash_movement_created","cash",m.id,{"box":p.box_name,"movement":p.movement,"amount":p.amount,"currency":p.currency},request); s.commit(); return {"id":m.id}
+@app.post("/cash-transfers")
+def cash_transfer(p:CashTransferPayload,request:Request,s:Session=Depends(db),u:User=Depends(can_add)):
+    if p.source_box==p.destination_box: raise HTTPException(400,"يجب اختيار صندوقين مختلفين")
+    if p.currency not in ("USD","SYP"): raise HTTPException(400,"عملة غير مدعومة")
+    rows=s.scalars(select(CashMove).where(CashMove.box_name==p.source_box,CashMove.currency==p.currency).with_for_update()).all()
+    balance=sum((1 if x.movement in ("deposit","transfer_in") else -1)*float(x.amount) for x in rows)
+    if round(balance,2)<round(p.amount,2): raise HTTPException(400,"رصيد الصندوق المصدر غير كافٍ")
+    import uuid
+    group=str(uuid.uuid4())
+    source=CashMove(box_name=p.source_box,movement="withdrawal",amount=p.amount,currency=p.currency,description=("تحويل إلى "+p.destination_box+" · "+p.description).strip(" ·"),created_by=u.id,transfer_group=group)
+    dest=CashMove(box_name=p.destination_box,movement="deposit",amount=p.amount,currency=p.currency,description=("تحويل من "+p.source_box+" · "+p.description).strip(" ·"),created_by=u.id,transfer_group=group)
+    s.add_all([source,dest]); s.flush()
+    audit(s,u,"cash_transfer_created","cash_transfer",source.id,{"transfer_group":group,"from":p.source_box,"to":p.destination_box,"amount":p.amount,"currency":p.currency},request)
+    s.commit()
+    return {"ok":True,"transfer_group":group,"source_movement_id":source.id,"destination_movement_id":dest.id}
+
+@app.get("/cash-boxes/{box_name}/movements")
+def cash_box_movements(box_name:str,s:Session=Depends(db),u:User=Depends(current_user)):
+    rows=s.scalars(select(CashMove).where(CashMove.box_name==box_name).order_by(CashMove.id.desc())).all()
+    return [{"id":m.id,"box_name":m.box_name,"movement":m.movement,"amount":float(m.amount),"currency":m.currency,"description":m.description,"created_by":m.created_by,"created_at":m.created_at,"transfer_group":m.transfer_group} for m in rows]
+
 @app.get("/cash-movements")
 def cash_list(s:Session=Depends(db),u:User=Depends(current_user)):
     return [{"id":m.id,"box_name":m.box_name,"movement":m.movement,"amount":float(m.amount),"currency":m.currency,"description":m.description,"created_by":m.created_by,"created_at":m.created_at} for m in s.scalars(select(CashMove).order_by(CashMove.id.desc())).all()]
 @app.get("/audit-log")
 def audit_log(s:Session=Depends(db),_:User=Depends(manager)):
-    return [{"id":e.id,"user_id":e.user_id,"action":e.action,"entity":e.entity,"entity_id":e.entity_id,"details":e.details,"ip_address":e.ip_address,"created_at":e.created_at} for e in s.scalars(select(AuditEvent).order_by(AuditEvent.id.desc()).limit(1000)).all()]
+    rows=s.execute(select(AuditEvent,User).outerjoin(User,AuditEvent.user_id==User.id).order_by(AuditEvent.id.desc()).limit(1000)).all()
+    return [{"id":e.id,"user_id":e.user_id,"username":usr.username if usr else "—","user_name":usr.full_name if usr else "—","action":e.action,"entity":e.entity,"entity_id":e.entity_id,"details":e.details,"ip_address":e.ip_address,"created_at":e.created_at} for e,usr in rows]
 
 # Manager-only direct changes. Employees must use the approval workflow above.
 class RecordUpdate(BaseModel):
