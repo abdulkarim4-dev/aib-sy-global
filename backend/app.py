@@ -34,6 +34,13 @@ class User(Base):
     failed_logins: Mapped[int]=mapped_column(Integer, default=0)
     locked_until: Mapped[Optional[datetime]]=mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
+class CompanyProfile(Base):
+    __tablename__="company_profile"
+    id: Mapped[int]=mapped_column(primary_key=True)
+    data: Mapped[dict]=mapped_column(JSON, default=dict)
+    updated_by: Mapped[Optional[int]]=mapped_column(ForeignKey("users.id"), nullable=True)
+    updated_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
+
 class Record(Base):
     __tablename__="records"
     id: Mapped[int]=mapped_column(primary_key=True)
@@ -118,6 +125,22 @@ def startup():
     if settings.jwt_secret.startswith("CHANGE_THIS") and os.getenv("ENVIRONMENT")=="production":
         raise RuntimeError("Set a strong JWT_SECRET before production")
     Base.metadata.create_all(engine)
+    with SessionLocal() as s:
+        if not s.get(CompanyProfile,1):
+            s.add(CompanyProfile(id=1,data={
+                "national_no":"5420047617",
+                "first_name":"عبدالكريم",
+                "last_name":"محمد",
+                "father_name":"خيرو",
+                "mother_name":"فوزية هردوش",
+                "birth_place_date":"تل الكرامة 01.01.2004",
+                "document_type":"هوية شخصية",
+                "document_no":"030260726",
+                "issuing_authority":"الدانا",
+                "registry":"صلوة ٣٠",
+                "residence":"تل الكرامة"
+            }))
+            s.commit()
     with engine.begin() as conn:
         conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS transfer_group VARCHAR(36)"))
         conn.execute(text("ALTER TABLE invoice_payments ADD COLUMN IF NOT EXISTS cash_box VARCHAR(100) NOT NULL DEFAULT 'صندوق المبيع'"))
@@ -146,6 +169,28 @@ def login(form:OAuth2PasswordRequestForm=Depends(), request:Request=None, s:Sess
 def me(u:User=Depends(current_user)): return {"id":u.id,"username":u.username,"name":u.full_name,"role":u.role}
 
 class UserCreate(BaseModel): username:str=Field(min_length=3,max_length=80); full_name:str; password:str=Field(min_length=12); role:str="employee"
+class CompanyProfilePayload(BaseModel):
+    data: dict
+
+@app.get("/company-profile")
+def get_company_profile(s:Session=Depends(db), u:User=Depends(current_user)):
+    profile=s.get(CompanyProfile,1)
+    return profile.data if profile else {}
+
+@app.put("/company-profile")
+def update_company_profile(p:CompanyProfilePayload, request:Request, s:Session=Depends(db), u:User=Depends(manager)):
+    profile=s.get(CompanyProfile,1)
+    if not profile:
+        profile=CompanyProfile(id=1,data=p.data,updated_by=u.id)
+        s.add(profile)
+    else:
+        profile.data=p.data
+        profile.updated_by=u.id
+        profile.updated_at=datetime.now(timezone.utc)
+    audit(s,u,"company_profile_updated","company_profile",1,{"fields":sorted(p.data.keys())},request)
+    s.commit()
+    return {"ok":True,"data":profile.data}
+
 @app.get("/users")
 def list_users(s:Session=Depends(db), _:User=Depends(manager)):
     return [{"id":u.id,"username":u.username,"name":u.full_name,"role":u.role,"active":u.active} for u in s.scalars(select(User)).all()]
