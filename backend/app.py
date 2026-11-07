@@ -474,7 +474,18 @@ def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=
         term=f"%{q.strip()}%"
         query=query.where(or_(InventoryProduct.sku.ilike(term),InventoryProduct.name.ilike(term),InventoryProduct.model.ilike(term)))
     rows=s.scalars(query.order_by(InventoryProduct.sku).limit(300)).all()
-    return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owned_stock":float(p.owned_stock or 0),"consigned_stock":float(p.consigned_stock or 0)} for p in rows]
+    latest_purchase={}
+    purchase_records=s.scalars(select(Record).where(Record.section=="purchase",Record.deleted.is_(False)).order_by(Record.created_at.desc(),Record.id.desc())).all()
+    for record in purchase_records:
+        currency=record.currency or "USD"
+        for item in (record.data or {}).get("items",[]):
+            if not isinstance(item,dict):
+                continue
+            sku=str(item.get("sku") or "").strip().upper()
+            price=float(item.get("price") or 0)
+            if sku and price>0 and sku not in latest_purchase:
+                latest_purchase[sku]={"purchase_price":round(price,2),"sale_price":round(price*1.35,2),"currency":currency}
+    return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owned_stock":float(p.owned_stock or 0),"consigned_stock":float(p.consigned_stock or 0),**latest_purchase.get(p.sku,{"purchase_price":0,"sale_price":0,"currency":"—"})} for p in rows]
 
 class RecordCreate(BaseModel): section:str; invoice_no:Optional[str]=None; currency:str="USD"; data:dict
 @app.post("/records")
