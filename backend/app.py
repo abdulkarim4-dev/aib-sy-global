@@ -375,6 +375,18 @@ def ensure_cash_balance(s:Session, box_name:str, currency:str, amount:float):
         raise HTTPException(400,f"رصيد الصندوق غير كافٍ. الرصيد المتاح: {balance:.2f} {currency}")
     return balance
 
+def ensure_cash_reversal_safe(s:Session, moves:list[CashMove]):
+    active=[m for m in moves if not m.voided]
+    if not active: return
+    ids=[m.id for m in active]
+    keys=sorted({(m.box_name,m.currency) for m in active})
+    for box_name,currency in keys:
+        s.execute(select(func.pg_advisory_xact_lock(func.hashtext(box_name),func.hashtext(currency))))
+        rows=s.scalars(select(CashMove).where(CashMove.box_name==box_name,CashMove.currency==currency,CashMove.voided.is_(False),CashMove.id.not_in(ids))).all()
+        balance=sum((1 if x.movement in ("deposit","transfer_in") else -1)*float(x.amount) for x in rows)
+        if round(balance,2)<0:
+            raise HTTPException(400,f"لا يمكن إلغاء أو حذف هذه العملية لأن ذلك سيجعل رصيد {box_name} بالسالب ({balance:.2f} {currency})")
+
 @app.post("/cash-movements")
 def cash_move(p:CashPayload,request:Request,s:Session=Depends(db),u:User=Depends(can_add)):
     if p.movement not in ("deposit","withdrawal"): raise HTTPException(400,"اختر إيداعاً أو سحباً؛ التحويل بين الصناديق له عملية مستقلة")
@@ -413,6 +425,7 @@ def void_cash_movement(move_id:int,request:Request,s:Session=Depends(db),u:User=
     related=[move]
     if move.transfer_group:
         related=s.scalars(select(CashMove).where(CashMove.transfer_group==move.transfer_group,CashMove.voided.is_(False))).all()
+    ensure_cash_reversal_safe(s,related)
     now=datetime.now(timezone.utc)
     for item in related:
         item.voided=True; item.voided_by=u.id; item.voided_at=now
@@ -426,6 +439,7 @@ def delete_cash_movement(move_id:int,request:Request,s:Session=Depends(db),u:Use
     related=[move]
     if move.transfer_group:
         related=s.scalars(select(CashMove).where(CashMove.transfer_group==move.transfer_group)).all()
+    ensure_cash_reversal_safe(s,related)
     details={"movement_ids":[x.id for x in related],"transfer_group":move.transfer_group,"box":move.box_name,"movement":move.movement,"amount":float(move.amount),"currency":move.currency,"permanent":True}
     audit(s,u,"cash_movement_permanently_deleted","cash",move.id,details,request)
     for item in related: s.delete(item)
