@@ -964,6 +964,10 @@ FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 def home():
     return FileResponse(FRONTEND_DIR / "store.html")
 
+@app.get("/shop", include_in_schema=False)
+def shop_page():
+    return FileResponse(FRONTEND_DIR / "shop.html")
+
 @app.get("/accounting", include_in_schema=False)
 def accounting_app():
     return FileResponse(FRONTEND_DIR / "index.html")
