@@ -413,6 +413,10 @@ def update_user_permissions(user_id:int,p:UserPermissionsPayload,request:Request
         values=p.permissions.get(module,{})
         if not isinstance(values,dict): raise HTTPException(400,"صيغة الصلاحيات غير صحيحة")
         clean[module]={action:bool(values.get(action,False)) for action in actions}
+    if any(clean["invoices"][k] for k in ("create","edit","delete","print")):
+        clean["invoices"]["view"]=True
+    if any(clean["cash"][k] for k in ("create","edit","delete","print")):
+        clean["cash"]["view"]=True
     target.permissions=clean
     audit(s,u,"user_permissions_updated","user",user_id,{"permissions":clean},request)
     s.commit()
