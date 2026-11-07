@@ -485,7 +485,7 @@ def recalculate_inventory(s:Session):
         product.consigned_stock=max(0,consigned)
 
 @app.get("/inventory/products")
-def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=Depends(current_user)):
+def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=Depends(require_permission("inventory","view"))):
     query=select(InventoryProduct).where(InventoryProduct.active.is_(True))
     if q:
         term=f"%{q.strip()}%"
@@ -506,7 +506,7 @@ def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=
 
 class RecordCreate(BaseModel): section:str; invoice_no:Optional[str]=None; currency:str="USD"; data:dict
 @app.post("/records")
-def create_record(p:RecordCreate, request:Request, s:Session=Depends(db), u:User=Depends(can_add)):
+def create_record(p:RecordCreate, request:Request, s:Session=Depends(db), u:User=Depends(require_permission("invoices","create"))):
     if p.section not in {"deposit","purchase","consignSale","directSale","repair","carPurchase","carSale"}: raise HTTPException(400,"قسم غير معروف")
     if p.currency not in {"USD","SYP"}: raise HTTPException(400,"عملة غير مدعومة")
     section_codes={"directSale":"A","purchase":"B","consignSale":"C","deposit":"D","repair":"E","carPurchase":"F","carSale":"G"}
@@ -518,7 +518,7 @@ def create_record(p:RecordCreate, request:Request, s:Session=Depends(db), u:User
     r=Record(section=p.section,invoice_no=invoice_no,currency=p.currency,data=prepared_data,created_by=u.id)
     s.add(r); s.flush(); recalculate_inventory(s); audit(s,u,"record_created","record",r.id,{"section":r.section,"invoice_no":r.invoice_no},request); s.commit(); return {"id":r.id,"invoice_no":r.invoice_no,"created_at":r.created_at}
 @app.get("/records")
-def list_records(section:Optional[str]=None, s:Session=Depends(db), u:User=Depends(current_user)):
+def list_records(section:Optional[str]=None, s:Session=Depends(db), u:User=Depends(require_permission("invoices","view"))):
     q=select(Record).where(Record.deleted==False)
     if section: q=q.where(Record.section==section)
     out=[]
@@ -560,7 +560,7 @@ def invoice_cash_description(record:Record, action:str="دفعة فاتورة")-
     return " | ".join(x for x in parts if x)
 
 @app.post("/records/{record_id}/payments")
-def add_invoice_payment(record_id:int,p:PaymentPayload,request:Request,s:Session=Depends(db),u:User=Depends(can_add)):
+def add_invoice_payment(record_id:int,p:PaymentPayload,request:Request,s:Session=Depends(db),u:User=Depends(require_permission("invoices","create"))):
     r=s.get(Record,record_id)
     if not r or r.deleted: raise HTTPException(404,"الفاتورة غير موجودة")
     if p.method not in {"cash","baraka_bank","sham_cash","syriatel_cash"}: raise HTTPException(400,"طريقة الدفع غير صالحة")
@@ -577,7 +577,7 @@ def add_invoice_payment(record_id:int,p:PaymentPayload,request:Request,s:Session
     return {"id":x.id,"record_id":record_id,"amount":float(x.amount),"method":x.method,"cash_box":x.cash_box,"paid_at":x.paid_at}
 
 @app.get("/records/{record_id}/payments")
-def list_invoice_payments(record_id:int,s:Session=Depends(db),u:User=Depends(current_user)):
+def list_invoice_payments(record_id:int,s:Session=Depends(db),u:User=Depends(require_permission("invoices","view"))):
     r=s.get(Record,record_id)
     if not r or r.deleted: raise HTTPException(404,"الفاتورة غير موجودة")
     return [{"id":x.id,"amount":float(x.amount),"method":x.method,"cash_box":x.cash_box,"paid_at":x.paid_at} for x in s.scalars(select(InvoicePayment).where(InvoicePayment.record_id==record_id).order_by(InvoicePayment.id)).all()]
@@ -595,7 +595,7 @@ def reverse_payment_cash_move(s:Session, r:Record, payment:InvoicePayment, u:Use
     s.add(CashMove(box_name=payment.cash_box,movement=reverse,amount=payment.amount,currency=r.currency,description=invoice_cash_description(r,f"تسوية عكسية للدفعة {payment.id} ({reason})"),created_by=u.id,record_id=r.id))
 
 @app.put("/records/{record_id}/payments/{payment_id}")
-def update_invoice_payment(record_id:int,payment_id:int,p:PaymentUpdatePayload,request:Request,s:Session=Depends(db),u:User=Depends(manager)):
+def update_invoice_payment(record_id:int,payment_id:int,p:PaymentUpdatePayload,request:Request,s:Session=Depends(db),u:User=Depends(require_permission("invoices","edit"))):
     r=s.get(Record,record_id); x=s.get(InvoicePayment,payment_id)
     if not r or r.deleted or not x or x.record_id!=record_id: raise HTTPException(404,"الدفعة غير موجودة")
     if p.method not in {"cash","baraka_bank","sham_cash","syriatel_cash"}: raise HTTPException(400,"طريقة الدفع غير صالحة")
@@ -617,7 +617,7 @@ def update_invoice_payment(record_id:int,payment_id:int,p:PaymentUpdatePayload,r
     return {"ok":True,"id":x.id}
 
 @app.delete("/records/{record_id}/payments/{payment_id}")
-def delete_invoice_payment(record_id:int,payment_id:int,request:Request,s:Session=Depends(db),u:User=Depends(manager)):
+def delete_invoice_payment(record_id:int,payment_id:int,request:Request,s:Session=Depends(db),u:User=Depends(require_permission("invoices","delete"))):
     r=s.get(Record,record_id); x=s.get(InvoicePayment,payment_id)
     if not r or r.deleted or not x or x.record_id!=record_id: raise HTTPException(404,"الدفعة غير موجودة")
     reverse_payment_cash_move(s,r,x,u,"حذف")
@@ -629,6 +629,8 @@ class ChangePayload(BaseModel): action:str; proposed_data:Optional[dict]=None; r
 @app.post("/records/{record_id}/change-requests")
 def request_change(record_id:int,p:ChangePayload,request:Request,s:Session=Depends(db),u:User=Depends(current_user)):
     if p.action not in ("update","delete"): raise HTTPException(400,"نوع الطلب غير صالح")
+    needed="edit" if p.action=="update" else "delete"
+    if not has_permission(u,"invoices",needed): raise HTTPException(403,"ليست لديك صلاحية طلب هذا الإجراء")
     if not s.get(Record,record_id): raise HTTPException(404,"السجل غير موجود")
     if p.action=="update" and p.proposed_data is None: raise HTTPException(400,"البيانات المقترحة مطلوبة")
     cr=ChangeRequest(record_id=record_id,requested_by=u.id,action=p.action,proposed_data=p.proposed_data,reason=p.reason)
@@ -664,6 +666,8 @@ class ApprovedChangeApplyPayload(BaseModel):
 @app.post("/change-requests/{request_id}/apply")
 def apply_approved_change(request_id:int,p:ApprovedChangeApplyPayload,request:Request,s:Session=Depends(db),u:User=Depends(current_user)):
     cr=s.get(ChangeRequest,request_id)
+    if cr and not has_permission(u,"invoices","edit" if cr.action=="update" else "delete"):
+        raise HTTPException(403,"ليست لديك صلاحية تنفيذ هذا التعديل أو الحذف")
     if not cr or cr.requested_by!=u.id or cr.status!="approved":
         raise HTTPException(403,"لا يوجد طلب موافق عليه ومتاح لهذا الحساب")
     rec=s.get(Record,cr.record_id)
@@ -746,13 +750,13 @@ def ensure_cash_reversal_safe(s:Session, moves:list[CashMove]):
             raise HTTPException(400,f"لا يمكن إلغاء أو حذف هذه العملية لأن ذلك سيجعل رصيد {box_name} بالسالب ({balance:.2f} {currency})")
 
 @app.post("/cash-movements")
-def cash_move(p:CashPayload,request:Request,s:Session=Depends(db),u:User=Depends(can_add)):
+def cash_move(p:CashPayload,request:Request,s:Session=Depends(db),u:User=Depends(require_permission("cash","create"))):
     if p.movement not in ("deposit","withdrawal"): raise HTTPException(400,"اختر إيداعاً أو سحباً؛ التحويل بين الصناديق له عملية مستقلة")
     if p.currency not in ("USD","SYP"): raise HTTPException(400,"عملة غير مدعومة")
     if p.movement=="withdrawal": ensure_cash_balance(s,p.box_name,p.currency,p.amount)
     m=CashMove(**p.model_dump(),created_by=u.id); s.add(m); s.flush(); audit(s,u,"cash_movement_created","cash",m.id,{"box":p.box_name,"movement":p.movement,"amount":p.amount,"currency":p.currency},request); s.commit(); return {"id":m.id}
 @app.post("/cash-transfers")
-def cash_transfer(p:CashTransferPayload,request:Request,s:Session=Depends(db),u:User=Depends(can_add)):
+def cash_transfer(p:CashTransferPayload,request:Request,s:Session=Depends(db),u:User=Depends(require_permission("cash","create"))):
     if p.source_box==p.destination_box: raise HTTPException(400,"يجب اختيار صندوقين مختلفين")
     if p.currency not in ("USD","SYP"): raise HTTPException(400,"عملة غير مدعومة")
     ensure_cash_balance(s,p.source_box,p.currency,p.amount)
@@ -776,12 +780,12 @@ def cash_move_display_description(s:Session, move:CashMove)->str:
     return move.description or ""
 
 @app.get("/cash-boxes/{box_name}/movements")
-def cash_box_movements(box_name:str,s:Session=Depends(db),u:User=Depends(current_user)):
+def cash_box_movements(box_name:str,s:Session=Depends(db),u:User=Depends(require_permission("cash","view"))):
     rows=s.scalars(select(CashMove).where(CashMove.box_name==box_name).order_by(CashMove.id.desc())).all()
     return [{"id":m.id,"box_name":m.box_name,"movement":m.movement,"amount":float(m.amount),"currency":m.currency,"description":cash_move_display_description(s,m),"created_by":m.created_by,"created_at":m.created_at,"transfer_group":m.transfer_group,"voided":m.voided,"voided_by":m.voided_by,"voided_at":m.voided_at,"sale_locked":is_sale_cash_move(s,m),"purchase_locked":is_purchase_cash_move(s,m)} for m in rows]
 
 @app.get("/cash-movements")
-def cash_list(s:Session=Depends(db),u:User=Depends(current_user)):
+def cash_list(s:Session=Depends(db),u:User=Depends(require_permission("cash","view"))):
     rows=s.scalars(select(CashMove).order_by(CashMove.id.desc())).all()
     return [{"id":m.id,"box_name":m.box_name,"movement":m.movement,"amount":float(m.amount),"currency":m.currency,"description":cash_move_display_description(s,m),"created_by":m.created_by,"created_at":m.created_at,"transfer_group":m.transfer_group,"voided":m.voided,"voided_by":m.voided_by,"voided_at":m.voided_at,"sale_locked":is_sale_cash_move(s,m),"purchase_locked":is_purchase_cash_move(s,m)} for m in rows]
 
@@ -817,7 +821,7 @@ def delete_cash_movement(move_id:int,request:Request,s:Session=Depends(db),u:Use
     for item in related: s.delete(item)
     s.commit(); return {"ok":True,"deleted_ids":details["movement_ids"]}
 @app.post("/audit-log/print")
-def audit_invoice_print(request:Request, record_id:int, invoice_no:str="", section:str="", s:Session=Depends(db), u:User=Depends(current_user)):
+def audit_invoice_print(request:Request, record_id:int, invoice_no:str="", section:str="", s:Session=Depends(db), u:User=Depends(require_permission("invoices","print"))):
     record=s.get(Record,record_id)
     if not record or record.deleted: raise HTTPException(404,"الفاتورة غير موجودة")
     audit(s,u,"invoice_printed","record",record.id,{"record_id":record.id,"invoice_no":record.invoice_no or invoice_no,"section":record.section or section},request)
@@ -836,7 +840,7 @@ class RecordUpdate(BaseModel):
     currency: str = "USD"
 
 @app.patch("/records/{record_id}")
-def update_record(record_id:int, p:RecordUpdate, request:Request, s:Session=Depends(db), u:User=Depends(manager)):
+def update_record(record_id:int, p:RecordUpdate, request:Request, s:Session=Depends(db), u:User=Depends(require_permission("invoices","edit"))):
     r=s.get(Record,record_id)
     if not r or r.deleted: raise HTTPException(404,"السجل غير موجود")
     if p.currency not in ("USD","SYP"): raise HTTPException(400,"عملة غير مدعومة")
@@ -855,7 +859,7 @@ def sale_cash_moves_for_record(s:Session, record:Record):
     ))).all()
 
 @app.delete("/records/{record_id}")
-def delete_record(record_id:int, request:Request, s:Session=Depends(db), u:User=Depends(manager)):
+def delete_record(record_id:int, request:Request, s:Session=Depends(db), u:User=Depends(require_permission("invoices","delete"))):
     r=s.get(Record,record_id)
     if not r or r.deleted: raise HTTPException(404,"السجل غير موجود")
     r.deleted=True; r.updated_at=datetime.now(timezone.utc)
@@ -880,7 +884,7 @@ def my_requests(s:Session=Depends(db),u:User=Depends(current_user)):
     return out
 
 @app.get("/cash-summary")
-def cash_summary(s:Session=Depends(db),u:User=Depends(current_user)):
+def cash_summary(s:Session=Depends(db),u:User=Depends(require_permission("cash","view"))):
     rows=s.scalars(select(CashMove).where(CashMove.voided.is_(False))).all(); out={}
     for m in rows:
         key=f"{m.box_name}|{m.currency}"
