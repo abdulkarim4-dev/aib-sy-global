@@ -488,6 +488,15 @@ def update_record(record_id:int, p:RecordUpdate, request:Request, s:Session=Depe
     r.data=p.data; r.invoice_no=p.invoice_no; r.currency=p.currency; r.updated_at=datetime.now(timezone.utc)
     audit(s,u,"record_updated","record",r.id,{"section":r.section,"invoice_no":r.invoice_no},request); s.commit(); return {"ok":True}
 
+def sale_cash_moves_for_record(s:Session, record:Record):
+    if record.section not in {"directSale","consignSale","carSale"}:
+        return []
+    invoice_no=record.invoice_no or str(record.id)
+    return s.scalars(select(CashMove).where(or_(
+        CashMove.record_id==record.id,
+        CashMove.description.contains("فاتورة "+invoice_no)
+    ))).all()
+
 @app.delete("/records/{record_id}")
 def delete_record(record_id:int, request:Request, s:Session=Depends(db), u:User=Depends(manager)):
     r=s.get(Record,record_id)
