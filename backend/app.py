@@ -469,7 +469,7 @@ def delete_cash_movement(move_id:int,request:Request,s:Session=Depends(db),u:Use
     for item in related: s.delete(item)
     s.commit(); return {"ok":True,"deleted_ids":details["movement_ids"]}
 @app.post("/audit-log/print")
-def audit_invoice_print(record_id:int, invoice_no:str="", section:str="", request:Request=None, s:Session=Depends(db), u:User=Depends(current_user)):
+def audit_invoice_print(request:Request, record_id:int, invoice_no:str="", section:str="", s:Session=Depends(db), u:User=Depends(current_user)):
     record=s.get(Record,record_id)
     if not record or record.deleted: raise HTTPException(404,"الفاتورة غير موجودة")
     audit(s,u,"invoice_printed","record",record.id,{"record_id":record.id,"invoice_no":record.invoice_no or invoice_no,"section":record.section or section},request)
