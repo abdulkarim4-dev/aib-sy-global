@@ -389,6 +389,31 @@ def update_company_profile(p:CompanyProfilePayload, request:Request, s:Session=D
     s.commit()
     return {"ok":True,"data":profile.data}
 
+class PublicSiteSettingsPayload(BaseModel):
+    show_stats: bool = True
+
+@app.get("/public-site-settings")
+def get_public_site_settings(s:Session=Depends(db), u:User=Depends(manager)):
+    profile=s.get(CompanyProfile,1)
+    data=profile.data if profile and isinstance(profile.data,dict) else {}
+    return {"show_stats":data.get("public_show_stats",True) is not False}
+
+@app.put("/public-site-settings")
+def update_public_site_settings(p:PublicSiteSettingsPayload, request:Request, s:Session=Depends(db), u:User=Depends(manager)):
+    profile=s.get(CompanyProfile,1)
+    if not profile:
+        profile=CompanyProfile(id=1,data={"public_show_stats":p.show_stats},updated_by=u.id)
+        s.add(profile)
+    else:
+        data=dict(profile.data or {})
+        data["public_show_stats"]=p.show_stats
+        profile.data=data
+        profile.updated_by=u.id
+        profile.updated_at=datetime.now(timezone.utc)
+    audit(s,u,"public_site_settings_updated","company_profile",1,{"show_stats":p.show_stats},request)
+    s.commit()
+    return {"ok":True,"show_stats":p.show_stats}
+
 @app.get("/users")
 def list_users(s:Session=Depends(db), _:User=Depends(manager)):
     return [{"id":u.id,"username":u.username,"name":u.full_name,"email":u.email,"role":u.role,"active":u.active,"permissions":u.permissions or {}} for u in s.scalars(select(User)).all()]
@@ -913,6 +938,8 @@ def cash_summary(s:Session=Depends(db),u:User=Depends(require_permission("cash",
 @app.get("/public/stats")
 def public_stats(s:Session=Depends(db)):
     rows=s.scalars(select(Record).where(Record.deleted.is_(False))).all()
+    profile=s.get(CompanyProfile,1)
+    profile_data=profile.data if profile and isinstance(profile.data,dict) else {}
     customers=set()
     sales=0
     purchases=0
@@ -925,7 +952,7 @@ def public_stats(s:Session=Depends(db)):
             sales+=1
         if r.section in {"purchase","carPurchase","deposit"}:
             purchases+=1
-    return {"customers":len(customers),"sales":sales,"purchases":purchases,"records":len(rows)}
+    return {"visible":profile_data.get("public_show_stats",True) is not False,"customers":len(customers),"sales":sales,"purchases":purchases,"records":len(rows)}
 
 @app.get("/public/products")
 def public_products(q:Optional[str]=None, category:Optional[str]=None, s:Session=Depends(db)):
