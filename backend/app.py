@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Any
-import os, secrets
+import os, secrets, smtplib
+from email.message import EmailMessage
 import jwt
 from fastapi import FastAPI, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -17,6 +18,11 @@ class Settings(BaseSettings):
     owner_username: str = "abdulkarim"
     owner_password: str = ""
     owner_name: str = "عبد الكريم محمد بن خيرو"
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
     class Config: env_file = ".env"
 settings = Settings()
 engine = create_engine(settings.database_url, pool_pre_ping=True)
@@ -90,6 +96,15 @@ class ChangeRequest(Base):
     reviewed_by: Mapped[Optional[int]]=mapped_column(ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
     reviewed_at: Mapped[Optional[datetime]]=mapped_column(DateTime(timezone=True), nullable=True)
+class EmailVerification(Base):
+    __tablename__="email_verifications"
+    id: Mapped[int]=mapped_column(primary_key=True)
+    user_id: Mapped[int]=mapped_column(ForeignKey("users.id"), index=True)
+    email: Mapped[str]=mapped_column(String(254))
+    code_hash: Mapped[str]=mapped_column(String(300))
+    expires_at: Mapped[datetime]=mapped_column(DateTime(timezone=True))
+    attempts: Mapped[int]=mapped_column(Integer, default=0)
+    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
 class PasswordChangeRequest(Base):
     __tablename__="password_change_requests"
     id: Mapped[int]=mapped_column(primary_key=True)
@@ -215,29 +230,75 @@ class AccountSettingsPayload(BaseModel):
     email: Optional[str] = None
     full_name: Optional[str] = None
 class PasswordChangePayload(BaseModel):
+    current_password: str = Field(min_length=1, max_length=256)
     new_password: str = Field(min_length=12, max_length=256)
+class EmailVerificationStartPayload(BaseModel):
+    email: str = Field(min_length=5, max_length=254)
+class EmailVerificationConfirmPayload(BaseModel):
+    email: str = Field(min_length=5, max_length=254)
+    code: str = Field(min_length=6, max_length=6)
 @app.get("/account-settings")
 def get_account_settings(u:User=Depends(current_user)):
     return {"id":u.id,"username":u.username,"full_name":u.full_name,"email":u.email,"role":u.role}
 @app.patch("/account-settings")
 def update_account_settings(p:AccountSettingsPayload, request:Request, s:Session=Depends(db), u:User=Depends(current_user)):
-    if p.email is not None:
-        email=p.email.strip().lower()
-        if email and ("@" not in email or "." not in email.rsplit("@",1)[-1] or len(email)>254):
-            raise HTTPException(400,"البريد الإلكتروني غير صالح")
-        duplicate=s.scalar(select(User).where(User.email==email,User.id!=u.id)) if email else None
-        if duplicate: raise HTTPException(409,"البريد الإلكتروني مستخدم لحساب آخر")
-        u.email=email or None
+    if p.email is not None: raise HTTPException(400,"لا يمكن اعتماد البريد مباشرة. اطلب رمز تحقق وأكده أولاً")
     if p.full_name is not None:
         name=p.full_name.strip()
         if not name: raise HTTPException(400,"الاسم لا يمكن أن يكون فارغاً")
         u.full_name=name
-    audit(s,u,"account_settings_updated","user",u.id,{"email_updated":p.email is not None,"name_updated":p.full_name is not None},request)
+    audit(s,u,"account_settings_updated","user",u.id,{"name_updated":p.full_name is not None},request)
     s.commit()
     return {"ok":True,"email":u.email,"full_name":u.full_name}
 
+def send_verification_email(email:str, code:str):
+    if not settings.smtp_host or not settings.smtp_user or not settings.smtp_password or not settings.smtp_from:
+        raise HTTPException(503,"خدمة إرسال البريد غير مهيأة بعد. يجب ضبط إعدادات SMTP في Render أولاً")
+    msg=EmailMessage()
+    msg["Subject"]="رمز التحقق من البريد الإلكتروني - AIB"
+    msg["From"]=settings.smtp_from
+    msg["To"]=email
+    msg.set_content(f"رمز التحقق الخاص بك في تطبيق AIB هو: {code}\\nصلاحية الرمز 10 دقائق. لا تشاركه مع أحد.")
+    try:
+        with smtplib.SMTP(settings.smtp_host,settings.smtp_port,timeout=15) as server:
+            server.starttls()
+            server.login(settings.smtp_user,settings.smtp_password)
+            server.send_message(msg)
+    except Exception:
+        raise HTTPException(502,"تعذر إرسال رمز التحقق. تحقق من إعدادات البريد في Render")
+
+@app.post("/account-settings/email-verification")
+def start_email_verification(p:EmailVerificationStartPayload, request:Request, s:Session=Depends(db), u:User=Depends(current_user)):
+    email=p.email.strip().lower()
+    if "@" not in email or "." not in email.rsplit("@",1)[-1]: raise HTTPException(400,"البريد الإلكتروني غير صالح")
+    duplicate=s.scalar(select(User).where(User.email==email,User.id!=u.id))
+    if duplicate: raise HTTPException(409,"البريد الإلكتروني مستخدم لحساب آخر")
+    code=f"{secrets.randbelow(1000000):06d}"
+    row=EmailVerification(user_id=u.id,email=email,code_hash=password_hash.hash(code),expires_at=datetime.now(timezone.utc)+timedelta(minutes=10))
+    s.add(row);s.flush()
+    send_verification_email(email,code)
+    audit(s,u,"email_verification_sent","user",u.id,{"email":email},request)
+    s.commit()
+    return {"ok":True,"message":"تم إرسال رمز التحقق إلى البريد"}
+@app.post("/account-settings/email-verification/confirm")
+def confirm_email_verification(p:EmailVerificationConfirmPayload, request:Request, s:Session=Depends(db), u:User=Depends(current_user)):
+    email=p.email.strip().lower()
+    row=s.scalar(select(EmailVerification).where(EmailVerification.user_id==u.id,EmailVerification.email==email).order_by(EmailVerification.id.desc()))
+    now=datetime.now(timezone.utc)
+    if not row or row.expires_at<now or row.attempts>=5: raise HTTPException(400,"رمز التحقق منتهي أو غير موجود. اطلب رمزاً جديداً")
+    if not password_hash.verify(p.code,row.code_hash):
+        row.attempts+=1;s.commit()
+        raise HTTPException(400,"رمز التحقق غير صحيح")
+    duplicate=s.scalar(select(User).where(User.email==email,User.id!=u.id))
+    if duplicate: raise HTTPException(409,"البريد الإلكتروني مستخدم لحساب آخر")
+    u.email=email
+    s.query(EmailVerification).filter(EmailVerification.user_id==u.id).delete(synchronize_session=False)
+    audit(s,u,"email_verified","user",u.id,{"email":email},request)
+    s.commit()
+    return {"ok":True,"email":u.email,"verified":True}
 @app.post("/password-change-requests")
 def create_password_change_request(p:PasswordChangePayload, request:Request, s:Session=Depends(db), u:User=Depends(current_user)):
+    if not password_hash.verify(p.current_password,u.password_hash): raise HTTPException(401,"كلمة المرور الحالية غير صحيحة")
     pending=s.scalar(select(PasswordChangeRequest).where(PasswordChangeRequest.user_id==u.id,PasswordChangeRequest.status=="pending"))
     if pending: raise HTTPException(409,"لديك طلب تغيير كلمة مرور قيد انتظار موافقة المالك")
     row=PasswordChangeRequest(user_id=u.id,requested_by=u.id,new_password_hash=password_hash.hash(p.new_password))
