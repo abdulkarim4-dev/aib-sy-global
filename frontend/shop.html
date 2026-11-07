@@ -159,6 +159,68 @@ body.modal-open{overflow:hidden}
   .detail-information{padding:0}
 }
 
+
+/* AIB product detail: compact, centered and fully contained on mobile */
+.product-modal{
+  align-items:center!important;
+  justify-content:center!important;
+  padding:12px!important;
+  overflow:auto!important;
+}
+.product-detail-page{
+  width:min(760px,100%)!important;
+  max-width:760px!important;
+  max-height:calc(100dvh - 24px)!important;
+  height:auto!important;
+  margin:auto!important;
+  overflow-y:auto!important;
+  overscroll-behavior:contain;
+}
+.detail-layout{align-items:start!important}
+.detail-image-frame{height:clamp(180px,28vw,300px)!important;max-height:none!important;min-height:0!important}
+.detail-image-frame img{width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain!important}
+@media(max-width:650px){
+  .product-modal{padding:10px!important}
+  .product-detail-page{
+    width:min(540px,92vw)!important;
+    max-height:calc(100dvh - 20px)!important;
+    border-radius:15px!important;
+  }
+  .detail-topbar{padding:9px 12px!important;font-size:11px}
+  .detail-close{width:32px!important;height:32px!important;font-size:23px!important}
+  .detail-layout{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr)!important;
+    gap:7px!important;
+    padding:10px!important;
+  }
+  .detail-image-frame{
+    height:clamp(115px,18vh,155px)!important;
+    max-height:155px!important;
+    min-height:115px!important;
+    border-radius:11px!important;
+  }
+  .detail-gallery{padding:6px 2px!important;max-height:58px!important;gap:6px!important}
+  .detail-thumb{width:46px!important;height:40px!important;padding:2px!important}
+  .detail-image-count{font-size:10px!important}
+  .detail-information{padding:0!important}
+  .detail-information h2{font-size:19px!important;line-height:1.35!important;margin:5px 0 3px!important}
+  .detail-information .category-label{font-size:9px!important;padding:3px 7px!important;margin-top:2px!important}
+  .detail-information .sku{font-size:10px!important}
+  .detail-price{font-size:19px!important;margin:7px 0!important}
+  .detail-description{font-size:11px!important;line-height:1.65!important;margin:5px 0!important}
+  .detail-specs{grid-template-columns:1fr 1fr!important;gap:6px!important;margin:9px 0!important}
+  .detail-specs>div{padding:8px!important;border-radius:8px!important}
+  .detail-specs small{font-size:9px!important;margin-bottom:4px!important}
+  .detail-specs strong{font-size:11px!important}
+  .detail-contact{padding:10px 12px!important;font-size:11px!important;border-radius:8px!important}
+}
+@media(max-height:700px) and (max-width:650px){
+  .detail-image-frame{height:105px!important;min-height:105px!important}
+  .detail-layout{gap:5px!important;padding:8px!important}
+  .detail-specs{margin:6px 0!important}
+}
+
 </style></head><body><header class="wrap top"><div class="brand"><a class="brand-logo-link" href="/" aria-label="العودة إلى الصفحة الرئيسية"><img src="/logo.png?v=aib-logo-20261108" alt="AIB"></a><div><b>AIB GROUP</b><small>المتجر الإلكتروني الرسمي</small></div></div></header><main class="wrap"><section class="hero"><div style="color:#72b9ec;font-size:12px;letter-spacing:2px;font-weight:bold">AIB ONLINE STORE</div><h1>تسوّق من مجموعة AIB</h1><p>اكتشف قطع الغيار والمحركات والسيارات والشاحنات والمعدات الثقيلة المتوفرة في مخزون الشركة.</p></section><section class="catalog-tools" aria-label="أدوات التسوق"><div class="catalog-tools-head"><div><span class="eyebrow">اكتشف منتجاتنا</span><h2>ابحث واختر بسهولة</h2><p>اكتب اسم القطعة أو رقمها أو الموديل للوصول السريع إلى المنتج.</p></div><span class="catalog-mark">AIB <small>STORE</small></span></div><div class="tools"><label class="search-field"><span aria-hidden="true">⌕</span><input id="q" placeholder="ابحث باسم المنتج أو رقم القطعة أو الموديل" oninput="load()"></label><label class="sort-field"><span>ترتيب حسب</span><select id="sort" onchange="load()"><option value="">الأحدث / الافتراضي</option><option value="name">اسم المنتج</option><option value="stock">الكمية المتوفرة</option></select></label></div></section><section class="category-section" aria-label="تصفية حسب القسم"><div class="section-heading"><div><span class="eyebrow">تصفح حسب الفئة</span><h2>أقسام التسوق</h2></div><span class="section-note">اختر القسم لعرض منتجاته</span></div><div class="cats"><button class="cat active" onclick="category('',this)"><i>✦</i><span>جميع المنتجات</span><small>كل الفئات</small></button><button class="cat" onclick="category('parts',this)"><i>⚙</i><span>قطع الغيار</span><small>قطع ومكونات</small></button><button class="cat" onclick="category('engines',this)"><i>◉</i><span>المحركات</span><small>محركات ونقل حركة</small></button><button class="cat" onclick="category('cars',this)"><i>▰</i><span>السيارات</span><small>سيارات متنوعة</small></button><button class="cat" onclick="category('trucks',this)"><i>▣</i><span>الشاحنات</span><small>شاحنات ومركبات</small></button><button class="cat" onclick="category('heavy',this)"><i>⚒</i><span>المعدات الثقيلة</span><small>معدات وآليات</small></button></div></section><section class="products-section"><div class="section-heading products-heading"><div><span class="eyebrow">كتالوج مجموعة AIB</span><h2>المنتجات المتاحة</h2><p>تفاصيل المخزون والأسعار والصور المضافة لكل منتج.</p></div><span class="results-count" id="resultCount">جارٍ التحميل…</span></div><div id="grid" class="grid"><div class="empty">جارٍ تحميل المنتجات…</div></div></section><section id="productModal" class="product-modal" aria-hidden="true" onclick="if(event.target===this)closeProduct()"><div class="product-detail-page" role="dialog" aria-modal="true" aria-labelledby="detailName"><div class="detail-topbar"><span>تفاصيل المنتج · AIB STORE</span><button id="closeProduct" class="detail-close" type="button" onclick="closeProduct()" aria-label="إغلاق">×</button></div><div class="detail-layout"><div class="detail-visual"><div class="detail-image-frame"><img id="detailMainImage" alt="" hidden><div id="detailNoImage" class="detail-no-image">لا توجد صور مضافة لهذا المنتج</div></div><div id="detailGallery" class="detail-gallery"></div><div id="detailImageCount" class="detail-image-count"></div></div><div class="detail-information"><span id="detailCategory" class="category-label"></span><h2 id="detailName"></h2><div id="detailSku" class="sku"></div><div id="detailPrice" class="detail-price"></div><p id="detailDescription" class="detail-description"></p><div class="detail-specs"><div><small>الموديل</small><strong id="detailModel"></strong></div><div><small>المخزون المملوك</small><strong id="detailOwned"></strong></div><div><small>مخزون الأمانة</small><strong id="detailConsigned"></strong></div><div><small>إجمالي الكمية المتوفرة</small><strong id="detailStock"></strong></div></div><a id="detailWhatsapp" class="detail-contact" href="https://wa.me/963997439627" target="_blank" rel="noopener">استفسر عن هذا المنتج عبر واتساب</a></div></div></div></section><footer class="foot">مجموعة AIB التجارية · للاستفسار والشراء تواصل عبر <a href="https://wa.me/963997439627" style="color:#70b9ed">واتساب +963997439627</a></footer></main><script>
 let selected='';function category(c,b){selected=c;document.querySelectorAll('.cat').forEach(x=>x.classList.remove('active'));b.classList.add('active');load()}
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
