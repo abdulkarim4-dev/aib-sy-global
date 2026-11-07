@@ -908,15 +908,63 @@ def cash_summary(s:Session=Depends(db),u:User=Depends(require_permission("cash",
         out[key]=out.get(key,0)+sign*float(m.amount)
     return [{"box_name":k.rsplit("|",1)[0],"currency":k.rsplit("|",1)[1],"balance":v} for k,v in out.items()]
 
+
+# Public storefront data: read-only aggregates from the live accounting database.
+@app.get("/public/stats")
+def public_stats(s:Session=Depends(db)):
+    rows=s.scalars(select(Record).where(Record.deleted.is_(False))).all()
+    customers=set()
+    sales=0
+    purchases=0
+    for r in rows:
+        data=r.data or {}
+        customer=str(data.get("customer") or data.get("customer_name") or "").strip()
+        if customer and customer not in {"—","-"}:
+            customers.add(customer.casefold())
+        if r.section in {"directSale","consignSale","carSale"}:
+            sales+=1
+        if r.section in {"purchase","carPurchase","deposit"}:
+            purchases+=1
+    return {"customers":len(customers),"sales":sales,"purchases":purchases,"records":len(rows)}
+
+@app.get("/public/products")
+def public_products(q:Optional[str]=None, category:Optional[str]=None, s:Session=Depends(db)):
+    query=select(InventoryProduct).where(InventoryProduct.active.is_(True))
+    if q:
+        term=f"%{q.strip()}%"
+        query=query.where(or_(InventoryProduct.sku.ilike(term),InventoryProduct.name.ilike(term),InventoryProduct.model.ilike(term)))
+    rows=s.scalars(query.order_by(InventoryProduct.sku).limit(300)).all()
+    latest_purchase={}
+    purchase_records=s.scalars(select(Record).where(Record.section=="purchase",Record.deleted.is_(False)).order_by(Record.created_at.desc(),Record.id.desc())).all()
+    for record in purchase_records:
+        for item in (record.data or {}).get("items",[]):
+            if not isinstance(item,dict): continue
+            sku=str(item.get("sku") or "").strip().upper()
+            price=float(item.get("price") or 0)
+            if sku and price>0 and sku not in latest_purchase:
+                latest_purchase[sku]={"sale_price":round(price*1.35,2),"currency":record.currency or "USD"}
+    out=[]
+    for p in rows:
+        name=(p.name+" "+(p.model or "")).lower()
+        if any(x in name for x in ["حفار","excavator","تركس","لودر","loader","كاتربلر","caterpillar","volvo ec","hyundai r"]): cat="heavy"
+        elif any(x in name for x in ["شاحنة","truck","fh","scania","قاطر"]): cat="trucks"
+        elif any(x in name for x in ["محرك","engine","gearbox","جير","دفرنس","ناقل"]): cat="engines"
+        elif any(x in name for x in ["سيارة","sedan","bmw","mercedes","hyundai","kia","toyota","volkswagen"]): cat="cars"
+        else: cat="parts"
+        if category and category!=cat: continue
+        price=latest_purchase.get(p.sku,{})
+        out.append({"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"category":cat,"stock":float(p.owned_stock or 0)+float(p.consigned_stock or 0),"sale_price":price.get("sale_price"),"currency":price.get("currency","")})
+    return out
+
 # Serve the connected responsive web app from the same origin as the API.
 from pathlib import Path
 from fastapi.responses import FileResponse
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 @app.get("/", include_in_schema=False)
 def home():
-    return FileResponse(FRONTEND_DIR / "index.html")
+    return FileResponse(FRONTEND_DIR / "store.html")
 
-@app.get("/sham_cash_qr.png", include_in_schema=False)
+@app.get("/accounting", include_in_schema=False)\ndef accounting_app():\n    return FileResponse(FRONTEND_DIR / "index.html")\n\n@app.get("/sham_cash_qr.png", include_in_schema=False)
 def sham_cash_qr():
     return FileResponse(FRONTEND_DIR / "sham_cash_qr.png", media_type="image/png")
 
