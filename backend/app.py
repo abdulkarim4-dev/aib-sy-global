@@ -42,6 +42,7 @@ class User(Base):
     email_verified: Mapped[bool]=mapped_column(Boolean, default=False, nullable=False)
     password_hash: Mapped[str]=mapped_column(String(300))
     role: Mapped[str]=mapped_column(String(20), default="employee")
+    permissions: Mapped[dict]=mapped_column(JSON, default=dict, nullable=False)
     active: Mapped[bool]=mapped_column(Boolean, default=True)
     failed_logins: Mapped[int]=mapped_column(Integer, default=0)
     locked_until: Mapped[Optional[datetime]]=mapped_column(DateTime(timezone=True), nullable=True)
@@ -165,6 +166,17 @@ def manager(u:User=Depends(current_user)):
     if u.role!="owner": raise HTTPException(403,"هذا الإجراء متاح للمدير فقط")
     return u
 def can_add(u:User=Depends(current_user)): return u
+
+PERMISSION_SCHEMA={"inventory":{"view"},"invoices":{"view","create","edit","delete","print"},"cash":{"view","create","edit","delete","print"}}
+def has_permission(user:User,module:str,action:str)->bool:
+    if user.role=="owner": return True
+    return bool(((user.permissions or {}).get(module) or {}).get(action,False))
+def require_permission(module:str,action:str):
+    def checker(u:User=Depends(current_user)):
+        if not has_permission(u,module,action):
+            raise HTTPException(403,"ليست لديك صلاحية تنفيذ هذا الإجراء. راجع المالك لمنحك الإذن.")
+        return u
+    return checker
 
 @app.on_event("startup")
 def startup():
