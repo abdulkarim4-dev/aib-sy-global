@@ -173,6 +173,7 @@ def startup():
     Base.metadata.create_all(engine)
     # Migrate existing cash_moves before any ORM query selects the new columns.
     with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS permissions JSONB NOT NULL DEFAULT '{}'::jsonb"))
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(254)"))
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT FALSE"))
         conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_email_unique ON users (email) WHERE email IS NOT NULL"))
@@ -239,9 +240,9 @@ def login(form:OAuth2PasswordRequestForm=Depends(), request:Request=None, s:Sess
         audit(s,u,"login_failed","user",u.id,{},request); s.commit(); raise HTTPException(401,"اسم المستخدم أو كلمة المرور غير صحيحة")
     if not u.active: raise HTTPException(403,"الحساب غير فعال")
     u.failed_logins=0; u.locked_until=None; audit(s,u,"login","user",u.id,{},request); s.commit()
-    return {"access_token":token_for(u),"token_type":"bearer","user":{"id":u.id,"username":u.username,"name":u.full_name,"email":u.email if u.email_verified else None,"role":u.role}}
+    return {"access_token":token_for(u),"token_type":"bearer","user":{"id":u.id,"username":u.username,"name":u.full_name,"email":u.email if u.email_verified else None,"role":u.role,"permissions":u.permissions or {}}}
 @app.get("/auth/me")
-def me(u:User=Depends(current_user)): return {"id":u.id,"username":u.username,"name":u.full_name,"email":u.email,"role":u.role}
+def me(u:User=Depends(current_user)): return {"id":u.id,"username":u.username,"name":u.full_name,"email":u.email,"role":u.role,"permissions":u.permissions or {}}
 
 class AccountSettingsPayload(BaseModel):
     email: Optional[str] = None
@@ -378,7 +379,7 @@ def update_company_profile(p:CompanyProfilePayload, request:Request, s:Session=D
 
 @app.get("/users")
 def list_users(s:Session=Depends(db), _:User=Depends(manager)):
-    return [{"id":u.id,"username":u.username,"name":u.full_name,"email":u.email,"role":u.role,"active":u.active} for u in s.scalars(select(User)).all()]
+    return [{"id":u.id,"username":u.username,"name":u.full_name,"email":u.email,"role":u.role,"active":u.active,"permissions":u.permissions or {}} for u in s.scalars(select(User)).all()]
 @app.post("/users")
 def add_user(payload:UserCreate, request:Request, s:Session=Depends(db), u:User=Depends(manager)):
     if payload.role not in ("employee","owner"): raise HTTPException(400,"دور غير صالح")
@@ -387,7 +388,23 @@ def add_user(payload:UserCreate, request:Request, s:Session=Depends(db), u:User=
     if email and (("@" not in email) or ("." not in email.rsplit("@",1)[-1]) or len(email)>254): raise HTTPException(400,"البريد الإلكتروني غير صالح")
     if email and s.scalar(select(User).where(User.email==email)): raise HTTPException(409,"البريد الإلكتروني مستخدم لحساب آخر")
     nu=User(username=payload.username,full_name=payload.full_name,email=email,password_hash=password_hash.hash(payload.password),role="employee")
-    s.add(nu); s.flush(); audit(s,u,"user_created","user",nu.id,{"username":nu.username},request); s.commit(); return {"id":nu.id,"username":nu.username}
+    nu.permissions={}; s.add(nu); s.flush(); audit(s,u,"user_created","user",nu.id,{"username":nu.username},request); s.commit(); return {"id":nu.id,"username":nu.username}
+class UserPermissionsPayload(BaseModel):
+    permissions: dict
+@app.patch("/users/{user_id}/permissions")
+def update_user_permissions(user_id:int,p:UserPermissionsPayload,request:Request,s:Session=Depends(db),u:User=Depends(manager)):
+    target=s.get(User,user_id)
+    if not target: raise HTTPException(404,"المستخدم غير موجود")
+    if target.role=="owner": raise HTTPException(400,"لا يمكن تعديل صلاحيات حساب المالك")
+    clean={}
+    for module,actions in PERMISSION_SCHEMA.items():
+        values=p.permissions.get(module,{})
+        if not isinstance(values,dict): raise HTTPException(400,"صيغة الصلاحيات غير صحيحة")
+        clean[module]={action:bool(values.get(action,False)) for action in actions}
+    target.permissions=clean
+    audit(s,u,"user_permissions_updated","user",user_id,{"permissions":clean},request)
+    s.commit()
+    return {"ok":True,"permissions":clean}
 @app.patch("/users/{user_id}/active")
 def set_user_active(user_id:int, active:bool, request:Request, s:Session=Depends(db), u:User=Depends(manager)):
     target=s.get(User,user_id)
