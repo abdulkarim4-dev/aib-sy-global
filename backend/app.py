@@ -1027,6 +1027,7 @@ def accounting_app():
 def sham_cash_qr():
     return FileResponse(FRONTEND_DIR / "sham_cash_qr.png", media_type="image/png")
 
+@app.get("/logo.jpg", include_in_schema=False)
 @app.get("/logo.png", include_in_schema=False)
 def logo():
     return FileResponse(FRONTEND_DIR / "logo.jpg", media_type="image/jpeg")
