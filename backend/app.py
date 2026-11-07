@@ -64,6 +64,17 @@ class Record(Base):
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
     updated_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
     deleted: Mapped[bool]=mapped_column(Boolean, default=False)
+class InventoryProduct(Base):
+    __tablename__="inventory_products"
+    id: Mapped[int]=mapped_column(primary_key=True)
+    sku: Mapped[str]=mapped_column(String(80), unique=True, index=True)
+    name: Mapped[str]=mapped_column(String(240))
+    model: Mapped[str]=mapped_column(String(160), default="")
+    owned_stock: Mapped[Any]=mapped_column(Numeric(18,3), default=0)
+    consigned_stock: Mapped[Any]=mapped_column(Numeric(18,3), default=0)
+    active: Mapped[bool]=mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
+
 class InvoicePayment(Base):
     __tablename__="invoice_payments"
     id: Mapped[int]=mapped_column(primary_key=True)
@@ -384,6 +395,84 @@ def set_user_active(user_id:int, active:bool, request:Request, s:Session=Depends
     if target.role=="owner": raise HTTPException(400,"لا يمكن تعطيل حساب المالك")
     target.active=active; audit(s,u,"user_status_changed","user",user_id,{"active":active},request); s.commit(); return {"ok":True}
 
+def next_inventory_sku(s:Session)->str:
+    s.execute(text("SELECT pg_advisory_xact_lock(hashtext(:key))"), {"key":"aib-inventory-sku"})
+    serial=int(s.scalar(select(func.count(InventoryProduct.id))) or 0)+1
+    while True:
+        sku=f"AIB-{serial:06d}"
+        if not s.scalar(select(InventoryProduct.id).where(InventoryProduct.sku==sku)):
+            return sku
+        serial+=1
+
+def prepare_record_inventory(s:Session, section:str, raw_data:dict)->dict:
+    data=dict(raw_data or {})
+    items=data.get("items") if isinstance(data.get("items"),list) else []
+    prepared=[]
+    stock_sections={"purchase","directSale","deposit","consignSale"}
+    for raw in items:
+        if not isinstance(raw,dict): continue
+        item=dict(raw)
+        name=str(item.get("description") or item.get("model") or "").strip()
+        model=str(item.get("model") or "").strip()
+        sku=str(item.get("sku") or "").strip().upper()
+        if not name and not sku:
+            prepared.append(item); continue
+        if section not in stock_sections:
+            prepared.append(item); continue
+        product=s.scalar(select(InventoryProduct).where(InventoryProduct.sku==sku)) if sku else None
+        if not sku:
+            if section not in {"purchase","deposit"}:
+                raise HTTPException(400,"أدخل رقم القطعة أو اختر قطعة موجودة عند المبيع. لا يمكن إنشاء رقم جديد لقطعة مباعة دون رصيد سابق.")
+            sku=next_inventory_sku(s)
+        if not product:
+            if section not in {"purchase","deposit"}:
+                raise HTTPException(400,f"رقم القطعة {sku} غير موجود في المخزون. أضفها أولاً عبر الشراء أو الأمانة.")
+            product=InventoryProduct(sku=sku,name=name or sku,model=model)
+            s.add(product)
+            try: s.flush()
+            except Exception:
+                s.rollback()
+                raise HTTPException(409,f"رقم القطعة {sku} مستخدم مسبقاً. ابحث عنها واخترها.")
+        else:
+            if not product.active: raise HTTPException(400,f"القطعة {sku} غير مفعلة")
+            if not name: item["description"]=product.name
+            if not model: item["model"]=product.model
+        item["sku"]=sku
+        prepared.append(item)
+    data["items"]=prepared
+    return data
+
+def recalculate_inventory(s:Session):
+    totals={p.id:{"owned":0.0,"consigned":0.0} for p in s.scalars(select(InventoryProduct)).all()}
+    for record in s.scalars(select(Record).where(Record.deleted.is_(False))).all():
+        if record.section not in {"purchase","directSale","deposit","consignSale"}: continue
+        items=record.data.get("items") if isinstance(record.data,dict) else []
+        for item in items if isinstance(items,list) else []:
+            if not isinstance(item,dict) or not item.get("sku"): continue
+            product=s.scalar(select(InventoryProduct).where(InventoryProduct.sku==str(item["sku"]).strip().upper()))
+            if not product: raise HTTPException(400,f"القطعة {item['sku']} غير مسجلة في دليل المخزون")
+            qty=float(item.get("quantity") or 0)
+            if qty<=0: raise HTTPException(400,f"كمية القطعة {product.sku} يجب أن تكون أكبر من صفر")
+            bucket="owned" if record.section in {"purchase","directSale"} else "consigned"
+            sign=-1 if record.section in {"directSale","consignSale"} else 1
+            totals[product.id][bucket]+=sign*qty
+    for product in s.scalars(select(InventoryProduct)).all():
+        owned=round(totals[product.id]["owned"],3)
+        consigned=round(totals[product.id]["consigned"],3)
+        if owned < -0.0001: raise HTTPException(400,f"الرصيد المملوك للقطعة {product.sku} غير كافٍ. الرصيد الحالي لا يسمح بهذه الكمية.")
+        if consigned < -0.0001: raise HTTPException(400,f"رصيد الأمانة للقطعة {product.sku} غير كافٍ. تحقق من إيداعات الأمانة السابقة.")
+        product.owned_stock=max(0,owned)
+        product.consigned_stock=max(0,consigned)
+
+@app.get("/inventory/products")
+def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=Depends(current_user)):
+    query=select(InventoryProduct).where(InventoryProduct.active.is_(True))
+    if q:
+        term=f"%{q.strip()}%"
+        query=query.where(or_(InventoryProduct.sku.ilike(term),InventoryProduct.name.ilike(term),InventoryProduct.model.ilike(term)))
+    rows=s.scalars(query.order_by(InventoryProduct.sku).limit(300)).all()
+    return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owned_stock":float(p.owned_stock or 0),"consigned_stock":float(p.consigned_stock or 0)} for p in rows]
+
 class RecordCreate(BaseModel): section:str; invoice_no:Optional[str]=None; currency:str="USD"; data:dict
 @app.post("/records")
 def create_record(p:RecordCreate, request:Request, s:Session=Depends(db), u:User=Depends(can_add)):
@@ -394,8 +483,9 @@ def create_record(p:RecordCreate, request:Request, s:Session=Depends(db), u:User
     s.execute(text("SELECT pg_advisory_xact_lock(hashtext(:key))"), {"key":"aib-invoice:"+p.section})
     serial=int(s.scalar(select(func.count(Record.id)).where(Record.section==p.section)) or 0)+1
     invoice_no=f"{section_codes[p.section]}-{serial:05d}-B"
-    r=Record(section=p.section,invoice_no=invoice_no,currency=p.currency,data=p.data,created_by=u.id)
-    s.add(r); s.flush(); audit(s,u,"record_created","record",r.id,{"section":r.section,"invoice_no":r.invoice_no},request); s.commit(); return {"id":r.id,"invoice_no":r.invoice_no,"created_at":r.created_at}
+    prepared_data=prepare_record_inventory(s,p.section,p.data)
+    r=Record(section=p.section,invoice_no=invoice_no,currency=p.currency,data=prepared_data,created_by=u.id)
+    s.add(r); s.flush(); recalculate_inventory(s); audit(s,u,"record_created","record",r.id,{"section":r.section,"invoice_no":r.invoice_no},request); s.commit(); return {"id":r.id,"invoice_no":r.invoice_no,"created_at":r.created_at}
 @app.get("/records")
 def list_records(section:Optional[str]=None, s:Session=Depends(db), u:User=Depends(current_user)):
     q=select(Record).where(Record.deleted==False)
@@ -552,9 +642,11 @@ def apply_approved_change(request_id:int,p:ApprovedChangeApplyPayload,request:Re
         currency=p.currency or rec.currency
         if currency not in {"USD","SYP"}: raise HTTPException(400,"عملة غير مدعومة")
         ensure_total_covers_payments(s,rec.id,p.data)
-        rec.data=p.data; rec.currency=currency; rec.updated_at=datetime.now(timezone.utc)
+        rec.data=prepare_record_inventory(s,rec.section,p.data); rec.currency=currency; rec.updated_at=datetime.now(timezone.utc)
+        recalculate_inventory(s)
     elif cr.action=="delete":
         rec.deleted=True; rec.updated_at=datetime.now(timezone.utc)
+        recalculate_inventory(s)
         for payment in s.scalars(select(InvoicePayment).where(InvoicePayment.record_id==rec.id)).all(): s.delete(payment)
         for cash_move in sale_cash_moves_for_record(s,rec): s.delete(cash_move)
         for cash_move in s.scalars(select(CashMove).where(CashMove.record_id==rec.id)).all(): s.delete(cash_move)
@@ -718,7 +810,8 @@ def update_record(record_id:int, p:RecordUpdate, request:Request, s:Session=Depe
     if not r or r.deleted: raise HTTPException(404,"السجل غير موجود")
     if p.currency not in ("USD","SYP"): raise HTTPException(400,"عملة غير مدعومة")
     ensure_total_covers_payments(s,r.id,p.data)
-    r.data=p.data; r.invoice_no=p.invoice_no; r.currency=p.currency; r.updated_at=datetime.now(timezone.utc)
+    r.data=prepare_record_inventory(s,r.section,p.data); r.invoice_no=p.invoice_no; r.currency=p.currency; r.updated_at=datetime.now(timezone.utc)
+    recalculate_inventory(s)
     audit(s,u,"record_updated","record",r.id,{"section":r.section,"invoice_no":r.invoice_no},request); s.commit(); return {"ok":True}
 
 def sale_cash_moves_for_record(s:Session, record:Record):
@@ -735,6 +828,7 @@ def delete_record(record_id:int, request:Request, s:Session=Depends(db), u:User=
     r=s.get(Record,record_id)
     if not r or r.deleted: raise HTTPException(404,"السجل غير موجود")
     r.deleted=True; r.updated_at=datetime.now(timezone.utc)
+    recalculate_inventory(s)
     for payment in s.scalars(select(InvoicePayment).where(InvoicePayment.record_id==r.id)).all():
         s.delete(payment)
     for cash_move in sale_cash_moves_for_record(s,r):
