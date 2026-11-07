@@ -272,7 +272,7 @@ def cash_box_movements(box_name:str,s:Session=Depends(db),u:User=Depends(current
 
 @app.get("/cash-movements")
 def cash_list(s:Session=Depends(db),u:User=Depends(current_user)):
-    return [{"id":m.id,"box_name":m.box_name,"movement":m.movement,"amount":float(m.amount),"currency":m.currency,"description":m.description,"created_by":m.created_by,"created_at":m.created_at} for m in s.scalars(select(CashMove).order_by(CashMove.id.desc())).all()]
+    return [{"id":m.id,"box_name":m.box_name,"movement":m.movement,"amount":float(m.amount),"currency":m.currency,"description":m.description,"created_by":m.created_by,"created_at":m.created_at,"transfer_group":m.transfer_group} for m in s.scalars(select(CashMove).order_by(CashMove.id.desc())).all()]
 @app.get("/audit-log")
 def audit_log(s:Session=Depends(db),_:User=Depends(manager)):
     rows=s.execute(select(AuditEvent,User).outerjoin(User,AuditEvent.user_id==User.id).order_by(AuditEvent.id.desc()).limit(1000)).all()
