@@ -128,6 +128,11 @@ def startup():
     if settings.jwt_secret.startswith("CHANGE_THIS") and os.getenv("ENVIRONMENT")=="production":
         raise RuntimeError("Set a strong JWT_SECRET before production")
     Base.metadata.create_all(engine)
+    # Migrate existing cash_moves before any ORM query selects the new columns.
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS voided BOOLEAN NOT NULL DEFAULT FALSE"))
+        conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS voided_by INTEGER REFERENCES users(id)"))
+        conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS voided_at TIMESTAMP WITH TIME ZONE"))
     with SessionLocal() as s:
         if not s.get(CompanyProfile,1):
             s.add(CompanyProfile(id=1,data={
