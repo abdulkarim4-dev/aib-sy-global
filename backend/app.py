@@ -487,7 +487,7 @@ def cash_box_movements(box_name:str,s:Session=Depends(db),u:User=Depends(current
 @app.get("/cash-movements")
 def cash_list(s:Session=Depends(db),u:User=Depends(current_user)):
     rows=s.scalars(select(CashMove).order_by(CashMove.id.desc())).all()
-    return [{"id":m.id,"box_name":m.box_name,"movement":m.movement,"amount":float(m.amount),"currency":m.currency,"description":cash_move_display_description(s,m),"created_by":m.created_by,"created_at":m.created_at,"transfer_group":m.transfer_group,"voided":m.voided,"voided_by":m.voided_by,"voided_at":m.voided_at,"sale_locked":is_sale_cash_move(s,m)} for m in rows]
+    return [{"id":m.id,"box_name":m.box_name,"movement":m.movement,"amount":float(m.amount),"currency":m.currency,"description":cash_move_display_description(s,m),"created_by":m.created_by,"created_at":m.created_at,"transfer_group":m.transfer_group,"voided":m.voided,"voided_by":m.voided_by,"voided_at":m.voided_at,"sale_locked":is_sale_cash_move(s,m),"purchase_locked":is_purchase_cash_move(s,m)} for m in rows]
 
 @app.patch("/cash-movements/{move_id}/void")
 def void_cash_movement(move_id:int,request:Request,s:Session=Depends(db),u:User=Depends(manager)):
@@ -549,7 +549,7 @@ def update_record(record_id:int, p:RecordUpdate, request:Request, s:Session=Depe
     audit(s,u,"record_updated","record",r.id,{"section":r.section,"invoice_no":r.invoice_no},request); s.commit(); return {"ok":True}
 
 def sale_cash_moves_for_record(s:Session, record:Record):
-    if record.section not in {"directSale","consignSale","carSale"}:
+    if record.section not in {"directSale","consignSale","carSale","purchase","carPurchase"}:
         return []
     invoice_no=record.invoice_no or str(record.id)
     return s.scalars(select(CashMove).where(or_(
