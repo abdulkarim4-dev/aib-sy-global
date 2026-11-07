@@ -149,6 +149,15 @@ def startup():
                 if not row.invoice_no:
                     row.invoice_no=f"{code}-{serial:05d}-B"
         s.commit()
+    with SessionLocal() as s:
+        for move in s.scalars(select(CashMove).where(CashMove.box_name=="صندوق مبيع الأمانة")).all():
+            move.box_name="صندوق الأمانة"
+        for payment in s.scalars(select(InvoicePayment).where(InvoicePayment.cash_box=="صندوق مبيع الأمانة")).all():
+            payment.cash_box="صندوق الأمانة"
+        for record in s.scalars(select(Record)).all():
+            if isinstance(record.data,dict) and record.data.get("cash_box")=="صندوق مبيع الأمانة":
+                record.data={**record.data,"cash_box":"صندوق الأمانة"}
+        s.commit()
     with engine.begin() as conn:
         conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS transfer_group VARCHAR(36)"))
         conn.execute(text("ALTER TABLE invoice_payments ADD COLUMN IF NOT EXISTS cash_box VARCHAR(100) NOT NULL DEFAULT 'صندوق المبيع'"))
@@ -256,6 +265,7 @@ def add_invoice_payment(record_id:int,p:PaymentPayload,request:Request,s:Session
     x=InvoicePayment(record_id=record_id,amount=p.amount,method=p.method,cash_box=p.cash_box,paid_at=p.paid_at or datetime.now(timezone.utc),created_by=u.id)
     s.add(x); s.flush()
     movement="withdrawal" if r.section in {"purchase","carPurchase"} else "deposit"
+    if movement=="withdrawal": ensure_cash_balance(s,p.cash_box,r.currency,p.amount)
     s.add(CashMove(box_name=p.cash_box,movement=movement,amount=p.amount,currency=r.currency,description=("دفعة فاتورة "+(r.invoice_no or str(r.id))),created_by=u.id))
     audit(s,u,"invoice_payment_created","invoice_payment",x.id,{"record_id":record_id,"amount":p.amount,"method":p.method,"cash_box":p.cash_box,"cash_movement":movement},request); s.commit()
     return {"id":x.id,"record_id":record_id,"amount":float(x.amount),"method":x.method,"cash_box":x.cash_box,"paid_at":x.paid_at}
@@ -275,6 +285,7 @@ class PaymentUpdatePayload(BaseModel):
 def reverse_payment_cash_move(s:Session, r:Record, payment:InvoicePayment, u:User, reason:str):
     movement="withdrawal" if r.section in {"purchase","carPurchase"} else "deposit"
     reverse="deposit" if movement=="withdrawal" else "withdrawal"
+    if reverse=="withdrawal": ensure_cash_balance(s,payment.cash_box,r.currency,float(payment.amount))
     s.add(CashMove(box_name=payment.cash_box,movement=reverse,amount=payment.amount,currency=r.currency,description=f"تسوية عكسية للدفعة رقم {payment.id} - فاتورة {r.invoice_no or r.id} ({reason})",created_by=u.id))
 
 @app.put("/records/{record_id}/payments/{payment_id}")
@@ -289,7 +300,8 @@ def update_invoice_payment(record_id:int,payment_id:int,p:PaymentUpdatePayload,r
     changed=(round(float(x.amount),2)!=round(p.amount,2) or x.method!=p.method or x.cash_box!=p.cash_box or (p.paid_at and x.paid_at!=p.paid_at))
     if not changed: return {"ok":True,"unchanged":True}
     reverse_payment_cash_move(s,r,x,u,"تعديل")
-    movement="withdrawal" if r.section=="purchase" else "deposit"
+    movement="withdrawal" if r.section in {"purchase","carPurchase"} else "deposit"
+    if movement=="withdrawal": ensure_cash_balance(s,p.cash_box,r.currency,p.amount)
     s.add(CashMove(box_name=p.cash_box,movement=movement,amount=p.amount,currency=r.currency,description=f"تسجيل بديل للدفعة رقم {x.id} - فاتورة {r.invoice_no or r.id}",created_by=u.id))
     old={"amount":float(x.amount),"method":x.method,"cash_box":x.cash_box,"paid_at":str(x.paid_at)}
     x.amount=p.amount; x.method=p.method; x.cash_box=p.cash_box
@@ -343,18 +355,26 @@ class CashTransferPayload(BaseModel):
     amount:float=Field(gt=0)
     currency:str="USD"
     description:str=""
+def ensure_cash_balance(s:Session, box_name:str, currency:str, amount:float):
+    # Serialize all withdrawals/transfers for the same box and currency.
+    s.execute(select(func.pg_advisory_xact_lock(func.hashtext(box_name),func.hashtext(currency))))
+    rows=s.scalars(select(CashMove).where(CashMove.box_name==box_name,CashMove.currency==currency)).all()
+    balance=sum((1 if x.movement in ("deposit","transfer_in") else -1)*float(x.amount) for x in rows)
+    if round(balance,2)<round(float(amount),2):
+        raise HTTPException(400,f"رصيد الصندوق غير كافٍ. الرصيد المتاح: {balance:.2f} {currency}")
+    return balance
+
 @app.post("/cash-movements")
 def cash_move(p:CashPayload,request:Request,s:Session=Depends(db),u:User=Depends(can_add)):
     if p.movement not in ("deposit","withdrawal"): raise HTTPException(400,"اختر إيداعاً أو سحباً؛ التحويل بين الصناديق له عملية مستقلة")
     if p.currency not in ("USD","SYP"): raise HTTPException(400,"عملة غير مدعومة")
+    if p.movement=="withdrawal": ensure_cash_balance(s,p.box_name,p.currency,p.amount)
     m=CashMove(**p.model_dump(),created_by=u.id); s.add(m); s.flush(); audit(s,u,"cash_movement_created","cash",m.id,{"box":p.box_name,"movement":p.movement,"amount":p.amount,"currency":p.currency},request); s.commit(); return {"id":m.id}
 @app.post("/cash-transfers")
 def cash_transfer(p:CashTransferPayload,request:Request,s:Session=Depends(db),u:User=Depends(can_add)):
     if p.source_box==p.destination_box: raise HTTPException(400,"يجب اختيار صندوقين مختلفين")
     if p.currency not in ("USD","SYP"): raise HTTPException(400,"عملة غير مدعومة")
-    rows=s.scalars(select(CashMove).where(CashMove.box_name==p.source_box,CashMove.currency==p.currency).with_for_update()).all()
-    balance=sum((1 if x.movement in ("deposit","transfer_in") else -1)*float(x.amount) for x in rows)
-    if round(balance,2)<round(p.amount,2): raise HTTPException(400,"رصيد الصندوق المصدر غير كافٍ")
+    ensure_cash_balance(s,p.source_box,p.currency,p.amount)
     import uuid
     group=str(uuid.uuid4())
     source=CashMove(box_name=p.source_box,movement="withdrawal",amount=p.amount,currency=p.currency,description=("تحويل إلى "+p.destination_box+" · "+p.description).strip(" ·"),created_by=u.id,transfer_group=group)
