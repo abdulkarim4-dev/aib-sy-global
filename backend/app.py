@@ -264,7 +264,7 @@ def send_verification_email(email:str, code:str):
         "sender": {"name": settings.brevo_sender_name, "email": settings.brevo_sender_email},
         "to": [{"email": email}],
         "subject": "رمز التحقق من البريد الإلكتروني - AIB",
-        "textContent": f"رمز التحقق الخاص بك في تطبيق AIB هو: {code}\\nصلاحية الرمز 10 دقائق. لا تشاركه مع أحد."
+        "textContent": f"رمز التحقق الخاص بك في تطبيق AIB هو: {code}\nصلاحية الرمز 10 دقائق. لا تشاركه مع أحد."
     }
     req = UrlRequest(
         "https://api.brevo.com/v3/smtp/email",
