@@ -73,6 +73,9 @@ class CashMove(Base):
     created_by: Mapped[int]=mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
     transfer_group: Mapped[Optional[str]]=mapped_column(String(36), nullable=True, index=True)
+    voided: Mapped[bool]=mapped_column(Boolean, default=False, nullable=False)
+    voided_by: Mapped[Optional[int]]=mapped_column(ForeignKey("users.id"), nullable=True)
+    voided_at: Mapped[Optional[datetime]]=mapped_column(DateTime(timezone=True), nullable=True)
 class ChangeRequest(Base):
     __tablename__="record_change_requests"
     id: Mapped[int]=mapped_column(primary_key=True)
@@ -160,6 +163,9 @@ def startup():
         s.commit()
     with engine.begin() as conn:
         conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS transfer_group VARCHAR(36)"))
+        conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS voided BOOLEAN NOT NULL DEFAULT FALSE"))
+        conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS voided_by INTEGER REFERENCES users(id)"))
+        conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS voided_at TIMESTAMP WITH TIME ZONE"))
         conn.execute(text("ALTER TABLE invoice_payments ADD COLUMN IF NOT EXISTS cash_box VARCHAR(100) NOT NULL DEFAULT 'صندوق المبيع'"))
     if settings.owner_password:
         with SessionLocal() as s:
@@ -358,7 +364,7 @@ class CashTransferPayload(BaseModel):
 def ensure_cash_balance(s:Session, box_name:str, currency:str, amount:float):
     # Serialize all withdrawals/transfers for the same box and currency.
     s.execute(select(func.pg_advisory_xact_lock(func.hashtext(box_name),func.hashtext(currency))))
-    rows=s.scalars(select(CashMove).where(CashMove.box_name==box_name,CashMove.currency==currency)).all()
+    rows=s.scalars(select(CashMove).where(CashMove.box_name==box_name,CashMove.currency==currency,CashMove.voided.is_(False))).all()
     balance=sum((1 if x.movement in ("deposit","transfer_in") else -1)*float(x.amount) for x in rows)
     if round(balance,2)<round(float(amount),2):
         raise HTTPException(400,f"رصيد الصندوق غير كافٍ. الرصيد المتاح: {balance:.2f} {currency}")
@@ -387,11 +393,38 @@ def cash_transfer(p:CashTransferPayload,request:Request,s:Session=Depends(db),u:
 @app.get("/cash-boxes/{box_name}/movements")
 def cash_box_movements(box_name:str,s:Session=Depends(db),u:User=Depends(current_user)):
     rows=s.scalars(select(CashMove).where(CashMove.box_name==box_name).order_by(CashMove.id.desc())).all()
-    return [{"id":m.id,"box_name":m.box_name,"movement":m.movement,"amount":float(m.amount),"currency":m.currency,"description":m.description,"created_by":m.created_by,"created_at":m.created_at,"transfer_group":m.transfer_group} for m in rows]
+    return [{"id":m.id,"box_name":m.box_name,"movement":m.movement,"amount":float(m.amount),"currency":m.currency,"description":m.description,"created_by":m.created_by,"created_at":m.created_at,"transfer_group":m.transfer_group,"voided":m.voided,"voided_by":m.voided_by,"voided_at":m.voided_at} for m in rows]
 
 @app.get("/cash-movements")
 def cash_list(s:Session=Depends(db),u:User=Depends(current_user)):
-    return [{"id":m.id,"box_name":m.box_name,"movement":m.movement,"amount":float(m.amount),"currency":m.currency,"description":m.description,"created_by":m.created_by,"created_at":m.created_at,"transfer_group":m.transfer_group} for m in s.scalars(select(CashMove).order_by(CashMove.id.desc())).all()]
+    rows=s.scalars(select(CashMove).order_by(CashMove.id.desc())).all()
+    return [{"id":m.id,"box_name":m.box_name,"movement":m.movement,"amount":float(m.amount),"currency":m.currency,"description":m.description,"created_by":m.created_by,"created_at":m.created_at,"transfer_group":m.transfer_group,"voided":m.voided,"voided_by":m.voided_by,"voided_at":m.voided_at} for m in rows]
+
+@app.patch("/cash-movements/{move_id}/void")
+def void_cash_movement(move_id:int,request:Request,s:Session=Depends(db),u:User=Depends(manager)):
+    move=s.get(CashMove,move_id)
+    if not move: raise HTTPException(404,"حركة الصندوق غير موجودة")
+    if move.voided: raise HTTPException(400,"هذه الحركة ملغاة مسبقاً")
+    related=[move]
+    if move.transfer_group:
+        related=s.scalars(select(CashMove).where(CashMove.transfer_group==move.transfer_group,CashMove.voided.is_(False))).all()
+    now=datetime.now(timezone.utc)
+    for item in related:
+        item.voided=True; item.voided_by=u.id; item.voided_at=now
+    audit(s,u,"cash_movement_voided","cash",move.id,{"movement_ids":[x.id for x in related],"transfer_group":move.transfer_group,"box":move.box_name,"movement":move.movement,"amount":float(move.amount),"currency":move.currency},request)
+    s.commit(); return {"ok":True,"voided_ids":[x.id for x in related]}
+
+@app.delete("/cash-movements/{move_id}")
+def delete_cash_movement(move_id:int,request:Request,s:Session=Depends(db),u:User=Depends(manager)):
+    move=s.get(CashMove,move_id)
+    if not move: raise HTTPException(404,"حركة الصندوق غير موجودة")
+    related=[move]
+    if move.transfer_group:
+        related=s.scalars(select(CashMove).where(CashMove.transfer_group==move.transfer_group)).all()
+    details={"movement_ids":[x.id for x in related],"transfer_group":move.transfer_group,"box":move.box_name,"movement":move.movement,"amount":float(move.amount),"currency":move.currency,"permanent":True}
+    audit(s,u,"cash_movement_permanently_deleted","cash",move.id,details,request)
+    for item in related: s.delete(item)
+    s.commit(); return {"ok":True,"deleted_ids":details["movement_ids"]}
 @app.get("/audit-log")
 def audit_log(s:Session=Depends(db),_:User=Depends(manager)):
     rows=s.execute(select(AuditEvent,User).outerjoin(User,AuditEvent.user_id==User.id).order_by(AuditEvent.id.desc()).limit(1000)).all()
@@ -426,7 +459,7 @@ def my_requests(s:Session=Depends(db),u:User=Depends(current_user)):
 
 @app.get("/cash-summary")
 def cash_summary(s:Session=Depends(db),u:User=Depends(current_user)):
-    rows=s.scalars(select(CashMove)).all(); out={}
+    rows=s.scalars(select(CashMove).where(CashMove.voided.is_(False))).all(); out={}
     for m in rows:
         key=f"{m.box_name}|{m.currency}"
         sign=1 if m.movement in ("deposit","transfer_in") else -1
