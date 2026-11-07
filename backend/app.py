@@ -964,7 +964,11 @@ FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 def home():
     return FileResponse(FRONTEND_DIR / "store.html")
 
-@app.get("/accounting", include_in_schema=False)\ndef accounting_app():\n    return FileResponse(FRONTEND_DIR / "index.html")\n\n@app.get("/sham_cash_qr.png", include_in_schema=False)
+@app.get("/accounting", include_in_schema=False)
+def accounting_app():
+    return FileResponse(FRONTEND_DIR / "index.html")
+
+@app.get("/sham_cash_qr.png", include_in_schema=False)
 def sham_cash_qr():
     return FileResponse(FRONTEND_DIR / "sham_cash_qr.png", media_type="image/png")
 
