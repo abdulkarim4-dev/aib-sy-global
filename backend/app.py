@@ -285,7 +285,7 @@ def invoice_cash_description(record:Record, action:str="دفعة فاتورة")-
         if fallback: names=[str(fallback).strip()]
         elif data.get("car_make") or data.get("car_model"):
             names=[" ".join(str(data.get(k) or "").strip() for k in ("car_make","car_model","car_year") if data.get(k))]
-    parts=[f"{action} رقم {invoice}",section_names.get(section,section)]
+    parts=[action,section_names.get(section,section)]
     if names: parts.append(item_label+": "+ "، ".join(names))
     party=data.get("customer") or data.get("supplier")
     if party: parts.append(("المورد: " if section in {"purchase","carPurchase"} else "العميل: ")+str(party).strip())
@@ -422,6 +422,21 @@ def is_sale_cash_move(s:Session, move:CashMove)->bool:
     return any((r.invoice_no and r.invoice_no in desc) or
                (("فاتورة "+str(r.id)) in desc) for r in legacy)
 
+def is_purchase_cash_move(s:Session, move:CashMove)->bool:
+    if move.movement not in {"withdrawal","transfer_out"}:
+        return False
+    if move.record_id:
+        rec=s.get(Record,move.record_id)
+        if rec and rec.section in {"purchase","carPurchase"}:
+            return True
+    desc=move.description or ""
+    legacy=s.scalars(select(Record).where(
+        Record.section.in_(["purchase","carPurchase"]),
+        Record.deleted.is_(False)
+    )).all()
+    return any((r.invoice_no and r.invoice_no in desc) or
+               (("فاتورة "+str(r.id)) in desc) for r in legacy)
+
 def ensure_cash_reversal_safe(s:Session, moves:list[CashMove]):
     active=[m for m in moves if not m.voided]
     if not active: return
@@ -467,7 +482,7 @@ def cash_move_display_description(s:Session, move:CashMove)->str:
 @app.get("/cash-boxes/{box_name}/movements")
 def cash_box_movements(box_name:str,s:Session=Depends(db),u:User=Depends(current_user)):
     rows=s.scalars(select(CashMove).where(CashMove.box_name==box_name).order_by(CashMove.id.desc())).all()
-    return [{"id":m.id,"box_name":m.box_name,"movement":m.movement,"amount":float(m.amount),"currency":m.currency,"description":cash_move_display_description(s,m),"created_by":m.created_by,"created_at":m.created_at,"transfer_group":m.transfer_group,"voided":m.voided,"voided_by":m.voided_by,"voided_at":m.voided_at,"sale_locked":is_sale_cash_move(s,m)} for m in rows]
+    return [{"id":m.id,"box_name":m.box_name,"movement":m.movement,"amount":float(m.amount),"currency":m.currency,"description":cash_move_display_description(s,m),"created_by":m.created_by,"created_at":m.created_at,"transfer_group":m.transfer_group,"voided":m.voided,"voided_by":m.voided_by,"voided_at":m.voided_at,"sale_locked":is_sale_cash_move(s,m),"purchase_locked":is_purchase_cash_move(s,m)} for m in rows]
 
 @app.get("/cash-movements")
 def cash_list(s:Session=Depends(db),u:User=Depends(current_user)):
@@ -479,6 +494,7 @@ def void_cash_movement(move_id:int,request:Request,s:Session=Depends(db),u:User=
     move=s.get(CashMove,move_id)
     if not move: raise HTTPException(404,"حركة الصندوق غير موجودة")
     if is_sale_cash_move(s,move): raise HTTPException(403,"واردات المبيعات مرتبطة بالبيعة ولا يمكن إلغاؤها أو حذفها منفردة")
+    if is_purchase_cash_move(s,move): raise HTTPException(403,"مبالغ الشراء مرتبطة بفاتورة الشراء ولا يمكن إلغاؤها من الصندوق منفردة")
     if move.voided: raise HTTPException(400,"هذه الحركة ملغاة مسبقاً")
     related=[move]
     if move.transfer_group:
@@ -495,6 +511,7 @@ def delete_cash_movement(move_id:int,request:Request,s:Session=Depends(db),u:Use
     move=s.get(CashMove,move_id)
     if not move: raise HTTPException(404,"حركة الصندوق غير موجودة")
     if is_sale_cash_move(s,move): raise HTTPException(403,"لا يمكن حذف واردات المبيعات منفردة؛ احذف البيعة كاملة")
+    if is_purchase_cash_move(s,move): raise HTTPException(403,"مبالغ الشراء مرتبطة بفاتورة الشراء ولا يمكن حذفها من الصندوق منفردة")
     related=[move]
     if move.transfer_group:
         related=s.scalars(select(CashMove).where(CashMove.transfer_group==move.transfer_group)).all()
