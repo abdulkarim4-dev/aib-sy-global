@@ -73,6 +73,7 @@ class CashMove(Base):
     created_by: Mapped[int]=mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
     transfer_group: Mapped[Optional[str]]=mapped_column(String(36), nullable=True, index=True)
+    record_id: Mapped[Optional[int]]=mapped_column(ForeignKey("records.id"), nullable=True, index=True)
     voided: Mapped[bool]=mapped_column(Boolean, default=False, nullable=False)
     voided_by: Mapped[Optional[int]]=mapped_column(ForeignKey("users.id"), nullable=True)
     voided_at: Mapped[Optional[datetime]]=mapped_column(DateTime(timezone=True), nullable=True)
@@ -131,6 +132,7 @@ def startup():
     # Migrate existing cash_moves before any ORM query selects the new columns.
     with engine.begin() as conn:
         conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS voided BOOLEAN NOT NULL DEFAULT FALSE"))
+        conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS record_id INTEGER REFERENCES records(id)"))
         conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS voided_by INTEGER REFERENCES users(id)"))
         conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS voided_at TIMESTAMP WITH TIME ZONE"))
     with SessionLocal() as s:
@@ -277,7 +279,7 @@ def add_invoice_payment(record_id:int,p:PaymentPayload,request:Request,s:Session
     s.add(x); s.flush()
     movement="withdrawal" if r.section in {"purchase","carPurchase"} else "deposit"
     if movement=="withdrawal": ensure_cash_balance(s,p.cash_box,r.currency,p.amount)
-    s.add(CashMove(box_name=p.cash_box,movement=movement,amount=p.amount,currency=r.currency,description=("دفعة فاتورة "+(r.invoice_no or str(r.id))),created_by=u.id))
+    s.add(CashMove(box_name=p.cash_box,movement=movement,amount=p.amount,currency=r.currency,description=("دفعة فاتورة "+(r.invoice_no or str(r.id))),created_by=u.id,record_id=r.id))
     audit(s,u,"invoice_payment_created","invoice_payment",x.id,{"record_id":record_id,"amount":p.amount,"method":p.method,"cash_box":p.cash_box,"cash_movement":movement},request); s.commit()
     return {"id":x.id,"record_id":record_id,"amount":float(x.amount),"method":x.method,"cash_box":x.cash_box,"paid_at":x.paid_at}
 
@@ -297,7 +299,7 @@ def reverse_payment_cash_move(s:Session, r:Record, payment:InvoicePayment, u:Use
     movement="withdrawal" if r.section in {"purchase","carPurchase"} else "deposit"
     reverse="deposit" if movement=="withdrawal" else "withdrawal"
     if reverse=="withdrawal": ensure_cash_balance(s,payment.cash_box,r.currency,float(payment.amount))
-    s.add(CashMove(box_name=payment.cash_box,movement=reverse,amount=payment.amount,currency=r.currency,description=f"تسوية عكسية للدفعة رقم {payment.id} - فاتورة {r.invoice_no or r.id} ({reason})",created_by=u.id))
+    s.add(CashMove(box_name=payment.cash_box,movement=reverse,amount=payment.amount,currency=r.currency,description=f"تسوية عكسية للدفعة رقم {payment.id} - فاتورة {r.invoice_no or r.id} ({reason})",created_by=u.id,record_id=r.id))
 
 @app.put("/records/{record_id}/payments/{payment_id}")
 def update_invoice_payment(record_id:int,payment_id:int,p:PaymentUpdatePayload,request:Request,s:Session=Depends(db),u:User=Depends(manager)):
@@ -313,7 +315,7 @@ def update_invoice_payment(record_id:int,payment_id:int,p:PaymentUpdatePayload,r
     reverse_payment_cash_move(s,r,x,u,"تعديل")
     movement="withdrawal" if r.section in {"purchase","carPurchase"} else "deposit"
     if movement=="withdrawal": ensure_cash_balance(s,p.cash_box,r.currency,p.amount)
-    s.add(CashMove(box_name=p.cash_box,movement=movement,amount=p.amount,currency=r.currency,description=f"تسجيل بديل للدفعة رقم {x.id} - فاتورة {r.invoice_no or r.id}",created_by=u.id))
+    s.add(CashMove(box_name=p.cash_box,movement=movement,amount=p.amount,currency=r.currency,description=f"تسجيل بديل للدفعة رقم {x.id} - فاتورة {r.invoice_no or r.id}",created_by=u.id,record_id=r.id))
     old={"amount":float(x.amount),"method":x.method,"cash_box":x.cash_box,"paid_at":str(x.paid_at)}
     x.amount=p.amount; x.method=p.method; x.cash_box=p.cash_box
     if p.paid_at: x.paid_at=p.paid_at
@@ -353,7 +355,10 @@ def approve(request_id:int,approve:bool,request:Request,s:Session=Depends(db),u:
     if not cr or cr.status!="pending": raise HTTPException(404,"الطلب غير موجود أو تمت معالجته")
     rec=s.get(Record,cr.record_id)
     if approve:
-        if cr.action=="delete": rec.deleted=True
+        if cr.action=="delete":
+            rec.deleted=True
+            for payment in s.scalars(select(InvoicePayment).where(InvoicePayment.record_id==rec.id)).all(): s.delete(payment)
+            for cash_move in s.scalars(select(CashMove).where(CashMove.record_id==rec.id)).all(): s.delete(cash_move)
         else:
             ensure_total_covers_payments(s,rec.id,cr.proposed_data)
             rec.data=cr.proposed_data; rec.updated_at=datetime.now(timezone.utc)
@@ -374,6 +379,22 @@ def ensure_cash_balance(s:Session, box_name:str, currency:str, amount:float):
     if round(balance,2)<round(float(amount),2):
         raise HTTPException(400,f"رصيد الصندوق غير كافٍ. الرصيد المتاح: {balance:.2f} {currency}")
     return balance
+
+def is_sale_cash_move(s:Session, move:CashMove)->bool:
+    # Protect sale proceeds by explicit record linkage; also recognize legacy sale-payment rows.
+    if move.record_id:
+        rec=s.get(Record,move.record_id)
+        if rec and rec.section in {"directSale","consignSale","carSale"}:
+            return True
+    if move.movement not in {"deposit","transfer_in"}:
+        return False
+    legacy=s.scalars(select(Record).where(
+        Record.section.in_(["directSale","consignSale","carSale"]),
+        Record.deleted.is_(False)
+    )).all()
+    desc=(move.description or "")
+    return any((r.invoice_no and r.invoice_no in desc) or
+               (("فاتورة "+str(r.id)) in desc) for r in legacy)
 
 def ensure_cash_reversal_safe(s:Session, moves:list[CashMove]):
     active=[m for m in moves if not m.voided]
@@ -421,6 +442,7 @@ def cash_list(s:Session=Depends(db),u:User=Depends(current_user)):
 def void_cash_movement(move_id:int,request:Request,s:Session=Depends(db),u:User=Depends(manager)):
     move=s.get(CashMove,move_id)
     if not move: raise HTTPException(404,"حركة الصندوق غير موجودة")
+    if is_sale_cash_move(s,move): raise HTTPException(403,"واردات المبيعات مرتبطة بالبيعة ولا يمكن إلغاؤها أو حذفها منفردة")
     if move.voided: raise HTTPException(400,"هذه الحركة ملغاة مسبقاً")
     related=[move]
     if move.transfer_group:
@@ -468,8 +490,7 @@ def update_record(record_id:int, p:RecordUpdate, request:Request, s:Session=Depe
 def delete_record(record_id:int, request:Request, s:Session=Depends(db), u:User=Depends(manager)):
     r=s.get(Record,record_id)
     if not r or r.deleted: raise HTTPException(404,"السجل غير موجود")
-    r.deleted=True; r.updated_at=datetime.now(timezone.utc)
-    audit(s,u,"record_deleted","record",r.id,{"section":r.section},request); s.commit(); return {"ok":True}
+undefined
 
 @app.get("/my-change-requests")
 def my_requests(s:Session=Depends(db),u:User=Depends(current_user)):
