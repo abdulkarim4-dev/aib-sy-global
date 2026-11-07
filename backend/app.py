@@ -1029,7 +1029,7 @@ def sham_cash_qr():
 
 @app.get("/logo.png", include_in_schema=False)
 def logo():
-    return FileResponse(FRONTEND_DIR / "logo.png", media_type="image/png")
+    return FileResponse(FRONTEND_DIR / "logo.jpg", media_type="image/jpeg")
 
 
 @app.get("/accounting-portal", include_in_schema=False)
