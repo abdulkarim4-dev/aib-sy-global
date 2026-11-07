@@ -1006,3 +1006,8 @@ def sham_cash_qr():
 @app.get("/logo.png", include_in_schema=False)
 def logo():
     return FileResponse(FRONTEND_DIR / "logo.png", media_type="image/png")
+
+
+@app.get("/accounting-portal", include_in_schema=False)
+def accounting_portal():
+    return FileResponse(FRONTEND_DIR / "accounting-portal.html")
