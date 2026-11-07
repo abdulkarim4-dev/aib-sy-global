@@ -454,10 +454,20 @@ def cash_transfer(p:CashTransferPayload,request:Request,s:Session=Depends(db),u:
     s.commit()
     return {"ok":True,"transfer_group":group,"source_movement_id":source.id,"destination_movement_id":dest.id}
 
+def cash_move_display_description(s:Session, move:CashMove)->str:
+    record=s.get(Record,move.record_id) if move.record_id else None
+    if not record and move.description:
+        candidates=s.scalars(select(Record).where(Record.deleted.is_(False))).all()
+        record=next((r for r in candidates if r.invoice_no and r.invoice_no in move.description),None)
+    if record and not record.deleted:
+        action="قبض" if move.movement in {"deposit","transfer_in"} else "صرف" if move.movement in {"withdrawal","transfer_out"} else "حركة"
+        return invoice_cash_description(record,action)
+    return move.description or ""
+
 @app.get("/cash-boxes/{box_name}/movements")
 def cash_box_movements(box_name:str,s:Session=Depends(db),u:User=Depends(current_user)):
     rows=s.scalars(select(CashMove).where(CashMove.box_name==box_name).order_by(CashMove.id.desc())).all()
-    return [{"id":m.id,"box_name":m.box_name,"movement":m.movement,"amount":float(m.amount),"currency":m.currency,"description":m.description,"created_by":m.created_by,"created_at":m.created_at,"transfer_group":m.transfer_group,"voided":m.voided,"voided_by":m.voided_by,"voided_at":m.voided_at,"sale_locked":is_sale_cash_move(s,m)} for m in rows]
+    return [{"id":m.id,"box_name":m.box_name,"movement":m.movement,"amount":float(m.amount),"currency":m.currency,"description":cash_move_display_description(s,m),"created_by":m.created_by,"created_at":m.created_at,"transfer_group":m.transfer_group,"voided":m.voided,"voided_by":m.voided_by,"voided_at":m.voided_at,"sale_locked":is_sale_cash_move(s,m)} for m in rows]
 
 @app.get("/cash-movements")
 def cash_list(s:Session=Depends(db),u:User=Depends(current_user)):
