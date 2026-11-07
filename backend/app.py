@@ -675,7 +675,7 @@ def my_requests(s:Session=Depends(db),u:User=Depends(current_user)):
     out=[]
     for x in rows:
         rec=s.get(Record,x.record_id)
-        out.append({"id":x.id,"record_id":x.record_id,"section":rec.section if rec else None,"invoice_no":rec.invoice_no if rec else None,"action":x.action,"reason":x.reason,"status":x.status,"created_at":x.created_at})
+        out.append({"id":x.id,"record_id":x.record_id,"section":rec.section if rec else None,"invoice_no":rec.invoice_no if rec else None,"action":x.action,"proposed_data":x.proposed_data,"reason":x.reason,"status":x.status,"created_at":x.created_at})
     return out
 
 @app.get("/cash-summary")
