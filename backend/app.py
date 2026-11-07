@@ -165,7 +165,7 @@ def set_user_active(user_id:int, active:bool, request:Request, s:Session=Depends
 class RecordCreate(BaseModel): section:str; invoice_no:Optional[str]=None; currency:str="USD"; data:dict
 @app.post("/records")
 def create_record(p:RecordCreate, request:Request, s:Session=Depends(db), u:User=Depends(can_add)):
-    if p.section not in {"deposit","purchase","consignSale","directSale","repair"}: raise HTTPException(400,"قسم غير معروف")
+    if p.section not in {"deposit","purchase","consignSale","directSale","repair","carPurchase","carSale"}: raise HTTPException(400,"قسم غير معروف")
     if p.currency not in {"USD","SYP"}: raise HTTPException(400,"عملة غير مدعومة")
     r=Record(section=p.section,invoice_no=p.invoice_no,currency=p.currency,data=p.data,created_by=u.id)
     s.add(r); s.flush(); audit(s,u,"record_created","record",r.id,{"section":r.section,"invoice_no":r.invoice_no},request); s.commit(); return {"id":r.id,"created_at":r.created_at}
