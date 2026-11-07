@@ -260,7 +260,7 @@ def send_verification_email(email:str, code:str):
     msg["Subject"]="رمز التحقق من البريد الإلكتروني - AIB"
     msg["From"]=settings.smtp_from
     msg["To"]=email
-    msg.set_content(f"رمز التحقق الخاص بك في تطبيق AIB هو: {code}\\nصلاحية الرمز 10 دقائق. لا تشاركه مع أحد.")
+    msg.set_content(f"رمز التحقق الخاص بك في تطبيق AIB هو: {code}\nصلاحية الرمز 10 دقائق. لا تشاركه مع أحد.")
     try:
         with smtplib.SMTP(settings.smtp_host,settings.smtp_port,timeout=15) as server:
             server.starttls()
