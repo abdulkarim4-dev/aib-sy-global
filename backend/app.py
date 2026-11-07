@@ -208,6 +208,47 @@ def list_invoice_payments(record_id:int,s:Session=Depends(db),u:User=Depends(cur
     if not r or r.deleted: raise HTTPException(404,"الفاتورة غير موجودة")
     return [{"id":x.id,"amount":float(x.amount),"method":x.method,"cash_box":x.cash_box,"paid_at":x.paid_at} for x in s.scalars(select(InvoicePayment).where(InvoicePayment.record_id==record_id).order_by(InvoicePayment.id)).all()]
 
+class PaymentUpdatePayload(BaseModel):
+    amount: float = Field(gt=0)
+    method: str
+    paid_at: Optional[datetime] = None
+    cash_box: str
+
+def reverse_payment_cash_move(s:Session, r:Record, payment:InvoicePayment, u:User, reason:str):
+    movement="withdrawal" if r.section=="purchase" else "deposit"
+    reverse="deposit" if movement=="withdrawal" else "withdrawal"
+    s.add(CashMove(box_name=payment.cash_box,movement=reverse,amount=payment.amount,currency=r.currency,description=f"تسوية عكسية للدفعة رقم {payment.id} - فاتورة {r.invoice_no or r.id} ({reason})",created_by=u.id))
+
+@app.put("/records/{record_id}/payments/{payment_id}")
+def update_invoice_payment(record_id:int,payment_id:int,p:PaymentUpdatePayload,request:Request,s:Session=Depends(db),u:User=Depends(manager)):
+    r=s.get(Record,record_id); x=s.get(InvoicePayment,payment_id)
+    if not r or r.deleted or not x or x.record_id!=record_id: raise HTTPException(404,"الدفعة غير موجودة")
+    if p.method not in {"cash","baraka_bank","sham_cash","syriatel_cash"}: raise HTTPException(400,"طريقة الدفع غير صالحة")
+    if not p.cash_box.strip(): raise HTTPException(400,"اختر الصندوق")
+    paid=float(s.scalar(select(func.coalesce(func.sum(InvoicePayment.amount),0)).where(InvoicePayment.record_id==record_id)) or 0)
+    total=float(r.data.get("amount",r.data.get("price",r.data.get("sale",0))) or 0)
+    if round(paid-float(x.amount)+p.amount,2)>round(total,2): raise HTTPException(400,"مجموع الدفعات بعد التعديل يتجاوز إجمالي الفاتورة")
+    changed=(round(float(x.amount),2)!=round(p.amount,2) or x.method!=p.method or x.cash_box!=p.cash_box or (p.paid_at and x.paid_at!=p.paid_at))
+    if not changed: return {"ok":True,"unchanged":True}
+    reverse_payment_cash_move(s,r,x,u,"تعديل")
+    movement="withdrawal" if r.section=="purchase" else "deposit"
+    s.add(CashMove(box_name=p.cash_box,movement=movement,amount=p.amount,currency=r.currency,description=f"تسجيل بديل للدفعة رقم {x.id} - فاتورة {r.invoice_no or r.id}",created_by=u.id))
+    old={"amount":float(x.amount),"method":x.method,"cash_box":x.cash_box,"paid_at":str(x.paid_at)}
+    x.amount=p.amount; x.method=p.method; x.cash_box=p.cash_box
+    if p.paid_at: x.paid_at=p.paid_at
+    audit(s,u,"invoice_payment_updated","invoice_payment",x.id,{"record_id":record_id,"old":old,"new":{"amount":p.amount,"method":p.method,"cash_box":p.cash_box,"paid_at":str(x.paid_at)},"cash_adjustment":"automatic_reversal_and_replacement"},request)
+    s.commit()
+    return {"ok":True,"id":x.id}
+
+@app.delete("/records/{record_id}/payments/{payment_id}")
+def delete_invoice_payment(record_id:int,payment_id:int,request:Request,s:Session=Depends(db),u:User=Depends(manager)):
+    r=s.get(Record,record_id); x=s.get(InvoicePayment,payment_id)
+    if not r or r.deleted or not x or x.record_id!=record_id: raise HTTPException(404,"الدفعة غير موجودة")
+    reverse_payment_cash_move(s,r,x,u,"حذف")
+    audit(s,u,"invoice_payment_deleted","invoice_payment",x.id,{"record_id":record_id,"amount":float(x.amount),"method":x.method,"cash_box":x.cash_box,"cash_adjustment":"automatic_reversal"},request)
+    s.delete(x); s.commit()
+    return {"ok":True}
+
 class ChangePayload(BaseModel): action:str; proposed_data:Optional[dict]=None; reason:str=Field(min_length=3)
 @app.post("/records/{record_id}/change-requests")
 def request_change(record_id:int,p:ChangePayload,request:Request,s:Session=Depends(db),u:User=Depends(current_user)):
