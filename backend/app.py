@@ -141,6 +141,14 @@ def startup():
                 "residence":"تل الكرامة"
             }))
             s.commit()
+    with SessionLocal() as s:
+        section_codes={"directSale":"A","purchase":"B","consignSale":"C","deposit":"D","repair":"E","carPurchase":"F","carSale":"G"}
+        for section,code in section_codes.items():
+            rows=s.scalars(select(Record).where(Record.section==section).order_by(Record.id)).all()
+            for serial,row in enumerate(rows,1):
+                if not row.invoice_no:
+                    row.invoice_no=f"{code}-{serial:05d}-B"
+        s.commit()
     with engine.begin() as conn:
         conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS transfer_group VARCHAR(36)"))
         conn.execute(text("ALTER TABLE invoice_payments ADD COLUMN IF NOT EXISTS cash_box VARCHAR(100) NOT NULL DEFAULT 'صندوق المبيع'"))
