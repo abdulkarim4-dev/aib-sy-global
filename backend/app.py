@@ -432,12 +432,12 @@ def cash_transfer(p:CashTransferPayload,request:Request,s:Session=Depends(db),u:
 @app.get("/cash-boxes/{box_name}/movements")
 def cash_box_movements(box_name:str,s:Session=Depends(db),u:User=Depends(current_user)):
     rows=s.scalars(select(CashMove).where(CashMove.box_name==box_name).order_by(CashMove.id.desc())).all()
-    return [{"id":m.id,"box_name":m.box_name,"movement":m.movement,"amount":float(m.amount),"currency":m.currency,"description":m.description,"created_by":m.created_by,"created_at":m.created_at,"transfer_group":m.transfer_group,"voided":m.voided,"voided_by":m.voided_by,"voided_at":m.voided_at} for m in rows]
+    return [{"id":m.id,"box_name":m.box_name,"movement":m.movement,"amount":float(m.amount),"currency":m.currency,"description":m.description,"created_by":m.created_by,"created_at":m.created_at,"transfer_group":m.transfer_group,"voided":m.voided,"voided_by":m.voided_by,"voided_at":m.voided_at,"sale_locked":is_sale_cash_move(s,m)} for m in rows]
 
 @app.get("/cash-movements")
 def cash_list(s:Session=Depends(db),u:User=Depends(current_user)):
     rows=s.scalars(select(CashMove).order_by(CashMove.id.desc())).all()
-    return [{"id":m.id,"box_name":m.box_name,"movement":m.movement,"amount":float(m.amount),"currency":m.currency,"description":m.description,"created_by":m.created_by,"created_at":m.created_at,"transfer_group":m.transfer_group,"voided":m.voided,"voided_by":m.voided_by,"voided_at":m.voided_at} for m in rows]
+    return [{"id":m.id,"box_name":m.box_name,"movement":m.movement,"amount":float(m.amount),"currency":m.currency,"description":m.description,"created_by":m.created_by,"created_at":m.created_at,"transfer_group":m.transfer_group,"voided":m.voided,"voided_by":m.voided_by,"voided_at":m.voided_at,"sale_locked":is_sale_cash_move(s,m)} for m in rows]
 
 @app.patch("/cash-movements/{move_id}/void")
 def void_cash_movement(move_id:int,request:Request,s:Session=Depends(db),u:User=Depends(manager)):
