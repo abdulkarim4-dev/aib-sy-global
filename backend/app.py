@@ -448,6 +448,32 @@ def update_user_permissions(user_id:int,p:UserPermissionsPayload,request:Request
     audit(s,u,"user_permissions_updated","user",user_id,{"permissions":clean},request)
     s.commit()
     return {"ok":True,"permissions":clean}
+class UserPasswordResetPayload(BaseModel):
+    password: str = Field(min_length=12, max_length=256)
+
+@app.patch("/users/{user_id}/password")
+def reset_user_password(user_id:int, p:UserPasswordResetPayload, request:Request, s:Session=Depends(db), u:User=Depends(manager)):
+    target=s.get(User,user_id)
+    if not target: raise HTTPException(404,"المستخدم غير موجود")
+    if target.role=="owner": raise HTTPException(400,"لا يمكن إصدار بطاقة دخول لحساب المالك من هذه الصفحة")
+    target.password_hash=password_hash.hash(p.password)
+    target.failed_logins=0
+    target.locked_until=None
+    audit(s,u,"user_credentials_reissued","user",user_id,{"username":target.username},request)
+    s.commit()
+    return {"ok":True,"username":target.username,"full_name":target.full_name,"email":target.email}
+
+@app.delete("/users/{user_id}")
+def delete_user(user_id:int, request:Request, s:Session=Depends(db), u:User=Depends(manager)):
+    target=s.get(User,user_id)
+    if not target: raise HTTPException(404,"المستخدم غير موجود")
+    if target.role=="owner": raise HTTPException(400,"لا يمكن حذف حساب المالك")
+    details={"username":target.username,"full_name":target.full_name}
+    audit(s,u,"user_deleted","user",user_id,details,request)
+    s.delete(target)
+    s.commit()
+    return {"ok":True,"deleted_id":user_id}
+
 @app.patch("/users/{user_id}/active")
 def set_user_active(user_id:int, active:bool, request:Request, s:Session=Depends(db), u:User=Depends(manager)):
     target=s.get(User,user_id)
