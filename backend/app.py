@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Any
-import os, secrets, json, base64, binascii
+import os, secrets, json, base64, binascii, smtplib
+from email.message import EmailMessage
 from urllib.request import Request as UrlRequest, urlopen
 from urllib.error import HTTPError, URLError
 import jwt
@@ -321,13 +322,32 @@ def update_account_settings(p:AccountSettingsPayload, request:Request, s:Session
     return {"ok":True,"email":u.email,"full_name":u.full_name}
 
 def send_verification_email(email:str, code:str):
+    subject = "رمز استرداد الحساب - مجموعة AIB"
+    body = f"رمز التحقق الخاص بك في تطبيق AIB هو: {code}\nصلاحية الرمز 10 دقائق. لا تشاركه مع أحد."
+    # Prefer Gmail/SMTP when configured; retain Brevo as a backward-compatible fallback.
+    if settings.smtp_host and settings.smtp_user and settings.smtp_password and settings.smtp_from:
+        message = EmailMessage()
+        message["Subject"] = subject
+        message["From"] = settings.smtp_from
+        message["To"] = email
+        message.set_content(body)
+        try:
+            with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=25) as server:
+                server.ehlo()
+                server.starttls()
+                server.ehlo()
+                server.login(settings.smtp_user, settings.smtp_password)
+                server.send_message(message)
+            return
+        except (smtplib.SMTPException, OSError, TimeoutError):
+            raise HTTPException(502,"تعذر إرسال البريد عبر Gmail SMTP. تحقق من إعدادات SMTP في Render")
     if not settings.brevo_api_key or not settings.brevo_sender_email:
-        raise HTTPException(503,"خدمة إرسال البريد غير مهيأة. أضف BREVO_API_KEY وBREVO_SENDER_EMAIL إلى Render")
+        raise HTTPException(503,"خدمة البريد غير مهيأة. أضف إعدادات Gmail SMTP إلى Render")
     payload = {
         "sender": {"name": settings.brevo_sender_name, "email": settings.brevo_sender_email},
         "to": [{"email": email}],
-        "subject": "رمز التحقق من البريد الإلكتروني - AIB",
-        "textContent": f"رمز التحقق الخاص بك في تطبيق AIB هو: {code}\nصلاحية الرمز 10 دقائق. لا تشاركه مع أحد."
+        "subject": subject,
+        "textContent": body
     }
     req = UrlRequest(
         "https://api.brevo.com/v3/smtp/email",
@@ -342,7 +362,7 @@ def send_verification_email(email:str, code:str):
     except HTTPError as exc:
         raise HTTPException(502, f"رفض مزود البريد إرسال الرسالة (HTTP {exc.code})")
     except (URLError, TimeoutError, OSError):
-        raise HTTPException(502,"تعذر الاتصال بخدمة البريد عبر HTTPS. تحقق من إعدادات BREVO في Render")
+        raise HTTPException(502,"تعذر الاتصال بخدمة البريد عبر HTTPS. تحقق من إعدادات البريد في Render")
 
 @app.post("/account-settings/email-verification")
 def start_email_verification(p:EmailVerificationStartPayload, request:Request, s:Session=Depends(db), u:User=Depends(current_user)):
