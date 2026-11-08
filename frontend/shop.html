@@ -635,6 +635,47 @@ body.modal-open{overflow:hidden}
  .tools{margin-top:8px!important}
  .search-field,.sort-field{min-height:39px!important}
 }
+
+/* AIB category image correction: bind each photo directly to its category key */
+.category-zone .cat{
+  background-image:none!important;
+  background-color:#14212b!important;
+  background-size:cover!important;
+  background-position:center!important;
+  background-repeat:no-repeat!important;
+}
+.category-zone .cat::before{
+  inset:0!important;
+  opacity:.58!important;
+  filter:saturate(.92) contrast(1.06)!important;
+  background-size:cover!important;
+  background-position:center!important;
+  background-repeat:no-repeat!important;
+}
+.category-zone .cat::after{
+  background:linear-gradient(0deg,rgba(5,12,18,.88),rgba(5,12,18,.16) 72%)!important;
+}
+/* Passenger cars and their parts */
+.category-zone .cat[onclick="category('cars',this)"]::before{background-image:url('https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=1100&q=85')!important}
+.category-zone .cat[onclick="category('car_parts',this)"]::before{background-image:url('https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&w=1100&q=85')!important}
+.category-zone .cat[onclick="category('car_engines',this)"]::before{background-image:url('https://images.unsplash.com/photo-1635784063386-2e2e2c1f7f1a?auto=format&fit=crop&w=1100&q=85')!important}
+.category-zone .cat[onclick="category('car_engine_parts',this)"]::before{background-image:url('https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=1100&q=85')!important}
+/* Trucks and truck components */
+.category-zone .cat[onclick="category('trucks',this)"]::before{background-image:url('https://images.unsplash.com/photo-1519003722824-194d4455a60c?auto=format&fit=crop&w=1100&q=85')!important}
+.category-zone .cat[onclick="category('truck_parts',this)"]::before{background-image:url('https://images.unsplash.com/photo-1581092334651-ddf26d9a09d0?auto=format&fit=crop&w=1100&q=85')!important}
+.category-zone .cat[onclick="category('truck_engines',this)"]::before{background-image:url('https://images.unsplash.com/photo-1581092918056-0c4c3acd3781?auto=format&fit=crop&w=1100&q=85')!important}
+.category-zone .cat[onclick="category('truck_engine_parts',this)"]::before{background-image:url('https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?auto=format&fit=crop&w=1100&q=85')!important}
+/* Heavy construction equipment and components */
+.category-zone .cat[onclick="category('heavy',this)"]::before{background-image:url('https://images.unsplash.com/photo-1580901368919-7738efb0f87e?auto=format&fit=crop&w=1100&q=85')!important}
+.category-zone .cat[onclick="category('heavy_parts',this)"]::before{background-image:url('https://images.unsplash.com/photo-1579412690850-bd41cd0af397?auto=format&fit=crop&w=1100&q=85')!important}
+.category-zone .cat[onclick="category('heavy_engines',this)"]::before{background-image:url('https://images.unsplash.com/photo-1487754180451-c456f719a1fc?auto=format&fit=crop&w=1100&q=85')!important}
+.category-zone .cat[onclick="category('heavy_engine_parts',this)"]::before{background-image:url('https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=1100&q=85')!important}
+/* Agricultural equipment and components */
+.category-zone .cat[onclick="category('agri',this)"]::before{background-image:url('https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&w=1100&q=85')!important}
+.category-zone .cat[onclick="category('agri_parts',this)"]::before{background-image:url('https://images.unsplash.com/photo-1579412690850-bd41cd0af397?auto=format&fit=crop&w=1100&q=85')!important}
+.category-zone .cat[onclick="category('agri_engines',this)"]::before{background-image:url('https://images.unsplash.com/photo-1581092918056-0c4c3acd3781?auto=format&fit=crop&w=1100&q=85')!important}
+.category-zone .cat[onclick="category('agri_engine_parts',this)"]::before{background-image:url('https://www.agropeter.ro/poze/-piese-de-motor-pentru-tractor-si-utilaje1762587388.jpg')!important}
+
 </style></head><body><header class="wrap top"><div class="brand"><a class="brand-logo-link" href="/" aria-label="العودة إلى الصفحة الرئيسية"><img src="/aib-logo.webp?v=aib-original-full-20261108" alt="AIB"></a><div><b>AIB GROUP</b><small>المتجر الإلكتروني الرسمي</small></div></div><button class="store-account-button" id="storeAccountButton" type="button" onclick="openStoreAuth()" aria-label="حساب العميل">تسجيل الدخول</button><button class="store-logout-button" id="storeLogoutButton" type="button" onclick="logoutStoreCustomer()" hidden>تسجيل الخروج</button><button class="cart-open" type="button" onclick="openCart()" aria-label="فتح سلة التسوق">🛒 <span>سلة التسوق</span><b id="cartCount">0</b></button></header><main class="wrap"><section class="hero"><div style="color:#72b9ec;font-size:12px;letter-spacing:2px;font-weight:bold">AIB ONLINE STORE</div><h1>تسوّق من مجموعة AIB</h1><p>اكتشف قطع الغيار والمحركات والسيارات والشاحنات والمعدات الثقيلة المتوفرة في مخزون الشركة.</p></section><section class="catalog-tools" aria-label="أدوات التسوق"><div class="catalog-tools-head"><div><span class="eyebrow">اكتشف منتجاتنا</span><h2>ابحث واختر بسهولة</h2><p>اكتب اسم القطعة أو رقمها أو الموديل للوصول السريع إلى المنتج.</p></div><span class="catalog-mark">AIB <small>STORE</small></span></div><div class="tools"><label class="search-field"><span aria-hidden="true">⌕</span><input id="q" placeholder="ابحث باسم المنتج أو رقم القطعة أو الموديل" oninput="load()"></label><label class="sort-field"><span>ترتيب حسب</span><select id="sort" onchange="load()"><option value="">الأحدث / الافتراضي</option><option value="name">اسم المنتج</option><option value="stock">الكمية المتوفرة</option></select></label></div></section><section id="categorySection" class="category-section" aria-label="أقسام التسوق">
 <button class="all-products-banner active" type="button" onclick="category('',this)"><span class="all-products-icon"><svg viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path d="M20 5h8l2 5 5 2 5-2 4 7-4 4v6l4 4-4 7-5-2-5 2-2 5h-8l-2-5-5-2-5 2-4-7 4-4v-6l-4-4 4-7 5 2 5-2z"/><circle cx="24" cy="24" r="7"/></svg></span><span><b>جميع المنتجات</b><small>عرض كامل منتجات متجر AIB من جميع الأقسام</small></span><span class="all-products-arrow">←</span></button>
 <div class="category-zone">
