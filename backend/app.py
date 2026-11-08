@@ -1058,8 +1058,11 @@ def sham_cash_qr():
     return FileResponse(FRONTEND_DIR / "sham_cash_qr.png", media_type="image/png")
 
 @app.get("/logo.jpg", include_in_schema=False)
+def logo_jpg():
+    return FileResponse(FRONTEND_DIR / "logo.jpg", media_type="image/jpeg", headers={"Cache-Control": "public, max-age=3600"})
+
 @app.get("/logo.png", include_in_schema=False)
-def logo():
+def logo_png():
     return FileResponse(FRONTEND_DIR / "logo.png", media_type="image/png")
 
 @app.get("/logo.svg", include_in_schema=False)
