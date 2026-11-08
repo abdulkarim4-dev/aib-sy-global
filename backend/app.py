@@ -60,6 +60,28 @@ class StoreCustomer(Base):
     failed_logins: Mapped[int]=mapped_column(Integer, default=0, nullable=False)
     locked_until: Mapped[Optional[datetime]]=mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
+    first_name: Mapped[str]=mapped_column(String(80),default="")
+    last_name: Mapped[str]=mapped_column(String(80),default="")
+    shipping_address: Mapped[str]=mapped_column(Text,default="")
+    phone_country_code: Mapped[str]=mapped_column(String(8),default="+963")
+    phone_number: Mapped[str]=mapped_column(String(32),default="")
+
+class OnlinePurchaseOrder(Base):
+    __tablename__="online_purchase_orders"
+    id: Mapped[int]=mapped_column(primary_key=True)
+    customer_id: Mapped[int]=mapped_column(ForeignKey("store_customers.id"),index=True)
+    customer_data: Mapped[dict]=mapped_column(JSON,default=dict,nullable=False)
+    items: Mapped[list]=mapped_column(JSON,default=list,nullable=False)
+    total: Mapped[Any]=mapped_column(Numeric(18,2))
+    currency: Mapped[str]=mapped_column(String(8),default="USD")
+    payment_proof: Mapped[str]=mapped_column(Text)
+    proof_type: Mapped[str]=mapped_column(String(80),default="application/octet-stream")
+    status: Mapped[str]=mapped_column(String(20),default="pending",index=True)
+    record_id: Mapped[Optional[int]]=mapped_column(ForeignKey("records.id"),nullable=True)
+    review_note: Mapped[str]=mapped_column(Text,default="")
+    reviewed_by: Mapped[Optional[int]]=mapped_column(ForeignKey("users.id"),nullable=True)
+    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True),default=lambda:datetime.now(timezone.utc))
+    reviewed_at: Mapped[Optional[datetime]]=mapped_column(DateTime(timezone=True),nullable=True)
 
 class StorePasswordReset(Base):
     __tablename__="store_password_resets"
@@ -229,6 +251,12 @@ def startup():
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted BOOLEAN NOT NULL DEFAULT FALSE"))
         conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_email_unique ON users (email) WHERE email IS NOT NULL"))
         conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS images JSONB NOT NULL DEFAULT '[]'::jsonb"))
+        conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS first_name VARCHAR(80) NOT NULL DEFAULT ''"))
+        conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS last_name VARCHAR(80) NOT NULL DEFAULT ''"))
+        conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS shipping_address TEXT NOT NULL DEFAULT ''"))
+        conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS phone_country_code VARCHAR(8) NOT NULL DEFAULT '+963'"))
+        conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS phone_number VARCHAR(32) NOT NULL DEFAULT '"))
+
         conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS voided BOOLEAN NOT NULL DEFAULT FALSE"))
         conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS record_id INTEGER REFERENCES records(id)"))
         conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS voided_by INTEGER REFERENCES users(id)"))
@@ -1094,6 +1122,16 @@ class StorePasswordResetConfirmPayload(BaseModel):
 class StoreCartItemPayload(BaseModel):
     product_id: int = Field(gt=0)
     quantity: int = Field(ge=1, le=999)
+class OnlineOrderPayload(BaseModel):
+    first_name: str = Field(min_length=1,max_length=80)
+    last_name: str = Field(min_length=1,max_length=80)
+    shipping_address: str = Field(min_length=5,max_length=1000)
+    phone_country_code: str = Field(min_length=2,max_length=8)
+    phone_number: str = Field(min_length=5,max_length=32)
+    payment_proof: str = Field(min_length=40,max_length=7000000)
+    proof_type: str = Field(min_length=3,max_length=80)
+    items: list[StoreCartItemPayload] = Field(min_length=1,max_length=100)
+
 class StoreCartPayload(BaseModel):
     items: list[StoreCartItemPayload] = Field(default_factory=list, max_length=100)
 
@@ -1231,6 +1269,67 @@ def save_store_cart(p:StoreCartPayload, request:Request, s:Session=Depends(db), 
     customer.cart=cleaned
     s.commit()
     return {"ok":True,"items":serialize_store_cart(s,customer)}
+
+@app.get("/store/customer-profile")
+def get_store_customer_profile(customer:StoreCustomer=Depends(current_store_customer)):
+    return {"first_name":customer.first_name,"last_name":customer.last_name,"shipping_address":customer.shipping_address,"phone_country_code":customer.phone_country_code,"phone_number":customer.phone_number}
+
+@app.post("/store/orders")
+def create_online_order(p:OnlineOrderPayload,s:Session=Depends(db),customer:StoreCustomer=Depends(current_store_customer)):
+    try:
+        header,encoded=p.payment_proof.split(",",1)
+        if header not in ("data:image/jpeg;base64","data:image/png;base64","data:image/webp;base64","data:application/pdf;base64"):
+            raise HTTPException(400,"صيغة إثبات الدفع غير مدعومة")
+        raw=base64.b64decode(encoded,validate=True)
+    except HTTPException: raise
+    except Exception: raise HTTPException(400,"ملف إثبات الدفع غير صالح")
+    if not raw or len(raw)>5*1024*1024: raise HTTPException(413,"الحد الأقصى لإثبات الدفع 5 ميغابايت")
+    prices=store_latest_prices(s);lines=[];currency=None;total=0;seen=set()
+    for entry in p.items:
+        if entry.product_id in seen: continue
+        seen.add(entry.product_id);product=s.get(InventoryProduct,entry.product_id)
+        if not product or not product.active: raise HTTPException(409,"أحد المنتجات غير متاح")
+        qty=int(entry.quantity);stock=float(product.owned_stock or 0)+float(product.consigned_stock or 0)
+        if qty>stock: raise HTTPException(409,"الكمية المطلوبة تتجاوز المخزون")
+        price=prices.get(product.sku)
+        if not price or float(price.get("sale_price") or 0)<=0: raise HTTPException(409,"سعر أحد المنتجات غير محدد")
+        if currency and currency!=price["currency"]: raise HTTPException(409,"لا يمكن جمع عملات مختلفة في طلب واحد")
+        currency=price["currency"];unit=float(price["sale_price"]);total+=unit*qty
+        lines.append({"product_id":product.id,"sku":product.sku,"description":product.name,"model":product.model or "","quantity":qty,"price":unit})
+    if not lines: raise HTTPException(400,"السلة فارغة")
+    customer.first_name=p.first_name.strip();customer.last_name=p.last_name.strip();customer.full_name=(customer.first_name+" "+customer.last_name).strip()
+    customer.shipping_address=p.shipping_address.strip();customer.phone_country_code=p.phone_country_code;customer.phone_number=p.phone_number.strip()
+    data={"first_name":customer.first_name,"last_name":customer.last_name,"full_name":customer.full_name,"email":customer.email,"shipping_address":customer.shipping_address,"phone_country_code":customer.phone_country_code,"phone_number":customer.phone_number,"full_phone":customer.phone_country_code+customer.phone_number}
+    order=OnlinePurchaseOrder(customer_id=customer.id,customer_data=data,items=lines,total=round(total,2),currency=currency or "USD",payment_proof=p.payment_proof,proof_type=p.proof_type,status="pending")
+    s.add(order);s.commit();s.refresh(order)
+    return {"ok":True,"order_id":order.id,"customer":data,"items":lines,"total":float(order.total),"currency":order.currency,"status":order.status}
+
+@app.get("/online-purchase-orders")
+def list_online_purchase_orders(s:Session=Depends(db),u:User=Depends(manager)):
+    return [{"id":o.id,"customer":o.customer_data,"items":o.items,"total":float(o.total),"currency":o.currency,"payment_proof":o.payment_proof,"proof_type":o.proof_type,"status":o.status,"record_id":o.record_id,"review_note":o.review_note,"created_at":o.created_at} for o in s.scalars(select(OnlinePurchaseOrder).order_by(OnlinePurchaseOrder.id.desc())).all()]
+
+class OnlineOrderReviewPayload(BaseModel):
+    action: str
+    note: str = ""
+
+@app.post("/online-purchase-orders/{order_id}/review")
+def review_online_purchase_order(order_id:int,p:OnlineOrderReviewPayload,s:Session=Depends(db),u:User=Depends(manager)):
+    order=s.get(OnlinePurchaseOrder,order_id)
+    if not order: raise HTTPException(404,"الطلب غير موجود")
+    if order.status!="pending": raise HTTPException(409,"تمت مراجعة الطلب")
+    if p.action=="reject":
+        order.status="rejected";order.review_note=p.note or "إثبات الدفع غير مقبول";order.reviewed_by=u.id;order.reviewed_at=datetime.now(timezone.utc);s.commit()
+        return {"ok":True,"status":"rejected"}
+    if p.action!="approve": raise HTTPException(400,"إجراء غير صالح")
+    data={"customer":order.customer_data["full_name"],"customer_phone":order.customer_data["full_phone"],"customer_address":order.customer_data["shipping_address"],"amount":float(order.total),"items":[{"sku":x["sku"],"description":x["description"],"model":x["model"],"quantity":x["quantity"],"price":x["price"]} for x in order.items],"notes":"طلب إلكتروني – تم التحقق من إثبات الدفع واعتماده"}
+    prepared=prepare_record_inventory(s,"directSale",data)
+    s.execute(text("SELECT pg_advisory_xact_lock(hashtext(:key))"),{"key":"aib-invoice:directSale"})
+    serial=int(s.scalar(select(func.count(Record.id)).where(Record.section=="directSale")) or 0)+1
+    record=Record(section="directSale",invoice_no=f"A-{serial:05d}-B",currency=order.currency,data=prepared,created_by=u.id)
+    s.add(record);s.flush();recalculate_inventory(s)
+    order.status="approved";order.record_id=record.id;order.reviewed_by=u.id;order.reviewed_at=datetime.now(timezone.utc);order.review_note=p.note
+    s.commit()
+    return {"ok":True,"status":"approved","record_id":record.id,"invoice_no":record.invoice_no,"customer":order.customer_data}
 
 @app.get("/public/products")
 def public_products(q:Optional[str]=None, category:Optional[str]=None, s:Session=Depends(db)):
