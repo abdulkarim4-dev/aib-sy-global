@@ -513,6 +513,16 @@ body.modal-open{overflow:hidden}
 @keyframes aibLoadingShimmer{to{background-position:-200% 0}}
 @media(prefers-reduced-motion:reduce){.aib-loading-state{animation:none}.aib-loading-spinner{animation-duration:1.2s}}
 
+
+/* Explicit image bindings for the two engine categories */
+.category-zone .cat[onclick*="car_engines"]{
+ background-image:url('https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&w=1400&q=95')!important;
+ background-position:center 52%!important;
+}
+.category-zone .cat[onclick*="agri_engines"]{
+ background-image:url('https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=1400&q=95')!important;
+ background-position:center 52%!important;
+}
 /* AIB category photography refresh: clearer, category-specific images without watermarks */
 .hero:after{display:none!important;content:none!important}
 .category-section .cat:after{display:none!important;content:none!important}
