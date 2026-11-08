@@ -1359,7 +1359,7 @@ def public_products(q:Optional[str]=None, category:Optional[str]=None, s:Session
         truck_terms=["شاحنة","truck","fh","scania","قاطر","رأس قاطر","مرسيدس اكتروس","actros","volvo fh"]
         car_terms=["سيارة","سياحية","sedan","bmw","mercedes","hyundai","kia","toyota","volkswagen","audi","škoda","skoda","نيسان","هوندا"]
         engine_terms=["محرك","مكينة","engine","motor"]
-        engine_part_terms=["بستم","مكبس","شنبر","رنج","صباب","بلوف","راس محرك","رأس محرك","وش سلندر","جوان","كرتير","عمود كرنك","كرنك","طرمبة زيت","طرمبة ماء","oil pump","piston","liner","valve","gasket","crankshaft","cylinder head"]
+        engine_part_terms=["قطع محركات","قطع المحرك","قطع محرك","بستم","مكبس","شنبر","رنج","صباب","بلوف","راس محرك","رأس محرك","وش سلندر","جوان","كرتير","عمود كرنك","كرنك","طرمبة زيت","طرمبة ماء","oil pump","piston","liner","valve","gasket","crankshaft","cylinder head"]
         part_terms=["قطع","قطعة","فلتر","فلتر","حساس","بخاخ","انجكتر","injector","طرمبة","مضخة","رمان","bearing","سير","belt","كلتش","clutch","فرامل","brake","ديسك","جلدة","خرطوم","hose","gearbox","جير","دفرنس","ناقل"]
         is_engine=any(x in name for x in engine_terms)
         is_engine_part=is_engine and any(x in name for x in engine_part_terms)
