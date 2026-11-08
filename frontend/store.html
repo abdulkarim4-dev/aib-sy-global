@@ -57,7 +57,8 @@ body.menu-open{overflow:hidden}body.menu-open .menu-backdrop{opacity:1;visibilit
 function openMainMenu(){document.body.classList.add('menu-open');const b=document.getElementById('menuToggle'),d=document.getElementById('mainMenu');if(b)b.setAttribute('aria-expanded','true');if(d)d.setAttribute('aria-hidden','false')}
 function closeMainMenu(){document.body.classList.remove('menu-open');const b=document.getElementById('menuToggle'),d=document.getElementById('mainMenu');if(b)b.setAttribute('aria-expanded','false');if(d)d.setAttribute('aria-hidden','true')}
 document.getElementById('menuToggle')?.addEventListener('click',()=>document.body.classList.contains('menu-open')?closeMainMenu():openMainMenu());document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMainMenu()});
-\nlet activeCategory='';
+
+let activeCategory='';
 const labels={parts:'قطع الغيار',engines:'المحركات وعلب السرعة',cars:'السيارات',trucks:'الشاحنات',heavy:'الحفارات والمعدات الثقيلة'};
 function setCategory(c){activeCategory=c;loadProducts()}
 function fmt(n){return Number(n||0).toLocaleString('ar-SY',{maximumFractionDigits:2})}
