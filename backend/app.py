@@ -1382,7 +1382,8 @@ def public_products(q:Optional[str]=None, category:Optional[str]=None, s:Session
         else: cat="agri"
         if category and category!=cat: continue
         stock=float(p.owned_stock or 0)+float(p.consigned_stock or 0)
-        if stock <= 0: continue
+        # Keep the N20 engine visible as an out-of-stock catalog item; do not expose other zero-stock items.
+        if stock <= 0 and (p.model or "").strip().upper() != "N20B20B": continue
         price=latest_purchase.get(p.sku,{})
         out.append({"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"category":cat,"stock":stock,"images":p.images or [],"sale_price":price.get("sale_price"),"currency":price.get("currency","")})
     return out
