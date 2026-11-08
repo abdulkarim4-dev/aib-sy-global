@@ -48,6 +48,18 @@ class User(Base):
     failed_logins: Mapped[int]=mapped_column(Integer, default=0)
     locked_until: Mapped[Optional[datetime]]=mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
+class StoreCustomer(Base):
+    __tablename__="store_customers"
+    id: Mapped[int]=mapped_column(primary_key=True)
+    email: Mapped[str]=mapped_column(String(254), unique=True, index=True)
+    full_name: Mapped[str]=mapped_column(String(160))
+    password_hash: Mapped[str]=mapped_column(String(300))
+    cart: Mapped[list]=mapped_column(JSON, default=list, nullable=False)
+    active: Mapped[bool]=mapped_column(Boolean, default=True, nullable=False)
+    failed_logins: Mapped[int]=mapped_column(Integer, default=0, nullable=False)
+    locked_until: Mapped[Optional[datetime]]=mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
+
 class CompanyProfile(Base):
     __tablename__="company_profile"
     id: Mapped[int]=mapped_column(primary_key=True)
@@ -159,11 +171,25 @@ def token_for(user:User):
     now=datetime.now(timezone.utc)
     return jwt.encode({"sub":str(user.id),"iat":now,"exp":now+timedelta(minutes=settings.jwt_minutes)},settings.jwt_secret,algorithm="HS256")
 def current_user(token:str=Depends(oauth), s:Session=Depends(db)):
-    try: uid=int(jwt.decode(token,settings.jwt_secret,algorithms=["HS256"])["sub"])
+    try:
+        payload=jwt.decode(token,settings.jwt_secret,algorithms=["HS256"])
+        if payload.get("typ")=="store_customer": raise ValueError("store token")
+        uid=int(payload["sub"])
     except Exception: raise HTTPException(401,"جلسة الدخول غير صالحة أو انتهت")
     u=s.get(User,uid)
     if not u or not u.active: raise HTTPException(401,"الحساب غير فعال")
     return u
+def current_store_customer(token:str=Depends(oauth), s:Session=Depends(db)):
+    try:
+        payload=jwt.decode(token,settings.jwt_secret,algorithms=["HS256"])
+        if payload.get("typ")!="store_customer": raise ValueError("wrong token type")
+        cid=int(payload["sub"])
+    except Exception:
+        raise HTTPException(401,"يرجى تسجيل الدخول إلى حساب المتجر")
+    customer=s.get(StoreCustomer,cid)
+    if not customer or not customer.active: raise HTTPException(401,"حساب المتجر غير فعال")
+    return customer
+
 def manager(u:User=Depends(current_user)):
     if u.role!="owner": raise HTTPException(403,"هذا الإجراء متاح للمدير فقط")
     return u
@@ -1020,6 +1046,111 @@ def public_stats(s:Session=Depends(db)):
         if r.section in {"purchase","carPurchase","deposit"}:
             purchases+=1
     return {"visible":profile_data.get("public_show_stats",True) is not False,"customers":len(customers),"sales":sales,"purchases":purchases,"records":len(rows)}
+
+class StoreRegisterPayload(BaseModel):
+    full_name: str = Field(min_length=2, max_length=160)
+    email: str = Field(min_length=5, max_length=254)
+    password: str = Field(min_length=10, max_length=256)
+class StoreLoginPayload(BaseModel):
+    email: str = Field(min_length=5, max_length=254)
+    password: str = Field(min_length=1, max_length=256)
+class StoreCartItemPayload(BaseModel):
+    product_id: int = Field(gt=0)
+    quantity: int = Field(ge=1, le=999)
+class StoreCartPayload(BaseModel):
+    items: list[StoreCartItemPayload] = Field(default_factory=list, max_length=100)
+
+def store_customer_token(customer:StoreCustomer):
+    now=datetime.now(timezone.utc)
+    return jwt.encode({"sub":str(customer.id),"typ":"store_customer","iat":now,"exp":now+timedelta(days=30)},settings.jwt_secret,algorithm="HS256")
+
+def store_product_category(name:str, model:str):
+    value=(name+" "+(model or "")).lower()
+    if any(x in value for x in ["حفار","excavator","تركس","لودر","loader","كاتربلر","caterpillar","volvo ec","hyundai r"]): return "heavy"
+    if any(x in value for x in ["شاحنة","truck","fh","scania","قاطر"]): return "trucks"
+    if any(x in value for x in ["محرك","engine","gearbox","جير","دفرنس","ناقل"]): return "engines"
+    if any(x in value for x in ["سيارة","sedan","bmw","mercedes","hyundai","kia","toyota","volkswagen"]): return "cars"
+    return "parts"
+
+def store_latest_prices(s:Session):
+    prices={}
+    records=s.scalars(select(Record).where(Record.section=="purchase",Record.deleted.is_(False)).order_by(Record.created_at.desc(),Record.id.desc())).all()
+    for record in records:
+        for item in (record.data or {}).get("items",[]):
+            if not isinstance(item,dict): continue
+            sku=str(item.get("sku") or "").strip().upper()
+            price=float(item.get("price") or 0)
+            if sku and price>0 and sku not in prices:
+                prices[sku]={"sale_price":round(price*1.35,2),"currency":record.currency or "USD"}
+    return prices
+
+@app.post("/store/auth/register")
+def store_register(p:StoreRegisterPayload, request:Request, s:Session=Depends(db)):
+    email=p.email.strip().lower()
+    if "@" not in email or "." not in email.rsplit("@",1)[-1]:
+        raise HTTPException(400,"يرجى إدخال بريد إلكتروني صحيح")
+    if s.scalar(select(StoreCustomer).where(StoreCustomer.email==email)):
+        raise HTTPException(409,"هذا البريد مسجل مسبقاً. سجّل الدخول بدلاً من إنشاء حساب جديد")
+    customer=StoreCustomer(email=email,full_name=p.full_name.strip(),password_hash=password_hash.hash(p.password),cart=[])
+    s.add(customer);s.commit();s.refresh(customer)
+    return {"access_token":store_customer_token(customer),"token_type":"bearer","customer":{"id":customer.id,"email":customer.email,"full_name":customer.full_name}}
+
+@app.post("/store/auth/login")
+def store_login(p:StoreLoginPayload, request:Request, s:Session=Depends(db)):
+    email=p.email.strip().lower()
+    customer=s.scalar(select(StoreCustomer).where(StoreCustomer.email==email))
+    now=datetime.now(timezone.utc)
+    if not customer or not customer.active:
+        raise HTTPException(401,"البريد الإلكتروني أو كلمة المرور غير صحيحة")
+    if customer.locked_until and customer.locked_until>now:
+        raise HTTPException(423,"تم تعليق تسجيل الدخول مؤقتاً. حاول بعد قليل")
+    if not password_hash.verify(p.password,customer.password_hash):
+        customer.failed_logins+=1
+        if customer.failed_logins>=5:
+            customer.failed_logins=0
+            customer.locked_until=now+timedelta(minutes=15)
+        s.commit()
+        raise HTTPException(401,"البريد الإلكتروني أو كلمة المرور غير صحيحة")
+    customer.failed_logins=0;customer.locked_until=None;s.commit()
+    return {"access_token":store_customer_token(customer),"token_type":"bearer","customer":{"id":customer.id,"email":customer.email,"full_name":customer.full_name}}
+
+@app.get("/store/auth/me")
+def store_me(customer:StoreCustomer=Depends(current_store_customer)):
+    return {"id":customer.id,"email":customer.email,"full_name":customer.full_name}
+
+def serialize_store_cart(s:Session, customer:StoreCustomer):
+    prices=store_latest_prices(s)
+    out=[]
+    for item in customer.cart or []:
+        if not isinstance(item,dict): continue
+        product=s.get(InventoryProduct,int(item.get("product_id") or 0))
+        if not product or not product.active: continue
+        price=prices.get(product.sku,{})
+        out.append({"id":product.id,"sku":product.sku,"name":product.name,"model":product.model or "",
+            "qty":int(item.get("quantity") or 1),"stock":float(product.owned_stock or 0)+float(product.consigned_stock or 0),
+            "price":price.get("sale_price"),"currency":price.get("currency",""),
+            "images":product.images or [],"category":store_product_category(product.name,product.model or "")})
+    return out
+
+@app.get("/store/cart")
+def get_store_cart(s:Session=Depends(db), customer:StoreCustomer=Depends(current_store_customer)):
+    return {"items":serialize_store_cart(s,customer)}
+
+@app.put("/store/cart")
+def save_store_cart(p:StoreCartPayload, request:Request, s:Session=Depends(db), customer:StoreCustomer=Depends(current_store_customer)):
+    cleaned=[];seen=set()
+    for item in p.items:
+        if item.product_id in seen: continue
+        seen.add(item.product_id)
+        product=s.get(InventoryProduct,item.product_id)
+        if not product or not product.active: raise HTTPException(404,"أحد المنتجات لم يعد متاحاً")
+        stock=float(product.owned_stock or 0)+float(product.consigned_stock or 0)
+        if stock<=0: raise HTTPException(409,f"المنتج {product.name} غير متوفر حالياً")
+        if item.quantity>stock: raise HTTPException(409,f"الكمية المطلوبة من {product.name} تتجاوز المخزون المتاح ({stock:g})")
+        cleaned.append({"product_id":item.product_id,"quantity":item.quantity})
+    customer.cart=cleaned
+    s.commit()
+    return {"ok":True,"items":serialize_store_cart(s,customer)}
 
 @app.get("/public/products")
 def public_products(q:Optional[str]=None, category:Optional[str]=None, s:Session=Depends(db)):
