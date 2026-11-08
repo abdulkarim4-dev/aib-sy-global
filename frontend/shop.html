@@ -598,6 +598,43 @@ body.modal-open{overflow:hidden}
 .category-zone .cat[onclick="category('agri_parts',this)"]{background-image:linear-gradient(0deg,#07111bdc,#07111b45),url('https://images.unsplash.com/photo-1579412690850-bd41cd0af397?auto=format&fit=crop&w=1200&q=90')!important}
 .category-zone .cat[onclick="category('agri_engines',this)"]{background-image:linear-gradient(0deg,#07111bdc,#07111b45),url('https://www.deere.co.in/assets/images/region-1/parts-and-service/engine-parts/parts-engineparts-maintenancesupport-1298x768.jpg')!important}
 .category-zone .cat[onclick="category('agri_engine_parts',this)"]{background-image:linear-gradient(0deg,#07111bdc,#07111b45),url('https://www.agropeter.ro/poze/-piese-de-motor-pentru-tractor-si-utilaje1762587388.jpg')!important}
+
+/* AIB storefront: shorter hero and slim discovery/search panel */
+.hero{
+  min-height:0!important;
+  margin:14px 0 12px!important;
+  padding:20px 26px!important;
+  border-radius:15px!important;
+  box-shadow:0 12px 28px #0005!important;
+}
+.hero h1{font-size:clamp(23px,3vw,32px)!important;margin:0 0 5px!important;line-height:1.35!important}
+.hero p{font-size:12px!important;line-height:1.6!important;margin:0!important;max-width:760px}
+.catalog-tools{
+  margin:12px 0 18px!important;
+  padding:12px 16px!important;
+  border-radius:14px!important;
+  box-shadow:0 8px 22px #0003!important;
+}
+.catalog-tools-head{align-items:center!important;gap:10px!important}
+.eyebrow{margin-bottom:3px!important;font-size:10px!important}
+.catalog-tools-head h2{font-size:18px!important;line-height:1.35!important}
+.catalog-tools-head p{font-size:11px!important;line-height:1.5!important;margin:3px 0 0!important}
+.catalog-mark{font-size:22px!important}
+.tools{margin:9px 0 0!important;gap:9px!important}
+.search-field,.sort-field{min-height:42px!important;border-radius:9px!important}
+.search-field input{padding:9px 0!important;font-size:12px!important}
+.sort-field select{padding:9px 0!important}
+@media(max-width:600px){
+ .hero{padding:15px 16px!important;margin:10px 0!important}
+ .hero h1{font-size:22px!important}
+ .hero p{font-size:11px!important;line-height:1.5!important}
+ .catalog-tools{padding:10px 12px!important;margin:10px 0 14px!important}
+ .catalog-tools-head h2{font-size:16px!important}
+ .catalog-tools-head p{font-size:10px!important}
+ .catalog-mark{font-size:19px!important}
+ .tools{margin-top:8px!important}
+ .search-field,.sort-field{min-height:39px!important}
+}
 </style></head><body><header class="wrap top"><div class="brand"><a class="brand-logo-link" href="/" aria-label="العودة إلى الصفحة الرئيسية"><img src="/aib-logo.webp?v=aib-original-full-20261108" alt="AIB"></a><div><b>AIB GROUP</b><small>المتجر الإلكتروني الرسمي</small></div></div><button class="store-account-button" id="storeAccountButton" type="button" onclick="openStoreAuth()" aria-label="حساب العميل">تسجيل الدخول</button><button class="store-logout-button" id="storeLogoutButton" type="button" onclick="logoutStoreCustomer()" hidden>تسجيل الخروج</button><button class="cart-open" type="button" onclick="openCart()" aria-label="فتح سلة التسوق">🛒 <span>سلة التسوق</span><b id="cartCount">0</b></button></header><main class="wrap"><section class="hero"><div style="color:#72b9ec;font-size:12px;letter-spacing:2px;font-weight:bold">AIB ONLINE STORE</div><h1>تسوّق من مجموعة AIB</h1><p>اكتشف قطع الغيار والمحركات والسيارات والشاحنات والمعدات الثقيلة المتوفرة في مخزون الشركة.</p></section><section class="catalog-tools" aria-label="أدوات التسوق"><div class="catalog-tools-head"><div><span class="eyebrow">اكتشف منتجاتنا</span><h2>ابحث واختر بسهولة</h2><p>اكتب اسم القطعة أو رقمها أو الموديل للوصول السريع إلى المنتج.</p></div><span class="catalog-mark">AIB <small>STORE</small></span></div><div class="tools"><label class="search-field"><span aria-hidden="true">⌕</span><input id="q" placeholder="ابحث باسم المنتج أو رقم القطعة أو الموديل" oninput="load()"></label><label class="sort-field"><span>ترتيب حسب</span><select id="sort" onchange="load()"><option value="">الأحدث / الافتراضي</option><option value="name">اسم المنتج</option><option value="stock">الكمية المتوفرة</option></select></label></div></section><section id="categorySection" class="category-section" aria-label="أقسام التسوق">
 <button class="all-products-banner active" type="button" onclick="category('',this)"><span class="all-products-icon"><svg viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path d="M20 5h8l2 5 5 2 5-2 4 7-4 4v6l4 4-4 7-5-2-5 2-2 5h-8l-2-5-5-2-5 2-4-7 4-4v-6l-4-4 4-7 5 2 5-2z"/><circle cx="24" cy="24" r="7"/></svg></span><span><b>جميع المنتجات</b><small>عرض كامل منتجات متجر AIB من جميع الأقسام</small></span><span class="all-products-arrow">←</span></button>
 <div class="category-zone">
