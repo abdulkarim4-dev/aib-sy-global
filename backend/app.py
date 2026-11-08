@@ -60,6 +60,15 @@ class StoreCustomer(Base):
     locked_until: Mapped[Optional[datetime]]=mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
 
+class StorePasswordReset(Base):
+    __tablename__="store_password_resets"
+    id: Mapped[int]=mapped_column(primary_key=True)
+    customer_id: Mapped[int]=mapped_column(ForeignKey("store_customers.id"), index=True)
+    code_hash: Mapped[str]=mapped_column(String(300))
+    expires_at: Mapped[datetime]=mapped_column(DateTime(timezone=True))
+    attempts: Mapped[int]=mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
+
 class CompanyProfile(Base):
     __tablename__="company_profile"
     id: Mapped[int]=mapped_column(primary_key=True)
@@ -1054,6 +1063,13 @@ class StoreRegisterPayload(BaseModel):
 class StoreLoginPayload(BaseModel):
     email: str = Field(min_length=5, max_length=254)
     password: str = Field(min_length=1, max_length=256)
+class StorePasswordResetRequestPayload(BaseModel):
+    email: str = Field(min_length=5, max_length=254)
+class StorePasswordResetConfirmPayload(BaseModel):
+    email: str = Field(min_length=5, max_length=254)
+    code: str = Field(min_length=6, max_length=6)
+    new_password: str = Field(min_length=10, max_length=256)
+
 class StoreCartItemPayload(BaseModel):
     product_id: int = Field(gt=0)
     quantity: int = Field(ge=1, le=999)
@@ -1113,6 +1129,49 @@ def store_login(p:StoreLoginPayload, request:Request, s:Session=Depends(db)):
         raise HTTPException(401,"البريد الإلكتروني أو كلمة المرور غير صحيحة")
     customer.failed_logins=0;customer.locked_until=None;s.commit()
     return {"access_token":store_customer_token(customer),"token_type":"bearer","customer":{"id":customer.id,"email":customer.email,"full_name":customer.full_name}}
+
+@app.post("/store/auth/password-reset/request")
+def request_store_password_reset(p:StorePasswordResetRequestPayload, request:Request, s:Session=Depends(db)):
+    email=p.email.strip().lower()
+    customer=s.scalar(select(StoreCustomer).where(StoreCustomer.email==email,StoreCustomer.active.is_(True)))
+    # Keep the response identical for known and unknown addresses.
+    generic={"ok":True,"message":"إذا كان البريد مرتبطاً بحساب نشط، فستصلك رسالة تحتوي على رمز الاسترداد."}
+    if not customer:
+        return generic
+    now=datetime.now(timezone.utc)
+    latest=s.scalar(select(StorePasswordReset).where(StorePasswordReset.customer_id==customer.id).order_by(StorePasswordReset.id.desc()))
+    if latest and latest.created_at>now-timedelta(seconds=60):
+        raise HTTPException(429,"يرجى الانتظار دقيقة قبل طلب رمز جديد")
+    code=f"{secrets.randbelow(1000000):06d}"
+    row=StorePasswordReset(customer_id=customer.id,code_hash=password_hash.hash(code),expires_at=now+timedelta(minutes=10))
+    s.add(row);s.flush()
+    try:
+        send_verification_email(email,code)
+    except Exception:
+        s.rollback()
+        raise
+    s.commit()
+    return generic
+
+@app.post("/store/auth/password-reset/confirm")
+def confirm_store_password_reset(p:StorePasswordResetConfirmPayload, request:Request, s:Session=Depends(db)):
+    email=p.email.strip().lower()
+    customer=s.scalar(select(StoreCustomer).where(StoreCustomer.email==email,StoreCustomer.active.is_(True)))
+    if not customer:
+        raise HTTPException(400,"بيانات الاسترداد غير صحيحة أو انتهت صلاحية الرمز")
+    row=s.scalar(select(StorePasswordReset).where(StorePasswordReset.customer_id==customer.id).order_by(StorePasswordReset.id.desc()))
+    now=datetime.now(timezone.utc)
+    if not row or row.expires_at<now or row.attempts>=5:
+        raise HTTPException(400,"رمز الاسترداد منتهي أو غير صالح. اطلب رمزاً جديداً")
+    if not password_hash.verify(p.code,row.code_hash):
+        row.attempts+=1;s.commit()
+        raise HTTPException(400,"رمز الاسترداد غير صحيح")
+    customer.password_hash=password_hash.hash(p.new_password)
+    customer.failed_logins=0
+    customer.locked_until=None
+    s.query(StorePasswordReset).filter(StorePasswordReset.customer_id==customer.id).delete(synchronize_session=False)
+    s.commit()
+    return {"ok":True,"message":"تم تحديث كلمة المرور. يمكنك تسجيل الدخول الآن."}
 
 @app.get("/store/auth/me")
 def store_me(customer:StoreCustomer=Depends(current_store_customer)):
