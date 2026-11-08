@@ -339,7 +339,9 @@ def send_verification_email(email:str, code:str):
                 server.login(settings.smtp_user, settings.smtp_password)
                 server.send_message(message)
             return
-        except (smtplib.SMTPException, OSError, TimeoutError):
+        except (smtplib.SMTPException, OSError, TimeoutError) as exc:
+            # Log only the exception class and SMTP response code; never log credentials or message contents.
+            print(f"SMTP delivery failed: {type(exc).__name__}; smtp_code={getattr(exc, 'smtp_code', None)}", flush=True)
             raise HTTPException(502,"تعذر إرسال البريد عبر Gmail SMTP. تحقق من إعدادات SMTP في Render")
     if not settings.brevo_api_key or not settings.brevo_sender_email:
         raise HTTPException(503,"خدمة البريد غير مهيأة. أضف إعدادات Gmail SMTP إلى Render")
