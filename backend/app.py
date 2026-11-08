@@ -643,9 +643,16 @@ def recalculate_inventory(s:Session):
             if not product: raise HTTPException(400,f"القطعة {item['sku']} غير مسجلة في دليل المخزون")
             qty=float(item.get("quantity") or 0)
             if qty<=0: raise HTTPException(400,f"كمية القطعة {product.sku} يجب أن تكون أكبر من صفر")
-            bucket="owned" if record.section in {"purchase","directSale"} else "consigned"
-            sign=-1 if record.section in {"directSale","consignSale"} else 1
-            totals[product.id][bucket]+=sign*qty
+            if record.section=="directSale" and "consigned_quantity" in item:
+                consigned_qty=float(item.get("consigned_quantity") or 0)
+                if not (0 <= consigned_qty <= qty):
+                    raise HTTPException(400,f"توزيع مخزون القطعة {product.sku} غير صالح")
+                totals[product.id]["owned"]-=qty-consigned_qty
+                totals[product.id]["consigned"]-=consigned_qty
+            else:
+                bucket="owned" if record.section in {"purchase","directSale"} else "consigned"
+                sign=-1 if record.section in {"directSale","consignSale"} else 1
+                totals[product.id][bucket]+=sign*qty
     for product in s.scalars(select(InventoryProduct)).all():
         owned=round(totals[product.id]["owned"],3)
         consigned=round(totals[product.id]["consigned"],3)
@@ -1037,7 +1044,16 @@ def update_record(record_id:int, p:RecordUpdate, request:Request, s:Session=Depe
     if not r or r.deleted: raise HTTPException(404,"السجل غير موجود")
     if p.currency not in ("USD","SYP"): raise HTTPException(400,"عملة غير مدعومة")
     ensure_total_covers_payments(s,r.id,p.data)
-    r.data=prepare_record_inventory(s,r.section,p.data,allow_legacy=True); r.invoice_no=p.invoice_no; r.currency=p.currency; r.updated_at=datetime.now(timezone.utc)
+    incoming=dict(p.data or {})
+    if r.section=="directSale":
+        old_items=(r.data or {}).get("items",[]) if isinstance(r.data,dict) else []
+        old_consigned={str(x.get("sku") or "").strip().upper():float(x.get("consigned_quantity") or 0) for x in old_items if isinstance(x,dict) and float(x.get("consigned_quantity") or 0)>0}
+        for item in incoming.get("items",[]) if isinstance(incoming.get("items"),list) else []:
+            if not isinstance(item,dict): continue
+            sku=str(item.get("sku") or "").strip().upper()
+            if sku in old_consigned and "consigned_quantity" not in item:
+                item["consigned_quantity"]=min(float(item.get("quantity") or 0),old_consigned[sku])
+    r.data=prepare_record_inventory(s,r.section,incoming,allow_legacy=True); r.invoice_no=p.invoice_no; r.currency=p.currency; r.updated_at=datetime.now(timezone.utc)
     recalculate_inventory(s)
     audit(s,u,"record_updated","record",r.id,{"section":r.section,"invoice_no":r.invoice_no},request); s.commit(); return {"ok":True}
 
@@ -1289,8 +1305,8 @@ def create_online_order(p:OnlineOrderPayload,s:Session=Depends(db),customer:Stor
         if entry.product_id in seen: continue
         seen.add(entry.product_id);product=s.get(InventoryProduct,entry.product_id)
         if not product or not product.active: raise HTTPException(409,"أحد المنتجات غير متاح")
-        qty=int(entry.quantity);stock=float(product.owned_stock or 0)
-        if qty>stock: raise HTTPException(409,"الكمية المطلوبة تتجاوز المخزون")
+        qty=int(entry.quantity);stock=float(product.owned_stock or 0)+float(product.consigned_stock or 0)
+        if qty>stock: raise HTTPException(409,"الكمية المطلوبة تتجاوز إجمالي المخزون المتاح")
         price=prices.get(product.sku)
         if not price or float(price.get("sale_price") or 0)<=0: raise HTTPException(409,"سعر أحد المنتجات غير محدد")
         if currency and currency!=price["currency"]: raise HTTPException(409,"لا يمكن جمع عملات مختلفة في طلب واحد")
@@ -1321,7 +1337,22 @@ def review_online_purchase_order(order_id:int,p:OnlineOrderReviewPayload,s:Sessi
         order.status="rejected";order.review_note=p.note or "إثبات الدفع غير مقبول";order.reviewed_by=u.id;order.reviewed_at=datetime.now(timezone.utc);s.commit()
         return {"ok":True,"status":"rejected"}
     if p.action!="approve": raise HTTPException(400,"إجراء غير صالح")
-    data={"customer":order.customer_data["full_name"],"customer_phone":order.customer_data["full_phone"],"customer_address":order.customer_data["shipping_address"],"amount":float(order.total),"items":[{"sku":x["sku"],"description":x["description"],"model":x["model"],"quantity":x["quantity"],"price":x["price"]} for x in order.items],"notes":"طلب إلكتروني – تم التحقق من إثبات الدفع واعتماده"}
+    order_items=[]
+    for x in order.items:
+        product=s.scalar(select(InventoryProduct).where(InventoryProduct.sku==str(x["sku"]).strip().upper()))
+        if not product or not product.active:
+            raise HTTPException(409,f"القطعة {x['sku']} لم تعد متاحة")
+        qty=float(x["quantity"])
+        owned=max(0.0,float(product.owned_stock or 0))
+        consigned=max(0.0,float(product.consigned_stock or 0))
+        if qty>owned+consigned:
+            raise HTTPException(409,f"الكمية المتاحة من القطعة {x['sku']} تغيرت. المتاح حالياً: {owned+consigned:g}")
+        consigned_qty=max(0.0,qty-owned)
+        line={"sku":x["sku"],"description":x["description"],"model":x["model"],"quantity":qty,"price":x["price"]}
+        if consigned_qty>0:
+            line["consigned_quantity"]=consigned_qty
+        order_items.append(line)
+    data={"customer":order.customer_data["full_name"],"customer_phone":order.customer_data["full_phone"],"customer_address":order.customer_data["shipping_address"],"amount":float(order.total),"items":order_items,"notes":"طلب إلكتروني – تم التحقق من إثبات الدفع واعتماده"}
     prepared=prepare_record_inventory(s,"directSale",data)
     s.execute(text("SELECT pg_advisory_xact_lock(hashtext(:key))"),{"key":"aib-invoice:directSale"})
     serial=int(s.scalar(select(func.count(Record.id)).where(Record.section=="directSale")) or 0)+1
