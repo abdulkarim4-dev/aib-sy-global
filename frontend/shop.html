@@ -576,6 +576,19 @@ body.modal-open{overflow:hidden}
  .category-zone .cat{min-height:112px!important;padding:11px!important}
  .category-zone .cat>span:last-child{font-size:11px!important}
 }
+/* AIB: dedicated body-parts image for passenger-car spare parts */
+.category-zone .cat[onclick*="car_parts"]{
+  background-image:
+    linear-gradient(90deg,rgba(13,21,29,.94) 0%,rgba(13,21,29,.78) 58%,rgba(13,21,29,.48) 100%),
+    url('https://partsfinder.ae/public/storage/profile_images/profile_59_1774295872.webp') !important;
+  background-size:cover !important;
+  background-position:center !important;
+  border-color:#526b7c;
+}
+.category-zone .cat[onclick*="car_parts"] .cat-icon,
+.category-zone .cat[onclick*="car_parts"] .cat-icon svg{
+  filter:drop-shadow(0 1px 3px #000);
+}
 </style></head><body><header class="wrap top"><div class="brand"><a class="brand-logo-link" href="/" aria-label="العودة إلى الصفحة الرئيسية"><img src="/aib-logo.webp?v=aib-original-full-20261108" alt="AIB"></a><div><b>AIB GROUP</b><small>المتجر الإلكتروني الرسمي</small></div></div><button class="store-account-button" id="storeAccountButton" type="button" onclick="openStoreAuth()" aria-label="حساب العميل">تسجيل الدخول</button><button class="store-logout-button" id="storeLogoutButton" type="button" onclick="logoutStoreCustomer()" hidden>تسجيل الخروج</button><button class="cart-open" type="button" onclick="openCart()" aria-label="فتح سلة التسوق">🛒 <span>سلة التسوق</span><b id="cartCount">0</b></button></header><main class="wrap"><section class="hero"><div style="color:#72b9ec;font-size:12px;letter-spacing:2px;font-weight:bold">AIB ONLINE STORE</div><h1>تسوّق من مجموعة AIB</h1><p>اكتشف قطع الغيار والمحركات والسيارات والشاحنات والمعدات الثقيلة المتوفرة في مخزون الشركة.</p></section><section class="catalog-tools" aria-label="أدوات التسوق"><div class="catalog-tools-head"><div><span class="eyebrow">اكتشف منتجاتنا</span><h2>ابحث واختر بسهولة</h2><p>اكتب اسم القطعة أو رقمها أو الموديل للوصول السريع إلى المنتج.</p></div><span class="catalog-mark">AIB <small>STORE</small></span></div><div class="tools"><label class="search-field"><span aria-hidden="true">⌕</span><input id="q" placeholder="ابحث باسم المنتج أو رقم القطعة أو الموديل" oninput="load()"></label><label class="sort-field"><span>ترتيب حسب</span><select id="sort" onchange="load()"><option value="">الأحدث / الافتراضي</option><option value="name">اسم المنتج</option><option value="stock">الكمية المتوفرة</option></select></label></div></section><section id="categorySection" class="category-section" aria-label="أقسام التسوق">
 <button class="all-products-banner active" type="button" onclick="category('',this)"><span class="all-products-icon"><svg viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path d="M20 5h8l2 5 5 2 5-2 4 7-4 4v6l4 4-4 7-5-2-5 2-2 5h-8l-2-5-5-2-5 2-4-7 4-4v-6l-4-4 4-7 5 2 5-2z"/><circle cx="24" cy="24" r="7"/></svg></span><span><b>جميع المنتجات</b><small>عرض كامل منتجات متجر AIB من جميع الأقسام</small></span><span class="all-products-arrow">←</span></button>
 <div class="category-zone">
@@ -704,17 +717,3 @@ const initialCategory=new URLSearchParams(window.location.search).get('category'
 if(initialCategory)category(initialCategory,null,true);
 refreshStoreSession().finally(()=>{updateStoreAccountButton();renderCart()});if(!initialCategory)load();
 </script></body></html>
-
-/* AIB: dedicated body-parts image for passenger-car spare parts */
-.category-zone .cat[onclick*="car_parts"]{
-  background-image:
-    linear-gradient(90deg,rgba(13,21,29,.94) 0%,rgba(13,21,29,.78) 58%,rgba(13,21,29,.48) 100%),
-    url('https://partsfinder.ae/public/storage/profile_images/profile_59_1774295872.webp') !important;
-  background-size:cover !important;
-  background-position:center !important;
-  border-color:#526b7c;
-}
-.category-zone .cat[onclick*="car_parts"] .cat-icon,
-.category-zone .cat[onclick*="car_parts"] .cat-icon svg{
-  filter:drop-shadow(0 1px 3px #000);
-}
