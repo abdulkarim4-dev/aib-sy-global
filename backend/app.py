@@ -1364,10 +1364,12 @@ def public_products(q:Optional[str]=None, category:Optional[str]=None, s:Session
         is_engine=any(x in name for x in engine_terms)
         is_engine_part=is_engine and any(x in name for x in engine_part_terms)
         is_part=any(x in name for x in part_terms)
+        car_engine_model_prefixes=("N20","N47","N57","N63","B47","B48","B57","B58","M47","M54","M57","M62","S63")
+        is_known_car_engine=any((p.model or "").strip().upper().startswith(prefix) for prefix in car_engine_model_prefixes)
         if any(x in name for x in agri_terms): family="agri"
         elif any(x in name for x in heavy_terms): family="heavy"
         elif any(x in name for x in truck_terms): family="truck"
-        elif any(x in name for x in car_terms): family="car"
+        elif any(x in name for x in car_terms) or is_known_car_engine: family="car"
         else: family="other"
         if family=="other":
             if is_engine: cat="engines"
