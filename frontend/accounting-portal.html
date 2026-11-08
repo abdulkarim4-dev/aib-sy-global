@@ -37,7 +37,97 @@ h1{color:#f1f8ff;text-shadow:0 4px 22px #0008}
 footer{border-top-color:#28516c}
 
 </style>
-</head>
+<style id="aib-unified-white-theme">
+/* AIB unified premium white theme — shared visual layer */
+:root{
+ color-scheme:light;
+ --aib-page:#f4f5f7;--aib-surface:#ffffff;--aib-surface-soft:#fafbfc;
+ --aib-line:#e3e6ea;--aib-text:#20262d;--aib-muted:#737d87;
+ --aib-gold:#c49a50;--aib-gold-dark:#9e7535;--aib-gold-soft:#fbf5e9;
+ --aib-shadow:0 8px 28px rgba(25,32,40,.07);
+}
+@media screen{
+ html,body{background:var(--aib-page)!important;color:var(--aib-text)!important}
+ body{background-image:none!important}
+ body,button,input,select,textarea{font-family:Tahoma,Arial,sans-serif}
+ h1,h2,h3,h4,h5,h6,strong,b,label,legend{color:var(--aib-text)}
+ p,small,.muted,.hint,.subtle,.description{color:var(--aib-muted)}
+ a{color:var(--aib-gold-dark)}
+ header,.top,.topbar,.navbar,.site-header,.app-header,.toolbar,.page-header{
+  background:rgba(255,255,255,.97)!important;color:var(--aib-text)!important;
+  border-color:var(--aib-line)!important;box-shadow:0 3px 16px rgba(25,32,40,.045)!important;
+ }
+ nav,.nav,.sidebar,.side-nav,.menu-drawer,.drawer-panel,.dropdown-menu{
+  background:#fff!important;color:var(--aib-text)!important;border-color:var(--aib-line)!important;
+  box-shadow:var(--aib-shadow)!important;
+ }
+ .panel,.card,.section-card,.content-card,.stat-card,.widget,.box,.tile,
+ .form-card,.login-card,.feature,.table-wrap,.data-card,.summary-card,
+ .modal-content,.modal-card,.dialog-content,.popup-content,.drawer-content,
+ .dropdown,.menu-list,.settings-panel,.report-card,.invoice-card{
+  background:var(--aib-surface)!important;color:var(--aib-text)!important;
+  border-color:var(--aib-line)!important;box-shadow:var(--aib-shadow)!important;
+ }
+ .panel *, .card *, .section-card *, .content-card *, .stat-card *,
+ .form-card *, .login-card *, .modal-content *, .modal-card *,
+ .dialog-content *, .popup-content *, .drawer-content *, .settings-panel *{
+  border-color:var(--aib-line);
+ }
+ input:not([type=checkbox]):not([type=radio]):not([type=file]),
+ select,textarea{
+  background:#fff!important;color:var(--aib-text)!important;
+  border:1px solid #d9dee4!important;box-shadow:inset 0 1px 2px rgba(20,30,40,.025)!important;
+ }
+ input::placeholder,textarea::placeholder{color:#9aa3ac!important}
+ input:focus,select:focus,textarea:focus{
+  outline:none!important;border-color:var(--aib-gold)!important;
+  box-shadow:0 0 0 3px rgba(196,154,80,.14)!important;
+ }
+ button,.button,.btn{
+  background:#fff;color:var(--aib-text);border-color:#dfe3e8;
+  box-shadow:0 2px 7px rgba(25,32,40,.045);
+ }
+ .primary,.btn-primary,.button-primary,[type=submit],.save-btn,.action-primary,
+ .login-submit,.submit-btn,.checkout-submit{
+  background:linear-gradient(135deg,#d8b875,#b88a42)!important;
+  color:#201a10!important;border:1px solid #b88a42!important;
+  box-shadow:0 5px 14px rgba(174,130,57,.18)!important;font-weight:800!important;
+ }
+ button:hover,.button:hover,.btn:hover{border-color:#c6a15e}
+ .primary:hover,.btn-primary:hover,.button-primary:hover,[type=submit]:hover,
+ .save-btn:hover,.action-primary:hover,.login-submit:hover,.submit-btn:hover{
+  filter:brightness(1.035);transform:translateY(-1px)
+ }
+ .danger,.btn-danger,.delete-btn,.logout-btn,.danger-button{
+  background:#fff5f4!important;color:#b43c35!important;border-color:#efc9c6!important
+ }
+ .success,.btn-success,.success-button{background:#eef8f1!important;color:#247446!important;border-color:#cce8d5!important}
+ table{background:#fff!important;color:var(--aib-text)!important;border-color:var(--aib-line)!important}
+ th{background:#f8f4eb!important;color:#5d4828!important;border-color:#e8ddc8!important}
+ td{background:#fff!important;color:var(--aib-text)!important;border-color:var(--aib-line)!important}
+ tr:nth-child(even) td{background:#fbfcfd!important}
+ hr,.divider{border-color:var(--aib-line)!important}
+ .active,.selected,.tab.active,.nav-link.active{border-color:var(--aib-gold)!important}
+ .badge,.pill,.tag{border-color:#e8dcc5}
+ .modal-backdrop,.overlay,.backdrop,.drawer-backdrop{background:rgba(20,27,34,.42)!important}
+ .empty,.empty-state{background:#fff!important;color:var(--aib-muted)!important;border-color:var(--aib-line)!important}
+}
+
+@media screen{
+ header{background:#fff!important;border-bottom:1px solid var(--aib-line)!important}
+ .brand b,h1,.hero h1{color:#20262d!important;text-shadow:none!important}
+ .hero{background:linear-gradient(145deg,#fff,#faf7f0)!important;border:1px solid #e8ddc8!important;box-shadow:var(--aib-shadow)!important}
+ .hero-in{border-right-color:var(--aib-gold)!important}
+ .eyebrow{color:var(--aib-gold-dark)!important}
+ .lead,.feature span,footer{color:var(--aib-muted)!important}
+ .feature{background:#fff!important;border-color:var(--aib-line)!important}
+ .feature strong{color:#20262d!important}
+ .symbol{background:var(--aib-gold-soft)!important;color:var(--aib-gold-dark)!important}
+ .back,.secondary{background:#fff!important;color:#4c402c!important;border-color:#e3d5b9!important}
+ .primary{background:linear-gradient(135deg,#d8b875,#b88a42)!important;color:#201a10!important}
+ footer{border-top-color:var(--aib-line)!important}
+}
+</style></head>
 <body>
 <header class="wrap">
   <a class="brand" href="/" aria-label="مجموعة AIB التجارية">
