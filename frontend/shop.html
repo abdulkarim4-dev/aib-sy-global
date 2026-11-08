@@ -512,6 +512,60 @@ body.modal-open{overflow:hidden}
 @keyframes aibFastSpin{to{transform:rotate(360deg)}}
 @keyframes aibLoadingShimmer{to{background-position:-200% 0}}
 @media(prefers-reduced-motion:reduce){.aib-loading-state{animation:none}.aib-loading-spinner{animation-duration:1.2s}}
+
+/* AIB category photography refresh: clearer, category-specific images without watermarks */
+.hero:after{display:none!important;content:none!important}
+.category-section .cat:after{display:none!important;content:none!important}
+.category-zone .cat{
+  min-height:132px!important;
+  background-color:#17232d!important;
+  background-position:center 48%!important;
+  background-size:cover!important;
+  background-repeat:no-repeat!important;
+  border:1px solid #8b744e!important;
+  box-shadow:0 9px 24px #0005!important;
+}
+.category-zone .cat:before{display:none!important;content:none!important}
+.category-zone .cat:after{
+  display:block!important;content:""!important;inset:0!important;z-index:0!important;
+  background:linear-gradient(90deg,rgba(5,12,18,.48),rgba(5,12,18,.22) 52%,rgba(5,12,18,.58))!important;
+  pointer-events:none!important;
+}
+.category-zone .cat .cat-icon,.category-zone .cat>span:last-child{
+  position:relative!important;z-index:1!important;
+}
+.category-zone .cat>span:last-child{
+  color:#fff!important;font-size:13px!important;line-height:1.55!important;
+  text-shadow:0 2px 5px #000,0 0 10px #000!important;
+}
+.category-zone .cat:hover,.category-zone .cat.active{
+  filter:brightness(1.12);
+  border-color:#e4bd75!important;
+  box-shadow:0 14px 30px #0008!important;
+}
+/* Passenger cars */
+.category-zone:nth-of-type(1) .cat:nth-child(1){background-image:url('https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=1100&q=90')!important}
+.category-zone:nth-of-type(1) .cat:nth-child(2){background-image:url('https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&w=1100&q=90')!important}
+.category-zone:nth-of-type(1) .cat:nth-child(3){background-image:url('https://images.unsplash.com/photo-1581092918056-0c4c3acd3781?auto=format&fit=crop&w=1100&q=90')!important}
+.category-zone:nth-of-type(1) .cat:nth-child(4){background-image:url('https://images.unsplash.com/photo-1487754180451-c456f719a1fc?auto=format&fit=crop&w=1100&q=90')!important}
+/* Trucks */
+.category-zone:nth-of-type(2) .cat:nth-child(1){background-image:url('https://images.unsplash.com/photo-1519003722824-194d4455a60c?auto=format&fit=crop&w=1100&q=90')!important}
+.category-zone:nth-of-type(2) .cat:nth-child(2){background-image:url('https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&w=1100&q=90')!important}
+.category-zone:nth-of-type(2) .cat:nth-child(3){background-image:url('https://images.unsplash.com/photo-1581092334651-ddf26d9a09d0?auto=format&fit=crop&w=1100&q=90')!important}
+.category-zone:nth-of-type(2) .cat:nth-child(4){background-image:url('https://images.unsplash.com/photo-1487754180451-c456f719a1fc?auto=format&fit=crop&w=1100&q=90')!important}
+/* Construction and agricultural equipment */
+.category-zone:nth-of-type(3) .cat:nth-child(1){background-image:url('https://images.unsplash.com/photo-1580901368919-7738efb0f87e?auto=format&fit=crop&w=1100&q=90')!important}
+.category-zone:nth-of-type(3) .cat:nth-child(2){background-image:url('https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=1100&q=90')!important}
+.category-zone:nth-of-type(3) .cat:nth-child(3){background-image:url('https://images.unsplash.com/photo-1530267981375-f0de937f5f13?auto=format&fit=crop&w=1100&q=90')!important}
+.category-zone:nth-of-type(3) .cat:nth-child(4){background-image:url('https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&w=1100&q=90')!important}
+.category-zone:nth-of-type(3) .cat:nth-child(5){background-image:url('https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&w=1100&q=90')!important}
+.category-zone:nth-of-type(3) .cat:nth-child(6){background-image:url('https://images.unsplash.com/photo-1579412690850-bd41cd0af397?auto=format&fit=crop&w=1100&q=90')!important}
+.category-zone:nth-of-type(3) .cat:nth-child(7){background-image:url('https://images.unsplash.com/photo-1581092918056-0c4c3acd3781?auto=format&fit=crop&w=1100&q=90')!important}
+.category-zone:nth-of-type(3) .cat:nth-child(8){background-image:url('https://images.unsplash.com/photo-1487754180451-c456f719a1fc?auto=format&fit=crop&w=1100&q=90')!important}
+@media(max-width:650px){
+ .category-zone .cat{min-height:112px!important;padding:11px!important}
+ .category-zone .cat>span:last-child{font-size:11px!important}
+}
 </style></head><body><header class="wrap top"><div class="brand"><a class="brand-logo-link" href="/" aria-label="العودة إلى الصفحة الرئيسية"><img src="/aib-logo.webp?v=aib-original-full-20261108" alt="AIB"></a><div><b>AIB GROUP</b><small>المتجر الإلكتروني الرسمي</small></div></div><button class="store-account-button" id="storeAccountButton" type="button" onclick="openStoreAuth()" aria-label="حساب العميل">تسجيل الدخول</button><button class="store-logout-button" id="storeLogoutButton" type="button" onclick="logoutStoreCustomer()" hidden>تسجيل الخروج</button><button class="cart-open" type="button" onclick="openCart()" aria-label="فتح سلة التسوق">🛒 <span>سلة التسوق</span><b id="cartCount">0</b></button></header><main class="wrap"><section class="hero"><div style="color:#72b9ec;font-size:12px;letter-spacing:2px;font-weight:bold">AIB ONLINE STORE</div><h1>تسوّق من مجموعة AIB</h1><p>اكتشف قطع الغيار والمحركات والسيارات والشاحنات والمعدات الثقيلة المتوفرة في مخزون الشركة.</p></section><section class="catalog-tools" aria-label="أدوات التسوق"><div class="catalog-tools-head"><div><span class="eyebrow">اكتشف منتجاتنا</span><h2>ابحث واختر بسهولة</h2><p>اكتب اسم القطعة أو رقمها أو الموديل للوصول السريع إلى المنتج.</p></div><span class="catalog-mark">AIB <small>STORE</small></span></div><div class="tools"><label class="search-field"><span aria-hidden="true">⌕</span><input id="q" placeholder="ابحث باسم المنتج أو رقم القطعة أو الموديل" oninput="load()"></label><label class="sort-field"><span>ترتيب حسب</span><select id="sort" onchange="load()"><option value="">الأحدث / الافتراضي</option><option value="name">اسم المنتج</option><option value="stock">الكمية المتوفرة</option></select></label></div></section><section id="categorySection" class="category-section" aria-label="أقسام التسوق">
 <button class="all-products-banner active" type="button" onclick="category('',this)"><span class="all-products-icon"><svg viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path d="M20 5h8l2 5 5 2 5-2 4 7-4 4v6l4 4-4 7-5-2-5 2-2 5h-8l-2-5-5-2-5 2-4-7 4-4v-6l-4-4 4-7 5 2 5-2z"/><circle cx="24" cy="24" r="7"/></svg></span><span><b>جميع المنتجات</b><small>عرض كامل منتجات متجر AIB من جميع الأقسام</small></span><span class="all-products-arrow">←</span></button>
 <div class="category-zone">
