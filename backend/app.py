@@ -44,6 +44,7 @@ class User(Base):
     role: Mapped[str]=mapped_column(String(20), default="employee")
     permissions: Mapped[dict]=mapped_column(JSON, default=dict, nullable=False)
     active: Mapped[bool]=mapped_column(Boolean, default=True)
+    deleted: Mapped[bool]=mapped_column(Boolean, default=False, nullable=False)
     failed_logins: Mapped[int]=mapped_column(Integer, default=0)
     locked_until: Mapped[Optional[datetime]]=mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
@@ -189,6 +190,7 @@ def startup():
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS permissions JSONB NOT NULL DEFAULT '{}'::jsonb"))
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(254)"))
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT FALSE"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted BOOLEAN NOT NULL DEFAULT FALSE"))
         conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_email_unique ON users (email) WHERE email IS NOT NULL"))
         conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS images JSONB NOT NULL DEFAULT '[]'::jsonb"))
         conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS voided BOOLEAN NOT NULL DEFAULT FALSE"))
@@ -418,7 +420,7 @@ def update_public_site_settings(p:PublicSiteSettingsPayload, request:Request, s:
 
 @app.get("/users")
 def list_users(s:Session=Depends(db), _:User=Depends(manager)):
-    return [{"id":u.id,"username":u.username,"name":u.full_name,"email":u.email,"role":u.role,"active":u.active,"permissions":u.permissions or {}} for u in s.scalars(select(User)).all()]
+    return [{"id":u.id,"username":u.username,"name":u.full_name,"email":u.email,"role":u.role,"active":u.active,"permissions":u.permissions or {}} for u in s.scalars(select(User).where(User.deleted.is_(False))).all()]
 @app.post("/users")
 def add_user(payload:UserCreate, request:Request, s:Session=Depends(db), u:User=Depends(manager)):
     if payload.role not in ("employee","owner"): raise HTTPException(400,"دور غير صالح")
@@ -470,7 +472,9 @@ def delete_user(user_id:int, request:Request, s:Session=Depends(db), u:User=Depe
     if target.role=="owner": raise HTTPException(400,"لا يمكن حذف حساب المالك")
     details={"username":target.username,"full_name":target.full_name}
     audit(s,u,"user_deleted","user",user_id,details,request)
-    s.delete(target)
+    target.active=False
+    target.deleted=True
+    target.locked_until=None
     s.commit()
     return {"ok":True,"deleted_id":user_id}
 
