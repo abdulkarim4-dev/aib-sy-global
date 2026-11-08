@@ -1289,7 +1289,7 @@ def create_online_order(p:OnlineOrderPayload,s:Session=Depends(db),customer:Stor
         if entry.product_id in seen: continue
         seen.add(entry.product_id);product=s.get(InventoryProduct,entry.product_id)
         if not product or not product.active: raise HTTPException(409,"أحد المنتجات غير متاح")
-        qty=int(entry.quantity);stock=float(product.owned_stock or 0)+float(product.consigned_stock or 0)
+        qty=int(entry.quantity);stock=float(product.owned_stock or 0)
         if qty>stock: raise HTTPException(409,"الكمية المطلوبة تتجاوز المخزون")
         price=prices.get(product.sku)
         if not price or float(price.get("sale_price") or 0)<=0: raise HTTPException(409,"سعر أحد المنتجات غير محدد")
@@ -1327,7 +1327,11 @@ def review_online_purchase_order(order_id:int,p:OnlineOrderReviewPayload,s:Sessi
     serial=int(s.scalar(select(func.count(Record.id)).where(Record.section=="directSale")) or 0)+1
     record=Record(section="directSale",invoice_no=f"A-{serial:05d}-B",currency=order.currency,data=prepared,created_by=u.id)
     s.add(record);s.flush();recalculate_inventory(s)
+    payment=InvoicePayment(record_id=record.id,amount=order.total,method="sham_cash",cash_box="شام كاش",created_by=u.id)
+    s.add(payment)
+    s.add(CashMove(box_name="شام كاش",movement="deposit",amount=order.total,currency=order.currency,description="قبض فاتورة طلب شراء إلكتروني "+record.invoice_no,created_by=u.id,record_id=record.id))
     order.status="approved";order.record_id=record.id;order.reviewed_by=u.id;order.reviewed_at=datetime.now(timezone.utc);order.review_note=p.note
+    audit(s,u,"online_order_approved","online_purchase_order",order.id,{"record_id":record.id,"invoice_no":record.invoice_no,"payment_method":"sham_cash"},request=None)
     s.commit()
     return {"ok":True,"status":"approved","record_id":record.id,"invoice_no":record.invoice_no,"customer":order.customer_data}
 
