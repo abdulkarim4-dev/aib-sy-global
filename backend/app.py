@@ -1412,8 +1412,10 @@ def public_products(q:Optional[str]=None, category:Optional[str]=None, s:Session
         elif family=="heavy": cat="heavy"
         else: cat="agri"
         if category and category!=cat: continue
+        stock=float(p.owned_stock or 0)+float(p.consigned_stock or 0)
+        if stock <= 0: continue
         price=latest_purchase.get(p.sku,{})
-        out.append({"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"category":cat,"stock":float(p.owned_stock or 0)+float(p.consigned_stock or 0),"images":p.images or [],"sale_price":price.get("sale_price"),"currency":price.get("currency","")})
+        out.append({"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"category":cat,"stock":stock,"images":p.images or [],"sale_price":price.get("sale_price"),"currency":price.get("currency","")})
     return out
 
 # Serve the connected responsive web app from the same origin as the API.
