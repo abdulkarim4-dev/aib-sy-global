@@ -1398,7 +1398,10 @@ def home():
 
 @app.get("/shop", include_in_schema=False)
 def shop_page():
-    return FileResponse(FRONTEND_DIR / "shop.html")
+    return FileResponse(
+        FRONTEND_DIR / "shop.html",
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0", "Pragma": "no-cache"},
+    )
 
 @app.get("/accounting", include_in_schema=False)
 def accounting_app():
