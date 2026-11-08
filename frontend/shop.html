@@ -704,3 +704,17 @@ const initialCategory=new URLSearchParams(window.location.search).get('category'
 if(initialCategory)category(initialCategory,null,true);
 refreshStoreSession().finally(()=>{updateStoreAccountButton();renderCart()});if(!initialCategory)load();
 </script></body></html>
+
+/* AIB: dedicated body-parts image for passenger-car spare parts */
+.category-zone .cat[onclick*="car_parts"]{
+  background-image:
+    linear-gradient(90deg,rgba(13,21,29,.94) 0%,rgba(13,21,29,.78) 58%,rgba(13,21,29,.48) 100%),
+    url('https://partsfinder.ae/public/storage/profile_images/profile_59_1774295872.webp') !important;
+  background-size:cover !important;
+  background-position:center !important;
+  border-color:#526b7c;
+}
+.category-zone .cat[onclick*="car_parts"] .cat-icon,
+.category-zone .cat[onclick*="car_parts"] .cat-icon svg{
+  filter:drop-shadow(0 1px 3px #000);
+}
