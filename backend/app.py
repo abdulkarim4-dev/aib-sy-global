@@ -1039,7 +1039,7 @@ def public_products(q:Optional[str]=None, category:Optional[str]=None, s:Session
 
 # Serve the connected responsive web app from the same origin as the API.
 from pathlib import Path
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 @app.get("/", include_in_schema=False)
 def home():
@@ -1056,6 +1056,11 @@ def accounting_app():
 @app.get("/sham_cash_qr.png", include_in_schema=False)
 def sham_cash_qr():
     return FileResponse(FRONTEND_DIR / "sham_cash_qr.png", media_type="image/png")
+
+@app.get("/aib-logo.webp", include_in_schema=False)
+def aib_original_logo():
+    logo_data = base64.b64decode((FRONTEND_DIR / "aib-logo.webp.b64").read_text(encoding="ascii").strip())
+    return Response(content=logo_data, media_type="image/webp", headers={"Cache-Control": "public, max-age=86400"})
 
 @app.get("/logo.jpg", include_in_schema=False)
 def logo_jpg():
