@@ -1380,7 +1380,16 @@ def public_products(q:Optional[str]=None, category:Optional[str]=None, s:Session
         elif family=="truck": cat="trucks"
         elif family=="heavy": cat="heavy"
         else: cat="agri"
-        if category and category!=cat: continue
+        if category:
+            # Parent vehicle/equipment categories must include their own parts and engine subcategories.
+            family_categories={
+                "cars":{"cars","car_parts","car_engines","car_engine_parts"},
+                "trucks":{"trucks","truck_parts","truck_engines","truck_engine_parts"},
+                "heavy":{"heavy","heavy_parts","heavy_engines","heavy_engine_parts"},
+                "agri":{"agri","agri_parts","agri_engines","agri_engine_parts"},
+            }
+            allowed_categories=family_categories.get(category,{category})
+            if cat not in allowed_categories: continue
         stock=float(p.owned_stock or 0)+float(p.consigned_stock or 0)
         # Keep the N20 engine visible as an out-of-stock catalog item; do not expose other zero-stock items.
         if stock <= 0 and (p.model or "").strip().upper() != "N20B20B": continue
