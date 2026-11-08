@@ -446,3 +446,65 @@ function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&l
 function fmt(v){return Number(v||0).toLocaleString('ar-SY',{maximumFractionDigits:2})}
 function categoryName(c){return ({parts:'قطع الغيار',engines:'المحركات',cars:'السيارات السياحية',car_parts:'قطع غيار السيارات السياحية',car_engines:'محركات السيارات السياحية',car_engine_parts:'قطع محركات السيارات السياحية',trucks:'الشاحنات',truck_parts:'قطع غيار الشاحنات',truck_engines:'محركات الشاحنات',truck_engine_parts:'قطع محركات الشاحنات',heavy:'الحفارات والمعدات الثقيلة',heavy_parts:'قطع غيار المعدات الثقيلة',heavy_engines:'محركات المعدات الثقيلة',heavy_engine_parts:'قطع محركات المعدات الثقيلة',agri:'المعدات الزراعية',agri_parts:'قطع غيار المعدات الزراعية',agri_engines:'محركات المعدات الزراعية',agri_engine_parts:'قطع محركات المعدات الزراعية'})[c]||'منتجات AIB'}let currentProducts=[];function productCard(x,i){const imgs=Array.isArray(x.images)?x.images:[];const first=imgs[0]||'';const stock=Math.max(0,Math.floor(Number(x.stock)||0));const qtyId='cardQty-'+i;const media=first?'<div class="product-media"><img class="main-photo" loading="lazy" src="'+esc(first)+'" alt="'+esc(x.name)+'"></div>':'<div class="product-media"><span class="no-photo">لا توجد صورة</span></div>';return '<article class="product compact-product" role="button" tabindex="0" aria-label="عرض تفاصيل '+esc(x.name)+'" onclick="openProduct('+i+')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();openProduct('+i+')}">'+media+'<span class="category-label">'+categoryName(x.category)+'</span><h3>'+esc(x.name)+'</h3><div class="sku">SKU: '+esc(x.sku)+'</div><p class="compact-model">'+esc(x.model||'—')+'</p><div class="compact-bottom"><strong class="price">'+(x.sale_price?fmt(x.sale_price)+' '+esc(x.currency):'السعر عند التواصل')+'</strong><span class="compact-stock">المتاح: '+fmt(stock)+'</span></div><span class="view-product">عرض التفاصيل ←</span><div class="purchase-control" onclick="event.stopPropagation()"><div class="purchase-stepper"><button type="button" aria-label="زيادة العدد" '+(stock<=0?'disabled':'')+' onclick="event.stopPropagation();adjustPurchaseQty(\''+qtyId+'\',1,'+stock+')">+</button><input id="'+qtyId+'" type="number" min="1" max="'+stock+'" value="1" '+(stock<=0?'disabled':'')+' aria-label="العدد المطلوب" onclick="event.stopPropagation()" onkeydown="event.stopPropagation()" onchange="validateCardQty(\''+qtyId+'\','+stock+')"><button type="button" aria-label="تقليل العدد" '+(stock<=0?'disabled':'')+' onclick="event.stopPropagation();adjustPurchaseQty(\''+qtyId+'\',-1,'+stock+')">−</button></div><button class="add-cart card-add-cart" type="button" '+(stock<=0?'disabled':'')+' onclick="event.stopPropagation();addToCart('+i+',document.getElementById(\''+qtyId+'\').value)">أضف للسلة</button><button class="buy-now card-buy-now" type="button" onclick="event.stopPropagation();buyNow('+i+',document.getElementById(\''+qtyId+'\').value)">شراء الآن</button></div></article>'}function openProduct(i){const x=currentProducts[i];if(!x)return;document.getElementById('productModal').dataset.index=i;const imgs=Array.isArray(x.images)?x.images:[];const main=document.getElementById('detailMainImage');const empty=document.getElementById('detailNoImage');main.hidden=!imgs.length;empty.hidden=!!imgs.length;main.src=imgs[0]||'';main.alt=x.name||'صورة المنتج';document.getElementById('detailGallery').innerHTML=imgs.length>1?imgs.map((src,n)=>'<button class="detail-thumb'+(n===0?' active':'')+'" type="button" onclick="selectDetailImage('+n+')"><img src="'+esc(src)+'" alt="صورة '+(n+1)+'"></button>').join(''):'';document.getElementById('detailName').textContent=x.name||'منتج AIB';document.getElementById('detailSku').textContent='SKU: '+(x.sku||'—');document.getElementById('detailCategory').textContent=categoryName(x.category);document.getElementById('detailPrice').textContent=x.sale_price?fmt(x.sale_price)+' '+(x.currency||''):'السعر عند التواصل';document.getElementById('detailModel').textContent=x.model||'—';document.getElementById('detailStock').textContent=fmt(x.stock);document.getElementById('detailStock').dataset.stock=Number(x.stock||0);const detailQty=document.getElementById('detailQty');detailQty.value='1';detailQty.max=Math.max(1,Number(x.stock||0));document.getElementById('detailImageCount').textContent=imgs.length+' / 20 صورة';document.getElementById('detailDescription').textContent=x.description||x.notes||'للاستفسار عن مواصفات المنتج وتفاصيله، يرجى التواصل مع مجموعة AIB.';document.getElementById('detailWhatsapp').href='https://wa.me/963997439627?text='+encodeURIComponent('أرغب بالاستفسار عن المنتج: '+(x.name||'')+' | رقم القطعة: '+(x.sku||''));const modal=document.getElementById('productModal');modal.classList.add('open');modal.setAttribute('aria-hidden','false');document.body.classList.add('modal-open');document.getElementById('closeProduct').focus()}function selectDetailImage(i){const x=currentProducts[Number(document.getElementById('productModal').dataset.index)];if(!x)return;const src=(x.images||[])[i];if(!src)return;document.getElementById('detailMainImage').src=src;document.querySelectorAll('.detail-thumb').forEach((b,n)=>b.classList.toggle('active',n===i))}function closeProduct(){const m=document.getElementById('productModal');m.classList.remove('open');m.setAttribute('aria-hidden','true');document.body.classList.remove('modal-open')}document.addEventListener('keydown',e=>{if(e.key==='Escape')closeProduct()});async function load(){let g=document.getElementById('grid');try{let p=new URLSearchParams();if(q.value.trim())p.set('q',q.value.trim());if(selected)p.set('category',selected);let r=await fetch('/public/products?'+p);if(!r.ok)throw Error();let a=await r.json();if(sort.value==='name')a.sort((x,y)=>x.name.localeCompare(y.name,'ar'));if(sort.value==='stock')a.sort((x,y)=>y.stock-x.stock);const count=document.getElementById('resultCount');if(count)count.textContent=a.length+' منتج';currentProducts=a;g.innerHTML=a.length?a.map((item,i)=>productCard(item,i)).join(''):'<div class="empty">لا توجد منتجات متاحة في هذا القسم حالياً.</div>'}catch(e){const count=document.getElementById('resultCount');if(count)count.textContent='';g.innerHTML='<div class="empty">تعذر تحميل المنتجات حالياً.</div>'}}refreshStoreSession().finally(()=>{updateStoreAccountButton();renderCart()});load();
 </script></body></html>
+
+/* AIB photo-watermark category tiles */
+.category-zone .cat{
+  position:relative!important;
+  isolation:isolate;
+  overflow:hidden;
+  background:#1b2834!important;
+  border:1px solid #40576a!important;
+  min-height:88px!important;
+  padding:13px 15px!important;
+  text-align:right!important;
+}
+.category-zone .cat::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:-2;
+  background-position:center;
+  background-size:cover;
+  background-repeat:no-repeat;
+  opacity:.30;
+  filter:saturate(.78) contrast(1.05);
+  transition:transform .35s ease,opacity .25s ease;
+}
+.category-zone .cat::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:-1;
+  background:linear-gradient(90deg,rgba(16,24,32,.76),rgba(16,24,32,.48) 55%,rgba(16,24,32,.72));
+  pointer-events:none;
+}
+.category-zone .cat .cat-icon{display:none!important}
+.category-zone .cat>span:not(.cat-icon){
+  position:relative;
+  z-index:1;
+  text-shadow:0 2px 5px #000;
+  color:#f1f6fa;
+}
+.category-zone .cat:hover::before,
+.category-zone .cat.active::before{transform:scale(1.07);opacity:.43}
+.category-zone .cat.active::after{background:linear-gradient(90deg,rgba(18,48,69,.76),rgba(19,56,81,.48),rgba(18,48,69,.72))}
+.category-zone:nth-of-type(1) .cat:nth-child(1)::before{background-image:url('https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=900&q=75')}
+.category-zone:nth-of-type(1) .cat:nth-child(2)::before{background-image:url('https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&w=900&q=75')}
+.category-zone:nth-of-type(1) .cat:nth-child(3)::before{background-image:url('https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=900&q=75')}
+.category-zone:nth-of-type(1) .cat:nth-child(4)::before{background-image:url('https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?auto=format&fit=crop&w=900&q=75')}
+.category-zone:nth-of-type(2) .cat:nth-child(1)::before{background-image:url('https://images.unsplash.com/photo-1519641471654-76ce0107ad1b?auto=format&fit=crop&w=900&q=75')}
+.category-zone:nth-of-type(2) .cat:nth-child(2)::before{background-image:url('https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&w=900&q=75')}
+.category-zone:nth-of-type(2) .cat:nth-child(3)::before{background-image:url('https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=900&q=75')}
+.category-zone:nth-of-type(2) .cat:nth-child(4)::before{background-image:url('https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?auto=format&fit=crop&w=900&q=75')}
+.category-zone:nth-of-type(3) .cat:nth-child(1)::before{background-image:url('https://images.unsplash.com/photo-1579412690850-bd41cd0af397?auto=format&fit=crop&w=900&q=75')}
+.category-zone:nth-of-type(3) .cat:nth-child(2)::before{background-image:url('https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&w=900&q=75')}
+.category-zone:nth-of-type(3) .cat:nth-child(3)::before{background-image:url('https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=900&q=75')}
+.category-zone:nth-of-type(3) .cat:nth-child(4)::before{background-image:url('https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?auto=format&fit=crop&w=900&q=75')}
+.category-zone:nth-of-type(4) .cat:nth-child(1)::before{background-image:url('https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&w=900&q=75')}
+.category-zone:nth-of-type(4) .cat:nth-child(2)::before{background-image:url('https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&w=900&q=75')}
+.category-zone:nth-of-type(4) .cat:nth-child(3)::before{background-image:url('https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=900&q=75')}
+.category-zone:nth-of-type(4) .cat:nth-child(4)::before{background-image:url('https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?auto=format&fit=crop&w=900&q=75')}
+@media(max-width:600px){
+ .category-zone .cat{min-height:82px!important;padding:11px!important}
+ .category-zone .cat>span:not(.cat-icon){font-size:11px!important;line-height:1.5}
+}
