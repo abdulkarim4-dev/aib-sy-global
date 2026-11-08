@@ -1032,6 +1032,10 @@ def sham_cash_qr():
 def logo():
     return FileResponse(FRONTEND_DIR / "logo.png", media_type="image/png")
 
+@app.get("/logo.svg", include_in_schema=False)
+def logo_svg():
+    return FileResponse(FRONTEND_DIR / "logo.svg", media_type="image/svg+xml", headers={"Cache-Control": "public, max-age=3600"})
+
 
 @app.get("/accounting-portal", include_in_schema=False)
 def accounting_portal():
