@@ -1354,11 +1354,32 @@ def public_products(q:Optional[str]=None, category:Optional[str]=None, s:Session
     out=[]
     for p in rows:
         name=(p.name+" "+(p.model or "")).lower()
-        if any(x in name for x in ["حفار","excavator","تركس","لودر","loader","كاتربلر","caterpillar","volvo ec","hyundai r"]): cat="heavy"
-        elif any(x in name for x in ["شاحنة","truck","fh","scania","قاطر"]): cat="trucks"
-        elif any(x in name for x in ["محرك","engine","gearbox","جير","دفرنس","ناقل"]): cat="engines"
-        elif any(x in name for x in ["سيارة","sedan","bmw","mercedes","hyundai","kia","toyota","volkswagen"]): cat="cars"
-        else: cat="parts"
+        heavy_terms=["حفار","حفارة","excavator","تركس","لودر","loader","كاتربلر","caterpillar","volvo ec","hyundai r","بلدوزر","جرافة"]
+        agri_terms=["زراعي","زراعية","جرار","تركتور","tractor","combine","حصادة","حصادات","harvester"]
+        truck_terms=["شاحنة","truck","fh","scania","قاطر","رأس قاطر","مرسيدس اكتروس","actros","volvo fh"]
+        car_terms=["سيارة","سياحية","sedan","bmw","mercedes","hyundai","kia","toyota","volkswagen","audi","škoda","skoda","نيسان","هوندا"]
+        engine_terms=["محرك","مكينة","engine","motor"]
+        engine_part_terms=["بستم","مكبس","شنبر","رنج","صباب","بلوف","راس محرك","رأس محرك","وش سلندر","جوان","كرتير","عمود كرنك","كرنك","طرمبة زيت","طرمبة ماء","oil pump","piston","liner","valve","gasket","crankshaft","cylinder head"]
+        part_terms=["قطع","قطعة","فلتر","فلتر","حساس","بخاخ","انجكتر","injector","طرمبة","مضخة","رمان","bearing","سير","belt","كلتش","clutch","فرامل","brake","ديسك","جلدة","خرطوم","hose","gearbox","جير","دفرنس","ناقل"]
+        is_engine=any(x in name for x in engine_terms)
+        is_engine_part=is_engine and any(x in name for x in engine_part_terms)
+        is_part=any(x in name for x in part_terms)
+        if any(x in name for x in agri_terms): family="agri"
+        elif any(x in name for x in heavy_terms): family="heavy"
+        elif any(x in name for x in truck_terms): family="truck"
+        elif any(x in name for x in car_terms): family="car"
+        else: family="other"
+        if family=="other":
+            if is_engine: cat="engines"
+            elif is_part: cat="parts"
+            else: cat="parts"
+        elif is_engine_part: cat=family+"_engine_parts"
+        elif is_engine: cat=family+"_engines"
+        elif is_part: cat=family+"_parts"
+        elif family=="car": cat="cars"
+        elif family=="truck": cat="trucks"
+        elif family=="heavy": cat="heavy"
+        else: cat="agri"
         if category and category!=cat: continue
         price=latest_purchase.get(p.sku,{})
         out.append({"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"category":cat,"owned_stock":float(p.owned_stock or 0),"consigned_stock":float(p.consigned_stock or 0),"stock":float(p.owned_stock or 0)+float(p.consigned_stock or 0),"images":p.images or [],"sale_price":price.get("sale_price"),"currency":price.get("currency","")})
