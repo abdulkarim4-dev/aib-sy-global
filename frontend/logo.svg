@@ -1,37 +1,54 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" viewBox="0 0 1200 520" role="img" aria-labelledby="title desc">
-<title id="title">شعار مجموعة AIB التجارية</title><desc id="desc">AIB Group corporate logo in silver, blue and orange with compass, globe and automotive engineering motif</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="600" viewBox="0 0 1600 600" role="img" aria-labelledby="title desc">
+<title id="title">AIB GROUP</title>
+<desc id="desc">Transparent corporate emblem with a globe, gear, compass, rising orange route and automotive and industrial silhouettes.</desc>
 <defs>
- <linearGradient id="metal" x1="0" y1="0" x2="0.2" y2="1"><stop stop-color="#ffffff"/><stop offset=".38" stop-color="#dce5ec"/><stop offset=".72" stop-color="#899aa8"/><stop offset="1" stop-color="#eef4f8"/></linearGradient>
- <linearGradient id="blue" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#72caff"/><stop offset=".55" stop-color="#2586c7"/><stop offset="1" stop-color="#164a70"/></linearGradient>
- <linearGradient id="orange" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#f7b36f"/><stop offset="1" stop-color="#df6c2d"/></linearGradient>
- <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%"><feGaussianBlur in="SourceAlpha" stdDeviation="7"/><feOffset dy="8"/><feComponentTransfer><feFuncA type="linear" slope=".38"/></feComponentTransfer><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+ <linearGradient id="steel" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#fff"/><stop offset=".28" stop-color="#dce6ee"/><stop offset=".58" stop-color="#8296a8"/><stop offset=".82" stop-color="#f4f7fa"/><stop offset="1" stop-color="#8294a4"/></linearGradient>
+ <linearGradient id="navy" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#47a9ed"/><stop offset=".45" stop-color="#12649e"/><stop offset="1" stop-color="#092a49"/></linearGradient>
+ <linearGradient id="orange" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#ffd08c"/><stop offset=".45" stop-color="#f18b32"/><stop offset="1" stop-color="#d85b20"/></linearGradient>
+ <radialGradient id="globe" cx=".32" cy=".25" r=".8"><stop stop-color="#e9f6ff"/><stop offset=".38" stop-color="#388fc5"/><stop offset="1" stop-color="#092b4b"/></radialGradient>
+ <filter id="depth" x="-20%" y="-25%" width="145%" height="160%"><feGaussianBlur in="SourceAlpha" stdDeviation="8"/><feOffset dy="9"/><feComponentTransfer><feFuncA type="linear" slope=".42"/></feComponentTransfer><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>
 </defs>
-<g fill="none" stroke="url(#blue)" stroke-width="8" opacity=".95">
- <path d="M160 215A205 205 0 0 1 570 215" stroke-linecap="round"/>
- <path d="M183 226A181 181 0 0 0 548 226" stroke-width="3" opacity=".55"/>
- <path d="M220 75Q365 -8 520 75" stroke-width="3" opacity=".5"/>
+<!-- globe and gear emblem -->
+<g transform="translate(290 260)" filter="url(#depth)">
+ <path d="M0-205l28 15 30-6 17 29 31 7 6 33 27 17-5 33 20 27-17 29 7 31-27 20-5 33-32 8-17 29-33-6-28 18-27-18-33 6-17-29-32-8-5-33-27-20 7-31-17-29 20-27-5-33 27-17 6-33 31-7 17-29 30 6z" fill="none" stroke="url(#steel)" stroke-width="18" stroke-linejoin="round"/>
+ <circle r="151" fill="url(#globe)" stroke="url(#steel)" stroke-width="13"/>
+ <g fill="none" stroke="#c7eaff" opacity=".6">
+  <ellipse rx="148" ry="57" stroke-width="3"/><ellipse rx="148" ry="105" stroke-width="2"/>
+  <ellipse rx="64" ry="149" stroke-width="3"/><ellipse rx="112" ry="149" stroke-width="2"/>
+  <path d="M-145 0H145M-130-74H130M-130 74H130" stroke-width="2"/>
+ </g>
+ <path d="M-55-91l27 9 13 29 29 10 8 28-18 18-4 29-31 11-13 31-24-9-18-30-29-13-8-28 16-22 2-31 29-12z" fill="#eaf4fa" opacity=".92"/>
+ <path d="M45-8l28 7 18 24-9 29-29 8-13 23-22-13-4-29-23-17 12-25z" fill="#dceaf3" opacity=".85"/>
 </g>
-<g transform="translate(365 125)" fill="none" stroke="#5bb7ef" opacity=".55">
- <circle r="102" stroke-width="2"/><ellipse rx="102" ry="38" stroke-width="2"/><ellipse rx="42" ry="102" stroke-width="2"/>
- <path d="M-96 -34H96M-101 0H101M-96 34H96" stroke-width="1.5"/>
+<!-- rising orbital arrow -->
+<path d="M70 370C320 225 555 190 790 225S1190 250 1485 85" fill="none" stroke="#061b2d" stroke-width="34" opacity=".55" stroke-linecap="round"/>
+<path d="M70 350C320 205 555 170 790 205S1190 230 1485 65" fill="none" stroke="url(#orange)" stroke-width="25" stroke-linecap="round"/>
+<path d="M1445 52l75 7-37 68" fill="none" stroke="url(#orange)" stroke-width="23" stroke-linecap="round" stroke-linejoin="round"/>
+<!-- AIB wordmark -->
+<g filter="url(#depth)">
+ <text x="1010" y="345" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="300" font-weight="900" letter-spacing="-20" fill="url(#navy)" stroke="url(#steel)" stroke-width="8" paint-order="stroke fill">AIB</text>
 </g>
-<g filter="url(#shadow)">
- <text x="600" y="300" text-anchor="middle" font-family="Arial,sans-serif" font-size="260" font-weight="900" letter-spacing="-13" fill="url(#metal)" stroke="#526b7d" stroke-width="2">AIB</text>
+<path d="M610 385H1460" stroke="url(#steel)" stroke-width="9" stroke-linecap="round"/>
+<path d="M680 405H1390" stroke="url(#orange)" stroke-width="5" stroke-linecap="round"/>
+<!-- industrial transport silhouettes -->
+<g transform="translate(650 405)" stroke="url(#steel)" stroke-width="7" stroke-linejoin="round" fill="#0b2942">
+ <path d="M0 0h205l-18-53q-5-15-24-15H66q-20 0-30 17z"/><path d="M54-67l18-31h83l27 31" fill="#164e76"/>
+ <circle cx="53" cy="2" r="22" fill="#101a23"/><circle cx="165" cy="2" r="22" fill="#101a23"/>
+ <path d="M245 0h190v-94h-85l-28-34h-77z"/><path d="M350-128v128" fill="none"/>
+ <circle cx="290" cy="2" r="22" fill="#101a23"/><circle cx="405" cy="2" r="22" fill="#101a23"/>
+ <path d="M465 0h185l-18-45h-48v-73h-65v73h-42z" fill="#174d70"/>
+ <path d="M520-118h65v-35h-65zM585-45l55-60 17 11-47 64" fill="#e87936"/>
+ <circle cx="500" cy="2" r="22" fill="#101a23"/><circle cx="620" cy="2" r="22" fill="#101a23"/>
+ <path d="M690-3h115l-15-38h-84z" fill="#164e76"/>
+ <circle cx="716" cy="2" r="22" fill="#101a23"/><circle cx="785" cy="2" r="22" fill="#101a23"/>
 </g>
-<path d="M170 290Q405 165 690 225Q830 255 1005 130" fill="none" stroke="url(#orange)" stroke-width="13" stroke-linecap="round"/>
-<path d="M175 305Q425 190 690 247Q850 275 1015 151" fill="none" stroke="#ffca8e" stroke-width="2.5" opacity=".8"/>
-<g transform="translate(850 175)" fill="none" stroke="url(#blue)" stroke-width="9">
- <circle r="77"/><circle r="57" stroke-width="3" opacity=".7"/>
- <path d="M0 -48L14 -8L0 5L-14 -8Z" fill="#e7f2fa" stroke="none"/>
- <path d="M0 48L-14 8L0 -5L14 8Z" fill="#2586c7" stroke="none"/>
- <path d="M-48 0H48M0 -48V48" stroke-width="2" opacity=".55"/>
+<!-- compass detail -->
+<g transform="translate(1450 390)" stroke="url(#steel)" stroke-width="7" fill="none">
+ <circle r="66"/><circle r="48" stroke-width="3" opacity=".7"/>
+ <path d="M0-38L14-5 0 7-14-5z" fill="#e8f4fc" stroke="none"/>
+ <path d="M0 38L-14 5 0-7 14 5z" fill="#2586c7" stroke="none"/>
+ <path d="M0-78V-62M0 62V78M-78 0H-62M62 0H78" stroke-width="5"/>
 </g>
-<g transform="translate(1015 185)" fill="none" stroke="#93a9b8" stroke-width="7" opacity=".9">
- <circle r="53"/><circle r="36" stroke-width="4"/>
- <path d="M0 -72V-57M0 57V72M-72 0H-57M57 0H72M-51 -51L-41 -41M41 41L51 51M51 -51L41 -41M-41 41L-51 51"/>
-</g>
-<path d="M160 342H1040" stroke="url(#blue)" stroke-width="3" opacity=".8"/>
-<text x="600" y="405" text-anchor="middle" font-family="Tahoma,Arial,sans-serif" font-size="54" font-weight="700" fill="url(#metal)">مجموعة AIB التجارية</text>
-<text x="600" y="455" text-anchor="middle" font-family="Arial,sans-serif" font-size="25" letter-spacing="9" font-weight="700" fill="#83c8f2">AIB GROUP</text>
-<path d="M280 455H410M790 455H920" stroke="url(#orange)" stroke-width="4" stroke-linecap="round"/>
+<text x="1030" y="535" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="88" font-weight="800" letter-spacing="17" fill="url(#steel)">AIB GROUP</text>
+<path d="M490 510H650M1410 510H1510" stroke="url(#orange)" stroke-width="7" stroke-linecap="round"/>
 </svg>
