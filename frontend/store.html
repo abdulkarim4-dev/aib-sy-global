@@ -43,6 +43,92 @@ body.menu-open{overflow:hidden}body.menu-open .menu-backdrop{opacity:1;visibilit
 .menu-drawer .menu-list a span{flex:1;min-width:0}.menu-drawer .menu-list a b{display:block;color:#f0f4f6;font-size:14px}.menu-drawer .menu-list a small{display:block;color:#9eacb6;font-size:10px;margin-top:5px}.menu-drawer .menu-list a em{font-size:25px;font-style:normal;color:#76bce9}
 .menu-drawer-footer{margin-top:auto;padding-top:24px}.menu-drawer-footer>span{display:block;color:#8495a1;font-size:10px;text-align:center;margin-bottom:13px}.menu-drawer-footer>a{display:flex;justify-content:space-between;align-items:center;padding:13px 15px;border:1px solid #3e6e8c;border-radius:12px;background:#1c3d54;color:#dff2ff;font-weight:800;font-size:13px}.menu-drawer-footer>a b{font-size:18px;color:#83cafa}
 @media(max-width:520px){.hamb{width:47px;height:46px;border-radius:13px}.menu-drawer{padding:21px 17px 17px}.menu-drawer-head strong{font-size:19px}}
+</style><style id="aib-unified-white-theme">
+/* AIB unified premium white theme — shared visual layer */
+:root{
+ color-scheme:light;
+ --aib-page:#f4f5f7;--aib-surface:#ffffff;--aib-surface-soft:#fafbfc;
+ --aib-line:#e3e6ea;--aib-text:#20262d;--aib-muted:#737d87;
+ --aib-gold:#c49a50;--aib-gold-dark:#9e7535;--aib-gold-soft:#fbf5e9;
+ --aib-shadow:0 8px 28px rgba(25,32,40,.07);
+}
+@media screen{
+ html,body{background:var(--aib-page)!important;color:var(--aib-text)!important}
+ body{background-image:none!important}
+ body,button,input,select,textarea{font-family:Tahoma,Arial,sans-serif}
+ h1,h2,h3,h4,h5,h6,strong,b,label,legend{color:var(--aib-text)}
+ p,small,.muted,.hint,.subtle,.description{color:var(--aib-muted)}
+ a{color:var(--aib-gold-dark)}
+ header,.top,.topbar,.navbar,.site-header,.app-header,.toolbar,.page-header{
+  background:rgba(255,255,255,.97)!important;color:var(--aib-text)!important;
+  border-color:var(--aib-line)!important;box-shadow:0 3px 16px rgba(25,32,40,.045)!important;
+ }
+ nav,.nav,.sidebar,.side-nav,.menu-drawer,.drawer-panel,.dropdown-menu{
+  background:#fff!important;color:var(--aib-text)!important;border-color:var(--aib-line)!important;
+  box-shadow:var(--aib-shadow)!important;
+ }
+ .panel,.card,.section-card,.content-card,.stat-card,.widget,.box,.tile,
+ .form-card,.login-card,.feature,.table-wrap,.data-card,.summary-card,
+ .modal-content,.modal-card,.dialog-content,.popup-content,.drawer-content,
+ .dropdown,.menu-list,.settings-panel,.report-card,.invoice-card{
+  background:var(--aib-surface)!important;color:var(--aib-text)!important;
+  border-color:var(--aib-line)!important;box-shadow:var(--aib-shadow)!important;
+ }
+ .panel *, .card *, .section-card *, .content-card *, .stat-card *,
+ .form-card *, .login-card *, .modal-content *, .modal-card *,
+ .dialog-content *, .popup-content *, .drawer-content *, .settings-panel *{
+  border-color:var(--aib-line);
+ }
+ input:not([type=checkbox]):not([type=radio]):not([type=file]),
+ select,textarea{
+  background:#fff!important;color:var(--aib-text)!important;
+  border:1px solid #d9dee4!important;box-shadow:inset 0 1px 2px rgba(20,30,40,.025)!important;
+ }
+ input::placeholder,textarea::placeholder{color:#9aa3ac!important}
+ input:focus,select:focus,textarea:focus{
+  outline:none!important;border-color:var(--aib-gold)!important;
+  box-shadow:0 0 0 3px rgba(196,154,80,.14)!important;
+ }
+ button,.button,.btn{
+  background:#fff;color:var(--aib-text);border-color:#dfe3e8;
+  box-shadow:0 2px 7px rgba(25,32,40,.045);
+ }
+ .primary,.btn-primary,.button-primary,[type=submit],.save-btn,.action-primary,
+ .login-submit,.submit-btn,.checkout-submit{
+  background:linear-gradient(135deg,#d8b875,#b88a42)!important;
+  color:#201a10!important;border:1px solid #b88a42!important;
+  box-shadow:0 5px 14px rgba(174,130,57,.18)!important;font-weight:800!important;
+ }
+ button:hover,.button:hover,.btn:hover{border-color:#c6a15e}
+ .primary:hover,.btn-primary:hover,.button-primary:hover,[type=submit]:hover,
+ .save-btn:hover,.action-primary:hover,.login-submit:hover,.submit-btn:hover{
+  filter:brightness(1.035);transform:translateY(-1px)
+ }
+ .danger,.btn-danger,.delete-btn,.logout-btn,.danger-button{
+  background:#fff5f4!important;color:#b43c35!important;border-color:#efc9c6!important
+ }
+ .success,.btn-success,.success-button{background:#eef8f1!important;color:#247446!important;border-color:#cce8d5!important}
+ table{background:#fff!important;color:var(--aib-text)!important;border-color:var(--aib-line)!important}
+ th{background:#f8f4eb!important;color:#5d4828!important;border-color:#e8ddc8!important}
+ td{background:#fff!important;color:var(--aib-text)!important;border-color:var(--aib-line)!important}
+ tr:nth-child(even) td{background:#fbfcfd!important}
+ hr,.divider{border-color:var(--aib-line)!important}
+ .active,.selected,.tab.active,.nav-link.active{border-color:var(--aib-gold)!important}
+ .badge,.pill,.tag{border-color:#e8dcc5}
+ .modal-backdrop,.overlay,.backdrop,.drawer-backdrop{background:rgba(20,27,34,.42)!important}
+ .empty,.empty-state{background:#fff!important;color:var(--aib-muted)!important;border-color:var(--aib-line)!important}
+}
+
+@media screen{
+ .top,.menu-drawer-head,.menu-welcome{background:#fff!important;color:#20262d!important;border-color:var(--aib-line)!important}
+ .menu-drawer .menu-list a{background:#fff!important;border-color:var(--aib-line)!important}
+ .menu-drawer .menu-list a b,.menu-drawer .menu-list a span{color:#20262d!important}
+ .menu-drawer .menu-list a small,.menu-drawer-footer>span{color:var(--aib-muted)!important}
+ .menu-drawer .menu-list a i{background:var(--aib-gold-soft)!important;color:var(--aib-gold-dark)!important}
+ .menu-drawer .menu-list a em,.menu-drawer-footer>a b{color:var(--aib-gold-dark)!important}
+ .menu-drawer-footer>a{background:#fff!important;color:#4c402c!important;border-color:#e3d5b9!important}
+ .hamb,.top button{background:#fff!important;color:#29231a!important;border-color:#e1d5bf!important}
+}
 </style></head><body><header class="wrap top"><div class="brand"><a class="brand-logo-link" href="/" aria-label="العودة إلى الصفحة الرئيسية"><img class="brand-mark" src="/aib-logo.webp?v=aib-original-full-20261108" alt="شعار مجموعة AIB"></a><div><b>AIB GROUP</b><small>مجموعة AIB التجارية</small></div></div><div class="menu"><button class="hamb" id="menuToggle" type="button" aria-label="فتح القائمة الرئيسية" aria-expanded="false" aria-controls="mainMenu"><span></span><span></span><span></span></button></div></header><div class="menu-backdrop" id="menuBackdrop" onclick="closeMainMenu()" aria-hidden="true"></div><aside class="menu-drawer" id="mainMenu" aria-label="القائمة الرئيسية" aria-hidden="true"><div class="menu-drawer-head"><div><small>AIB TRADING GROUP</small><strong>القائمة الرئيسية</strong></div><button class="menu-close" type="button" onclick="closeMainMenu()" aria-label="إغلاق القائمة">×</button></div><div class="menu-welcome"><span class="menu-welcome-mark">AIB</span><div><strong>أهلاً بك في مجموعة AIB</strong><small>تجارة وخدمات متكاملة</small></div></div><nav class="menu-list"><a href="#categories" onclick="closeMainMenu()"><i>01</i><span><b>أقسام المتجر</b><small>السيارات وقطع الغيار والمعدات</small></span><em>‹</em></a><a href="#services" onclick="closeMainMenu()"><i>02</i><span><b>خدماتنا</b><small>الصيانة والتصليح والحلول الفنية</small></span><em>‹</em></a><a href="/shop"><i>03</i><span><b>متجر AIB</b><small>تصفح المنتجات والمخزون</small></span><em>‹</em></a><a href="#contact" onclick="closeMainMenu()"><i>04</i><span><b>تواصل معنا</b><small>الهاتف والبريد ووسائل التواصل</small></span><em>‹</em></a></nav><div class="menu-drawer-footer"><span>ثقة في التجارة · خبرة في قطع الغيار</span><a href="/accounting">بوابة المحاسبة <b>←</b></a></div></aside>
 <main class="wrap"><section class="hero"><div class="hero-in"><div class="eyebrow">AIB TRADING GROUP</div><h1>خبرة تجارية وخدمات متكاملة في عالم السيارات والمعدات</h1><p>مجموعة AIB التجارية تجمع بين تجارة السيارات والشاحنات والمحركات وقطع الغيار والمعدات الثقيلة، إلى جانب خدمات الصيانة والتصليح.</p><div class="hero-actions"><a class="btn" href="/shop">اكتشف متجر AIB</a><a class="btn alt" href="#services">تعرّف على خدماتنا</a></div></div></section>
 <section class="section" id="companyStatsSection"><div class="section-head"><div><h2>مجموعة AIB بالأرقام</h2><p>إحصائيات مباشرة من سجلات وفواتير الشركة</p></div></div><div class="stats"><div class="stat"><small>عدد العملاء المسجلين</small><strong id="customers">—</strong></div><div class="stat"><small>عمليات المبيع</small><strong id="sales">—</strong></div><div class="stat"><small>عمليات الشراء</small><strong id="purchases">—</strong></div></div></section>
