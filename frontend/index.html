@@ -49,6 +49,81 @@ input[type=checkbox]{accent-color:#2586c7}
 @media(max-width:600px){.login-card{border-radius:20px}}
 
  .brand-logo-link{display:block;flex:0 0 auto;line-height:0;border-radius:10px;cursor:pointer}.brand-logo-link:hover img{filter:drop-shadow(0 5px 14px #2586c788);transform:scale(1.025)}.brand-logo-link img{transition:transform .18s ease,filter .18s ease}.login-brand{gap:9px}.topbar .brand{gap:10px}
+</style><style id="aib-unified-white-theme">
+/* AIB unified premium white theme — shared visual layer */
+:root{
+ color-scheme:light;
+ --aib-page:#f4f5f7;--aib-surface:#ffffff;--aib-surface-soft:#fafbfc;
+ --aib-line:#e3e6ea;--aib-text:#20262d;--aib-muted:#737d87;
+ --aib-gold:#c49a50;--aib-gold-dark:#9e7535;--aib-gold-soft:#fbf5e9;
+ --aib-shadow:0 8px 28px rgba(25,32,40,.07);
+}
+@media screen{
+ html,body{background:var(--aib-page)!important;color:var(--aib-text)!important}
+ body{background-image:none!important}
+ body,button,input,select,textarea{font-family:Tahoma,Arial,sans-serif}
+ h1,h2,h3,h4,h5,h6,strong,b,label,legend{color:var(--aib-text)}
+ p,small,.muted,.hint,.subtle,.description{color:var(--aib-muted)}
+ a{color:var(--aib-gold-dark)}
+ header,.top,.topbar,.navbar,.site-header,.app-header,.toolbar,.page-header{
+  background:rgba(255,255,255,.97)!important;color:var(--aib-text)!important;
+  border-color:var(--aib-line)!important;box-shadow:0 3px 16px rgba(25,32,40,.045)!important;
+ }
+ nav,.nav,.sidebar,.side-nav,.menu-drawer,.drawer-panel,.dropdown-menu{
+  background:#fff!important;color:var(--aib-text)!important;border-color:var(--aib-line)!important;
+  box-shadow:var(--aib-shadow)!important;
+ }
+ .panel,.card,.section-card,.content-card,.stat-card,.widget,.box,.tile,
+ .form-card,.login-card,.feature,.table-wrap,.data-card,.summary-card,
+ .modal-content,.modal-card,.dialog-content,.popup-content,.drawer-content,
+ .dropdown,.menu-list,.settings-panel,.report-card,.invoice-card{
+  background:var(--aib-surface)!important;color:var(--aib-text)!important;
+  border-color:var(--aib-line)!important;box-shadow:var(--aib-shadow)!important;
+ }
+ .panel *, .card *, .section-card *, .content-card *, .stat-card *,
+ .form-card *, .login-card *, .modal-content *, .modal-card *,
+ .dialog-content *, .popup-content *, .drawer-content *, .settings-panel *{
+  border-color:var(--aib-line);
+ }
+ input:not([type=checkbox]):not([type=radio]):not([type=file]),
+ select,textarea{
+  background:#fff!important;color:var(--aib-text)!important;
+  border:1px solid #d9dee4!important;box-shadow:inset 0 1px 2px rgba(20,30,40,.025)!important;
+ }
+ input::placeholder,textarea::placeholder{color:#9aa3ac!important}
+ input:focus,select:focus,textarea:focus{
+  outline:none!important;border-color:var(--aib-gold)!important;
+  box-shadow:0 0 0 3px rgba(196,154,80,.14)!important;
+ }
+ button,.button,.btn{
+  background:#fff;color:var(--aib-text);border-color:#dfe3e8;
+  box-shadow:0 2px 7px rgba(25,32,40,.045);
+ }
+ .primary,.btn-primary,.button-primary,[type=submit],.save-btn,.action-primary,
+ .login-submit,.submit-btn,.checkout-submit{
+  background:linear-gradient(135deg,#d8b875,#b88a42)!important;
+  color:#201a10!important;border:1px solid #b88a42!important;
+  box-shadow:0 5px 14px rgba(174,130,57,.18)!important;font-weight:800!important;
+ }
+ button:hover,.button:hover,.btn:hover{border-color:#c6a15e}
+ .primary:hover,.btn-primary:hover,.button-primary:hover,[type=submit]:hover,
+ .save-btn:hover,.action-primary:hover,.login-submit:hover,.submit-btn:hover{
+  filter:brightness(1.035);transform:translateY(-1px)
+ }
+ .danger,.btn-danger,.delete-btn,.logout-btn,.danger-button{
+  background:#fff5f4!important;color:#b43c35!important;border-color:#efc9c6!important
+ }
+ .success,.btn-success,.success-button{background:#eef8f1!important;color:#247446!important;border-color:#cce8d5!important}
+ table{background:#fff!important;color:var(--aib-text)!important;border-color:var(--aib-line)!important}
+ th{background:#f8f4eb!important;color:#5d4828!important;border-color:#e8ddc8!important}
+ td{background:#fff!important;color:var(--aib-text)!important;border-color:var(--aib-line)!important}
+ tr:nth-child(even) td{background:#fbfcfd!important}
+ hr,.divider{border-color:var(--aib-line)!important}
+ .active,.selected,.tab.active,.nav-link.active{border-color:var(--aib-gold)!important}
+ .badge,.pill,.tag{border-color:#e8dcc5}
+ .modal-backdrop,.overlay,.backdrop,.drawer-backdrop{background:rgba(20,27,34,.42)!important}
+ .empty,.empty-state{background:#fff!important;color:var(--aib-muted)!important;border-color:var(--aib-line)!important}
+}
 </style></head><body>
 <svg aria-hidden="true" width="0" height="0" style="position:absolute;overflow:hidden"><filter id="aib-remove-white" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  -1 -1 -1 0 3"/></filter></svg>
 <div id="login" class="login-wrap hidden"><section class="login-card"><div class="brand login-brand"><a class="brand-logo-link" href="/" aria-label="العودة إلى الصفحة الرئيسية"><img src="/aib-logo.webp?v=aib-original-full-20261108" alt="AIB"></a><div><strong>AIB GROUP</strong><span>نظام الإدارة والمحاسبة</span></div></div><h1 data-i="loginTitle">تسجيل الدخول</h1><p data-i="loginSub">منصة مجموعة AIB التجارية الآمنة</p><div id="loginMsg"></div><form id="loginForm"><div class="field"><label data-i="username">اسم المستخدم</label><input id="username" autocomplete="username" required></div><div class="field"><label data-i="password">كلمة المرور</label><div style="display:flex;gap:8px;align-items:center"><input id="password" type="password" autocomplete="current-password" required style="flex:1"><button class="btn secondary" id="togglePassword" type="button" onclick="togglePasswordVisibility()" data-i="showPassword">إظهار</button></div></div><div style="display:flex;align-items:center;gap:9px;margin:12px 0 18px;color:#d4dbe0;font-size:13px"><input id="rememberMe" type="checkbox" style="width:17px;height:17px;accent-color:#2586c7"><label for="rememberMe" data-i="rememberMe">تذكرني على هذا الجهاز</label></div><button class="btn full" type="submit" data-i="loginBtn">دخول آمن</button></form><div class="toolbar" style="justify-content:center;margin-top:16px"><button class="btn secondary" onclick="toggleLang()">العربية / English</button></div><div class="foot">AIB • Secure Business Workspace</div></section></div>
