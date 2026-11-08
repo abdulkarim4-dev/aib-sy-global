@@ -92,6 +92,24 @@ class StorePasswordReset(Base):
     attempts: Mapped[int]=mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
 
+class StoreEmailVerification(Base):
+    __tablename__="store_email_verifications"
+    id: Mapped[int]=mapped_column(primary_key=True)
+    customer_id: Mapped[int]=mapped_column(ForeignKey("store_customers.id"), index=True)
+    code_hash: Mapped[str]=mapped_column(String(300))
+    expires_at: Mapped[datetime]=mapped_column(DateTime(timezone=True))
+    attempts: Mapped[int]=mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
+
+class StoreLoginVerification(Base):
+    __tablename__="store_login_verifications"
+    id: Mapped[int]=mapped_column(primary_key=True)
+    customer_id: Mapped[int]=mapped_column(ForeignKey("store_customers.id"), index=True)
+    code_hash: Mapped[str]=mapped_column(String(300))
+    expires_at: Mapped[datetime]=mapped_column(DateTime(timezone=True))
+    attempts: Mapped[int]=mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
+
 class CompanyProfile(Base):
     __tablename__="company_profile"
     id: Mapped[int]=mapped_column(primary_key=True)
@@ -341,57 +359,65 @@ def get_account_settings(u:User=Depends(current_user)):
 @app.patch("/account-settings")
 def update_account_settings(p:AccountSettingsPayload, request:Request, s:Session=Depends(db), u:User=Depends(current_user)):
     if p.email is not None: raise HTTPException(400,"لا يمكن اعتماد البريد مباشرة. اطلب رمز تحقق وأكده أولاً")
+    old_name=u.full_name
     if p.full_name is not None:
         name=p.full_name.strip()
         if not name: raise HTTPException(400,"الاسم لا يمكن أن يكون فارغاً")
         u.full_name=name
     audit(s,u,"account_settings_updated","user",u.id,{"name_updated":p.full_name is not None},request)
     s.commit()
+    if p.full_name is not None and old_name!=u.full_name:
+        notify_account_change(u.email,f"تغيير الاسم من «{old_name}» إلى «{u.full_name}»")
     return {"ok":True,"email":u.email,"full_name":u.full_name}
 
-def send_verification_email(email:str, code:str):
-    subject = "رمز استرداد الحساب - مجموعة AIB"
-    body = f"رمز التحقق الخاص بك في تطبيق AIB هو: {code}\nصلاحية الرمز 10 دقائق. لا تشاركه مع أحد."
-    # Prefer Gmail/SMTP when configured; retain Brevo as a backward-compatible fallback.
+def send_aib_email(email:str, subject:str, body:str):
+    if not email or "@" not in email:
+        raise HTTPException(400,"عنوان البريد الإلكتروني غير صالح")
     if settings.smtp_host and settings.smtp_user and settings.smtp_password and settings.smtp_from:
-        message = EmailMessage()
-        message["Subject"] = subject
-        message["From"] = settings.smtp_from
-        message["To"] = email
+        message=EmailMessage()
+        message["Subject"]=subject
+        message["From"]=settings.smtp_from
+        message["To"]=email
         message.set_content(body)
         try:
-            with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=25) as server:
-                server.ehlo()
-                server.starttls()
-                server.ehlo()
-                server.login(settings.smtp_user, settings.smtp_password)
+            with smtplib.SMTP(settings.smtp_host,settings.smtp_port,timeout=25) as server:
+                server.ehlo();server.starttls();server.ehlo()
+                server.login(settings.smtp_user,settings.smtp_password)
                 server.send_message(message)
             return
-        except (smtplib.SMTPException, OSError, TimeoutError) as exc:
-            # Render may block outbound SMTP; safely fall through to the HTTPS Brevo API when configured.
-            print(f"SMTP delivery failed; falling back to Brevo HTTPS: {type(exc).__name__}; smtp_code={getattr(exc, 'smtp_code', None)}", flush=True)
+        except (smtplib.SMTPException,OSError,TimeoutError) as exc:
+            print(f"SMTP delivery failed: {type(exc).__name__}; smtp_code={getattr(exc,'smtp_code',None)}",flush=True)
     if not settings.brevo_api_key or not settings.brevo_sender_email:
-        raise HTTPException(503,"خدمة البريد غير مهيأة. أضف إعدادات Gmail SMTP إلى Render")
-    payload = {
-        "sender": {"name": settings.brevo_sender_name, "email": settings.brevo_sender_email},
-        "to": [{"email": email}],
-        "subject": subject,
-        "textContent": body
-    }
-    req = UrlRequest(
-        "https://api.brevo.com/v3/smtp/email",
-        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-        headers={"api-key": settings.brevo_api_key, "accept": "application/json", "content-type": "application/json"},
-        method="POST"
-    )
+        raise HTTPException(503,"خدمة البريد غير مهيأة. تحقق من إعدادات Gmail SMTP في Render")
+    payload={"sender":{"name":settings.brevo_sender_name,"email":settings.brevo_sender_email},
+             "to":[{"email":email}],"subject":subject,"textContent":body}
+    req=UrlRequest("https://api.brevo.com/v3/smtp/email",
+        data=json.dumps(payload,ensure_ascii=False).encode("utf-8"),
+        headers={"api-key":settings.brevo_api_key,"accept":"application/json","content-type":"application/json"},
+        method="POST")
     try:
-        with urlopen(req, timeout=20) as response:
-            if response.status not in (200, 201, 202):
-                raise HTTPException(502, f"رفض مزود البريد إرسال الرسالة (HTTP {response.status})")
+        with urlopen(req,timeout=20) as response:
+            if response.status not in (200,201,202):
+                raise HTTPException(502,f"رفض مزود البريد إرسال الرسالة (HTTP {response.status})")
     except HTTPError as exc:
-        raise HTTPException(502, f"رفض مزود البريد إرسال الرسالة (HTTP {exc.code})")
-    except (URLError, TimeoutError, OSError):
-        raise HTTPException(502,"تعذر الاتصال بخدمة البريد عبر HTTPS. تحقق من إعدادات البريد في Render")
+        raise HTTPException(502,f"رفض مزود البريد إرسال الرسالة (HTTP {exc.code})")
+    except (URLError,TimeoutError,OSError):
+        raise HTTPException(502,"تعذر الاتصال بخدمة البريد. تحقق من إعدادات Render")
+
+def send_notification_email(email:str, subject:str, body:str):
+    try:
+        send_aib_email(email,subject,body)
+    except Exception as exc:
+        print(f"AIB notification email failed: {type(exc).__name__}",flush=True)
+
+def send_verification_email(email:str, code:str):
+    send_aib_email(email,"رمز التحقق - مجموعة AIB",
+        f"رمز التحقق الخاص بك في تطبيق AIB هو: {code}\\nصلاحية الرمز 10 دقائق. لا تشاركه مع أحد.")
+
+def notify_account_change(email:str, details:str):
+    if email:
+        send_notification_email(email,"تنبيه أمان: تغيير بيانات حساب AIB",
+            f"مرحباً، تم إجراء تغيير على بيانات حسابك في مجموعة AIB.\\nالتفاصيل: {details}\\nإذا لم تكن أنت من أجرى هذا التغيير، يرجى التواصل مع إدارة AIB فوراً.")
 
 @app.post("/account-settings/email-verification")
 def start_email_verification(p:EmailVerificationStartPayload, request:Request, s:Session=Depends(db), u:User=Depends(current_user)):
@@ -417,11 +443,14 @@ def confirm_email_verification(p:EmailVerificationConfirmPayload, request:Reques
         raise HTTPException(400,"رمز التحقق غير صحيح")
     duplicate=s.scalar(select(User).where(User.email==email,User.id!=u.id))
     if duplicate: raise HTTPException(409,"البريد الإلكتروني مستخدم لحساب آخر")
+    old_email=u.email
     u.email=email
     u.email_verified=True
     s.query(EmailVerification).filter(EmailVerification.user_id==u.id).delete(synchronize_session=False)
     audit(s,u,"email_verified","user",u.id,{"email":email},request)
     s.commit()
+    notify_account_change(old_email,"تم تغيير البريد الإلكتروني المرتبط بحسابك")
+    notify_account_change(email,"تم ربط هذا البريد الإلكتروني بحساب AIB")
     return {"ok":True,"email":u.email,"verified":True}
 @app.post("/auth/change-password")
 def change_owner_password(p:PasswordChangePayload, request:Request, s:Session=Depends(db), u:User=Depends(current_user)):
@@ -434,6 +463,7 @@ def change_owner_password(p:PasswordChangePayload, request:Request, s:Session=De
     u.locked_until=None
     audit(s,u,"owner_password_changed","user",u.id,{"method":"self_service"},request)
     s.commit()
+    notify_account_change(u.email,"تم تغيير كلمة المرور")
     return {"ok":True,"message":"تم تغيير كلمة المرور بنجاح"}
 
 @app.post("/password-change-requests")
@@ -1164,10 +1194,49 @@ def store_register(p:StoreRegisterPayload, request:Request, s:Session=Depends(db
     email=p.email.strip().lower()
     if "@" not in email or "." not in email.rsplit("@",1)[-1]:
         raise HTTPException(400,"يرجى إدخال بريد إلكتروني صحيح")
-    if s.scalar(select(StoreCustomer).where(StoreCustomer.email==email)):
+    customer=s.scalar(select(StoreCustomer).where(StoreCustomer.email==email))
+    if customer and customer.active:
         raise HTTPException(409,"هذا البريد مسجل مسبقاً. سجّل الدخول بدلاً من إنشاء حساب جديد")
-    customer=StoreCustomer(email=email,full_name=p.full_name.strip(),password_hash=password_hash.hash(p.password),cart=[])
-    s.add(customer);s.commit();s.refresh(customer)
+    now=datetime.now(timezone.utc)
+    if not customer:
+        customer=StoreCustomer(email=email,full_name=p.full_name.strip(),password_hash=password_hash.hash(p.password),cart=[],active=False)
+        s.add(customer);s.flush()
+    else:
+        customer.full_name=p.full_name.strip()
+        customer.password_hash=password_hash.hash(p.password)
+        s.query(StoreEmailVerification).filter(StoreEmailVerification.customer_id==customer.id).delete(synchronize_session=False)
+    latest=s.scalar(select(StoreEmailVerification).where(StoreEmailVerification.customer_id==customer.id).order_by(StoreEmailVerification.id.desc()))
+    if latest and latest.created_at>now-timedelta(seconds=60):
+        raise HTTPException(429,"يرجى الانتظار دقيقة قبل طلب رمز جديد")
+    code=f"{secrets.randbelow(1000000):06d}"
+    s.add(StoreEmailVerification(customer_id=customer.id,code_hash=password_hash.hash(code),expires_at=now+timedelta(minutes=10)))
+    s.flush()
+    try: send_verification_email(email,code)
+    except Exception:
+        s.rollback()
+        raise
+    s.commit()
+    return {"ok":True,"verification_required":True,"message":"أرسلنا رمز تأكيد الحساب إلى بريدك الإلكتروني"}
+
+class StoreEmailConfirmPayload(BaseModel):
+    email: str = Field(min_length=5,max_length=254)
+    code: str = Field(min_length=6,max_length=6)
+
+@app.post("/store/auth/register/confirm")
+def confirm_store_registration(p:StoreEmailConfirmPayload, request:Request, s:Session=Depends(db)):
+    email=p.email.strip().lower()
+    customer=s.scalar(select(StoreCustomer).where(StoreCustomer.email==email,StoreCustomer.active.is_(False)))
+    if not customer: raise HTTPException(400,"لا يوجد تسجيل معلّق لهذا البريد")
+    row=s.scalar(select(StoreEmailVerification).where(StoreEmailVerification.customer_id==customer.id).order_by(StoreEmailVerification.id.desc()))
+    now=datetime.now(timezone.utc)
+    if not row or row.expires_at<now or row.attempts>=5:
+        raise HTTPException(400,"رمز التأكيد منتهي أو غير صالح. أعد إنشاء الحساب")
+    if not password_hash.verify(p.code,row.code_hash):
+        row.attempts+=1;s.commit()
+        raise HTTPException(400,"رمز التأكيد غير صحيح")
+    customer.active=True
+    s.query(StoreEmailVerification).filter(StoreEmailVerification.customer_id==customer.id).delete(synchronize_session=False)
+    s.commit()
     return {"access_token":store_customer_token(customer),"token_type":"bearer","customer":{"id":customer.id,"email":customer.email,"full_name":customer.full_name}}
 
 @app.post("/store/auth/login")
@@ -1186,7 +1255,33 @@ def store_login(p:StoreLoginPayload, request:Request, s:Session=Depends(db)):
             customer.locked_until=now+timedelta(minutes=15)
         s.commit()
         raise HTTPException(401,"البريد الإلكتروني أو كلمة المرور غير صحيحة")
-    customer.failed_logins=0;customer.locked_until=None;s.commit()
+    customer.failed_logins=0;customer.locked_until=None
+    latest=s.scalar(select(StoreLoginVerification).where(StoreLoginVerification.customer_id==customer.id).order_by(StoreLoginVerification.id.desc()))
+    if latest and latest.created_at>now-timedelta(seconds=30):
+        raise HTTPException(429,"أرسلنا رمزاً قبل قليل. افحص بريدك أو انتظر 30 ثانية")
+    code=f"{secrets.randbelow(1000000):06d}"
+    s.add(StoreLoginVerification(customer_id=customer.id,code_hash=password_hash.hash(code),expires_at=now+timedelta(minutes=10)))
+    s.commit()
+    try: send_verification_email(email,code)
+    except Exception:
+        s.rollback()
+        raise
+    return {"ok":True,"verification_required":True,"message":"أرسلنا رمز الدخول إلى بريدك الإلكتروني"}
+
+@app.post("/store/auth/login/verify")
+def verify_store_login(p:StoreEmailConfirmPayload, request:Request, s:Session=Depends(db)):
+    email=p.email.strip().lower()
+    customer=s.scalar(select(StoreCustomer).where(StoreCustomer.email==email,StoreCustomer.active.is_(True)))
+    if not customer: raise HTTPException(400,"بيانات التحقق غير صحيحة")
+    row=s.scalar(select(StoreLoginVerification).where(StoreLoginVerification.customer_id==customer.id).order_by(StoreLoginVerification.id.desc()))
+    now=datetime.now(timezone.utc)
+    if not row or row.expires_at<now or row.attempts>=5:
+        raise HTTPException(400,"رمز الدخول منتهي أو غير صالح. سجّل الدخول مجدداً")
+    if not password_hash.verify(p.code,row.code_hash):
+        row.attempts+=1;s.commit()
+        raise HTTPException(400,"رمز الدخول غير صحيح")
+    s.query(StoreLoginVerification).filter(StoreLoginVerification.customer_id==customer.id).delete(synchronize_session=False)
+    s.commit()
     return {"access_token":store_customer_token(customer),"token_type":"bearer","customer":{"id":customer.id,"email":customer.email,"full_name":customer.full_name}}
 
 @app.post("/store/auth/password-reset/request")
@@ -1230,6 +1325,7 @@ def confirm_store_password_reset(p:StorePasswordResetConfirmPayload, request:Req
     customer.locked_until=None
     s.query(StorePasswordReset).filter(StorePasswordReset.customer_id==customer.id).delete(synchronize_session=False)
     s.commit()
+    notify_account_change(customer.email,"تم تغيير كلمة المرور الخاصة بحساب المتجر")
     return {"ok":True,"message":"تم تحديث كلمة المرور. يمكنك تسجيل الدخول الآن."}
 
 @app.get("/store/auth/me")
@@ -1297,11 +1393,25 @@ def create_online_order(p:OnlineOrderPayload,s:Session=Depends(db),customer:Stor
         currency=price["currency"];unit=float(price["sale_price"]);total+=unit*qty
         lines.append({"product_id":product.id,"sku":product.sku,"description":product.name,"model":product.model or "","quantity":qty,"price":unit})
     if not lines: raise HTTPException(400,"السلة فارغة")
+    previous_profile={"full_name":customer.full_name,"shipping_address":customer.shipping_address,"phone_country_code":customer.phone_country_code,"phone_number":customer.phone_number}
     customer.first_name=p.first_name.strip();customer.last_name=p.last_name.strip();customer.full_name=(customer.first_name+" "+customer.last_name).strip()
     customer.shipping_address=p.shipping_address.strip();customer.phone_country_code=p.phone_country_code;customer.phone_number=p.phone_number.strip()
     data={"first_name":customer.first_name,"last_name":customer.last_name,"full_name":customer.full_name,"email":customer.email,"shipping_address":customer.shipping_address,"phone_country_code":customer.phone_country_code,"phone_number":customer.phone_number,"full_phone":customer.phone_country_code+customer.phone_number}
     order=OnlinePurchaseOrder(customer_id=customer.id,customer_data=data,items=lines,total=round(total,2),currency=currency or "USD",payment_proof=p.payment_proof,proof_type=p.proof_type,status="pending")
     s.add(order);s.commit();s.refresh(order)
+    if any(previous_profile[k]!=(customer.full_name if k=="full_name" else customer.shipping_address if k=="shipping_address" else customer.phone_country_code if k=="phone_country_code" else customer.phone_number) for k in previous_profile):
+        notify_account_change(customer.email,"تم تحديث بيانات الاسم أو عنوان الشحن أو رقم الهاتف أثناء إرسال طلب شراء")
+    item_lines="\\n".join(f"- {x['description']} ({x['sku']}) × {x['quantity']} = {x['price']*x['quantity']:.2f} {order.currency}" for x in lines)
+    customer_message=(f"مرحباً {customer.full_name}،\\nتم استلام طلب الشراء الإلكتروني رقم #{order.id} لدى مجموعة AIB.\\n"
+        f"المنتجات:\\n{item_lines}\\nالإجمالي: {float(order.total):.2f} {order.currency}\\n"
+        "الحالة: بانتظار مراجعة إثبات الدفع. سنرسل إليك تحديثاً عند اعتماد الطلب أو رفضه.")
+    send_notification_email(customer.email,"تأكيد استلام طلب الشراء - AIB",customer_message)
+    owner=s.scalar(select(User).where(User.role=="owner",User.active.is_(True)).order_by(User.id).limit(1))
+    admin_email=(owner.email if owner and owner.email_verified and owner.email else settings.smtp_user)
+    if admin_email:
+        send_notification_email(admin_email,f"طلب شراء إلكتروني جديد #{order.id}",
+            f"وصل طلب شراء جديد من {customer.full_name}\\nالبريد: {customer.email}\\nالهاتف: {data['full_phone']}\\n"
+            f"الإجمالي: {float(order.total):.2f} {order.currency}\\nالمنتجات:\\n{item_lines}\\nيرجى مراجعة الطلب وإثبات الدفع من لوحة المحاسبة.")
     return {"ok":True,"order_id":order.id,"customer":data,"items":lines,"total":float(order.total),"currency":order.currency,"status":order.status}
 
 @app.get("/online-purchase-orders")
@@ -1319,6 +1429,9 @@ def review_online_purchase_order(order_id:int,p:OnlineOrderReviewPayload,s:Sessi
     if order.status!="pending": raise HTTPException(409,"تمت مراجعة الطلب")
     if p.action=="reject":
         order.status="rejected";order.review_note=p.note or "إثبات الدفع غير مقبول";order.reviewed_by=u.id;order.reviewed_at=datetime.now(timezone.utc);s.commit()
+        customer_email=(order.customer_data or {}).get("email")
+        send_notification_email(customer_email,f"تحديث طلب الشراء #{order.id} - AIB",
+            f"تمت مراجعة طلب الشراء رقم #{order.id} ولم تتم الموافقة على إثبات الدفع.\\nملاحظة الإدارة: {order.review_note}")
         return {"ok":True,"status":"rejected"}
     if p.action!="approve": raise HTTPException(400,"إجراء غير صالح")
     data={"customer":order.customer_data["full_name"],"customer_phone":order.customer_data["full_phone"],"customer_address":order.customer_data["shipping_address"],"amount":float(order.total),"items":[{"sku":x["sku"],"description":x["description"],"model":x["model"],"quantity":x["quantity"],"price":x["price"]} for x in order.items],"notes":"طلب إلكتروني – تم التحقق من إثبات الدفع واعتماده"}
@@ -1333,6 +1446,9 @@ def review_online_purchase_order(order_id:int,p:OnlineOrderReviewPayload,s:Sessi
     order.status="approved";order.record_id=record.id;order.reviewed_by=u.id;order.reviewed_at=datetime.now(timezone.utc);order.review_note=p.note
     audit(s,u,"online_order_approved","online_purchase_order",order.id,{"record_id":record.id,"invoice_no":record.invoice_no,"payment_method":"sham_cash"},request=None)
     s.commit()
+    customer_email=(order.customer_data or {}).get("email")
+    send_notification_email(customer_email,f"تم اعتماد طلب الشراء #{order.id} - AIB",
+        f"تم اعتماد طلب الشراء رقم #{order.id} بعد مراجعة إثبات الدفع.\\nرقم فاتورة المبيع: {record.invoice_no}\\nالإجمالي: {float(order.total):.2f} {order.currency}")
     return {"ok":True,"status":"approved","record_id":record.id,"invoice_no":record.invoice_no,"customer":order.customer_data}
 
 @app.get("/public/products")
