@@ -339,6 +339,19 @@ def confirm_email_verification(p:EmailVerificationConfirmPayload, request:Reques
     audit(s,u,"email_verified","user",u.id,{"email":email},request)
     s.commit()
     return {"ok":True,"email":u.email,"verified":True}
+@app.post("/auth/change-password")
+def change_owner_password(p:PasswordChangePayload, request:Request, s:Session=Depends(db), u:User=Depends(current_user)):
+    if u.role != "owner":
+        raise HTTPException(403,"تغيير كلمة المرور مباشرة متاح لحساب المالك فقط")
+    if not password_hash.verify(p.current_password,u.password_hash):
+        raise HTTPException(401,"كلمة المرور الحالية غير صحيحة")
+    u.password_hash=password_hash.hash(p.new_password)
+    u.failed_logins=0
+    u.locked_until=None
+    audit(s,u,"owner_password_changed","user",u.id,{"method":"self_service"},request)
+    s.commit()
+    return {"ok":True,"message":"تم تغيير كلمة المرور بنجاح"}
+
 @app.post("/password-change-requests")
 def create_password_change_request(p:PasswordChangePayload, request:Request, s:Session=Depends(db), u:User=Depends(current_user)):
     if not password_hash.verify(p.current_password,u.password_hash): raise HTTPException(401,"كلمة المرور الحالية غير صحيحة")
