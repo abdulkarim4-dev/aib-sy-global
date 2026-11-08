@@ -412,12 +412,12 @@ def send_notification_email(email:str, subject:str, body:str):
 
 def send_verification_email(email:str, code:str):
     send_aib_email(email,"رمز التحقق - مجموعة AIB",
-        f"رمز التحقق الخاص بك في تطبيق AIB هو: {code}\\nصلاحية الرمز 10 دقائق. لا تشاركه مع أحد.")
+        f"رمز التحقق الخاص بك في تطبيق AIB هو: {code}\nصلاحية الرمز 10 دقائق. لا تشاركه مع أحد.")
 
 def notify_account_change(email:str, details:str):
     if email:
         send_notification_email(email,"تنبيه أمان: تغيير بيانات حساب AIB",
-            f"مرحباً، تم إجراء تغيير على بيانات حسابك في مجموعة AIB.\\nالتفاصيل: {details}\\nإذا لم تكن أنت من أجرى هذا التغيير، يرجى التواصل مع إدارة AIB فوراً.")
+            f"مرحباً، تم إجراء تغيير على بيانات حسابك في مجموعة AIB.\nالتفاصيل: {details}\nإذا لم تكن أنت من أجرى هذا التغيير، يرجى التواصل مع إدارة AIB فوراً.")
 
 @app.post("/account-settings/email-verification")
 def start_email_verification(p:EmailVerificationStartPayload, request:Request, s:Session=Depends(db), u:User=Depends(current_user)):
@@ -495,6 +495,8 @@ def review_password_change_request(request_id:int, approve:bool, request:Request
     row.reviewed_by=u.id; row.reviewed_at=datetime.now(timezone.utc)
     audit(s,u,"password_change_"+row.status,"user",target.id,{"request_id":row.id},request)
     s.commit()
+    if approve:
+        notify_account_change(target.email,"تم اعتماد تغيير كلمة المرور من قبل المالك")
     return {"status":row.status}
 
 class UserCreate(BaseModel): username:str=Field(min_length=3,max_length=80); full_name:str; email:Optional[str]=None; password:str=Field(min_length=12); role:str="employee"
@@ -1401,17 +1403,17 @@ def create_online_order(p:OnlineOrderPayload,s:Session=Depends(db),customer:Stor
     s.add(order);s.commit();s.refresh(order)
     if any(previous_profile[k]!=(customer.full_name if k=="full_name" else customer.shipping_address if k=="shipping_address" else customer.phone_country_code if k=="phone_country_code" else customer.phone_number) for k in previous_profile):
         notify_account_change(customer.email,"تم تحديث بيانات الاسم أو عنوان الشحن أو رقم الهاتف أثناء إرسال طلب شراء")
-    item_lines="\\n".join(f"- {x['description']} ({x['sku']}) × {x['quantity']} = {x['price']*x['quantity']:.2f} {order.currency}" for x in lines)
-    customer_message=(f"مرحباً {customer.full_name}،\\nتم استلام طلب الشراء الإلكتروني رقم #{order.id} لدى مجموعة AIB.\\n"
-        f"المنتجات:\\n{item_lines}\\nالإجمالي: {float(order.total):.2f} {order.currency}\\n"
+    item_lines="\n".join(f"- {x['description']} ({x['sku']}) × {x['quantity']} = {x['price']*x['quantity']:.2f} {order.currency}" for x in lines)
+    customer_message=(f"مرحباً {customer.full_name}،\nتم استلام طلب الشراء الإلكتروني رقم #{order.id} لدى مجموعة AIB.\n"
+        f"المنتجات:\n{item_lines}\nالإجمالي: {float(order.total):.2f} {order.currency}\n"
         "الحالة: بانتظار مراجعة إثبات الدفع. سنرسل إليك تحديثاً عند اعتماد الطلب أو رفضه.")
     send_notification_email(customer.email,"تأكيد استلام طلب الشراء - AIB",customer_message)
     owner=s.scalar(select(User).where(User.role=="owner",User.active.is_(True)).order_by(User.id).limit(1))
     admin_email=(owner.email if owner and owner.email_verified and owner.email else settings.smtp_user)
     if admin_email:
         send_notification_email(admin_email,f"طلب شراء إلكتروني جديد #{order.id}",
-            f"وصل طلب شراء جديد من {customer.full_name}\\nالبريد: {customer.email}\\nالهاتف: {data['full_phone']}\\n"
-            f"الإجمالي: {float(order.total):.2f} {order.currency}\\nالمنتجات:\\n{item_lines}\\nيرجى مراجعة الطلب وإثبات الدفع من لوحة المحاسبة.")
+            f"وصل طلب شراء جديد من {customer.full_name}\nالبريد: {customer.email}\nالهاتف: {data['full_phone']}\n"
+            f"الإجمالي: {float(order.total):.2f} {order.currency}\nالمنتجات:\n{item_lines}\nيرجى مراجعة الطلب وإثبات الدفع من لوحة المحاسبة.")
     return {"ok":True,"order_id":order.id,"customer":data,"items":lines,"total":float(order.total),"currency":order.currency,"status":order.status}
 
 @app.get("/online-purchase-orders")
@@ -1431,7 +1433,7 @@ def review_online_purchase_order(order_id:int,p:OnlineOrderReviewPayload,s:Sessi
         order.status="rejected";order.review_note=p.note or "إثبات الدفع غير مقبول";order.reviewed_by=u.id;order.reviewed_at=datetime.now(timezone.utc);s.commit()
         customer_email=(order.customer_data or {}).get("email")
         send_notification_email(customer_email,f"تحديث طلب الشراء #{order.id} - AIB",
-            f"تمت مراجعة طلب الشراء رقم #{order.id} ولم تتم الموافقة على إثبات الدفع.\\nملاحظة الإدارة: {order.review_note}")
+            f"تمت مراجعة طلب الشراء رقم #{order.id} ولم تتم الموافقة على إثبات الدفع.\nملاحظة الإدارة: {order.review_note}")
         return {"ok":True,"status":"rejected"}
     if p.action!="approve": raise HTTPException(400,"إجراء غير صالح")
     data={"customer":order.customer_data["full_name"],"customer_phone":order.customer_data["full_phone"],"customer_address":order.customer_data["shipping_address"],"amount":float(order.total),"items":[{"sku":x["sku"],"description":x["description"],"model":x["model"],"quantity":x["quantity"],"price":x["price"]} for x in order.items],"notes":"طلب إلكتروني – تم التحقق من إثبات الدفع واعتماده"}
@@ -1448,7 +1450,7 @@ def review_online_purchase_order(order_id:int,p:OnlineOrderReviewPayload,s:Sessi
     s.commit()
     customer_email=(order.customer_data or {}).get("email")
     send_notification_email(customer_email,f"تم اعتماد طلب الشراء #{order.id} - AIB",
-        f"تم اعتماد طلب الشراء رقم #{order.id} بعد مراجعة إثبات الدفع.\\nرقم فاتورة المبيع: {record.invoice_no}\\nالإجمالي: {float(order.total):.2f} {order.currency}")
+        f"تم اعتماد طلب الشراء رقم #{order.id} بعد مراجعة إثبات الدفع.\nرقم فاتورة المبيع: {record.invoice_no}\nالإجمالي: {float(order.total):.2f} {order.currency}")
     return {"ok":True,"status":"approved","record_id":record.id,"invoice_no":record.invoice_no,"customer":order.customer_data}
 
 @app.get("/public/products")
