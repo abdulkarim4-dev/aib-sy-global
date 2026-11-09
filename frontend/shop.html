@@ -982,6 +982,25 @@ function downloadProvisionalInvoice(){const w=window.open('','_blank');if(!w){sh
 .category-zone:nth-of-type(3) .cats .cat:nth-child(6){background-image:url('https://images.unsplash.com/photo-1579412690850-bd41cd0af397?auto=format&fit=crop&w=1100&q=85')!important}
 .category-zone:nth-of-type(3) .cats .cat:nth-child(7){background-image:url('https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=1100&q=85')!important}
 .category-zone:nth-of-type(3) .cats .cat:nth-child(8){background-image:url('https://www.deere.co.in/assets/images/region-1/parts-and-service/engine-parts/parts-engineparts-maintenancesupport-1298x768.jpg')!important}
+
+/* AIB category image fixes: target the three actual category zones */
+.category-section > .category-zone .cat{background-size:cover!important;background-position:center!important;background-repeat:no-repeat!important;background-color:#17232d!important}
+.category-section > .category-zone:nth-child(2) .cats .cat:nth-child(1){background-image:linear-gradient(0deg,#07111b88,#07111b22),url('/assets/aib-tourist-cars.jpg')!important}
+.category-section > .category-zone:nth-child(2) .cats .cat:nth-child(2){background-image:linear-gradient(0deg,#07111b88,#07111b22),url('https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&w=1100&q=85')!important}
+.category-section > .category-zone:nth-child(2) .cats .cat:nth-child(3){background-image:linear-gradient(0deg,#07111b88,#07111b22),url('https://images.unsplash.com/photo-1581092918056-0c4c3acd3781?auto=format&fit=crop&w=1100&q=85')!important}
+.category-section > .category-zone:nth-child(2) .cats .cat:nth-child(4){background-image:linear-gradient(0deg,#07111b88,#07111b22),url('https://images.unsplash.com/photo-1487754180451-c456f719a1fc?auto=format&fit=crop&w=1100&q=85')!important}
+.category-section > .category-zone:nth-child(3) .cats .cat:nth-child(1){background-image:linear-gradient(0deg,#07111b88,#07111b22),url('https://images.unsplash.com/photo-1519003722824-194d4455a60c?auto=format&fit=crop&w=1100&q=85')!important}
+.category-section > .category-zone:nth-child(3) .cats .cat:nth-child(2){background-image:linear-gradient(0deg,#07111b88,#07111b22),url('https://images.unsplash.com/photo-1581092334651-ddf26d9a09d0?auto=format&fit=crop&w=1100&q=85')!important}
+.category-section > .category-zone:nth-child(3) .cats .cat:nth-child(3){background-image:linear-gradient(0deg,#07111b88,#07111b22),url('https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=1100&q=85')!important}
+.category-section > .category-zone:nth-child(3) .cats .cat:nth-child(4){background-image:linear-gradient(0deg,#07111b88,#07111b22),url('https://kuntsevo.com/upload/medialibrary/a6a/tb1i7zosfxxxxxlxvxxxxxxxxxx.jpg')!important}
+.category-section > .category-zone:nth-child(4) .cats .cat:nth-child(1){background-image:linear-gradient(0deg,#07111b88,#07111b22),url('https://images.unsplash.com/photo-1580901368919-7738efb0f87e?auto=format&fit=crop&w=1100&q=85')!important}
+.category-section > .category-zone:nth-child(4) .cats .cat:nth-child(2){background-image:linear-gradient(0deg,#07111b88,#07111b22),url('https://images.unsplash.com/photo-1579412690850-bd41cd0af397?auto=format&fit=crop&w=1100&q=85')!important}
+.category-section > .category-zone:nth-child(4) .cats .cat:nth-child(3){background-image:linear-gradient(0deg,#07111b88,#07111b22),url('https://images.unsplash.com/photo-1581092918056-0c4c3acd3781?auto=format&fit=crop&w=1100&q=85')!important}
+.category-section > .category-zone:nth-child(4) .cats .cat:nth-child(4){background-image:linear-gradient(0deg,#07111b88,#07111b22),url('https://www.deere.co.in/assets/images/region-1/parts-and-service/engine-parts/parts-engineparts-maintenancesupport-1298x768.jpg')!important}
+.category-section > .category-zone:nth-child(4) .cats .cat:nth-child(5){background-image:linear-gradient(0deg,#07111b88,#07111b22),url('https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&w=1100&q=85')!important}
+.category-section > .category-zone:nth-child(4) .cats .cat:nth-child(6){background-image:linear-gradient(0deg,#07111b88,#07111b22),url('https://images.unsplash.com/photo-1579412690850-bd41cd0af397?auto=format&fit=crop&w=1100&q=85')!important}
+.category-section > .category-zone:nth-child(4) .cats .cat:nth-child(7){background-image:linear-gradient(0deg,#07111b88,#07111b22),url('https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=1100&q=85')!important}
+.category-section > .category-zone:nth-child(4) .cats .cat:nth-child(8){background-image:linear-gradient(0deg,#07111b88,#07111b22),url('https://www.deere.co.in/assets/images/region-1/parts-and-service/engine-parts/parts-engineparts-maintenancesupport-1298x768.jpg')!important}
 </style>'+window.aibProvisionalInvoice+'</html>');w.document.close();w.focus();setTimeout(()=>w.print(),300)}
 let selected='';
 function category(c,b,fromHistory=false){
@@ -1036,6 +1055,3 @@ refreshStoreSession().finally(()=>{updateStoreAccountButton();renderCart()});if(
 function toggleStorePassword(inputId,button){const field=document.getElementById(inputId);if(!field)return;const show=field.type==='password';field.type=show?'text':'password';button.textContent=show?'إخفاء':'إظهار';button.setAttribute('aria-label',show?'إخفاء كلمة المرور':'إظهار كلمة المرور');button.setAttribute('aria-pressed',String(show));}
 
 </script></body></html>
-/* Final override: supplied tourist-car showroom image */
-.category-zone .cat[onclick="category('cars',this)"]{background-image:linear-gradient(0deg,#07111bdc,#07111b45),url('/assets/aib-tourist-cars.jpg')!important;background-size:cover!important;background-position:center 55%!important}
-.category-zone .cat[onclick="category('cars',this)"]::before{background-image:url('/assets/aib-tourist-cars.jpg')!important}
