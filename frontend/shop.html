@@ -738,6 +738,43 @@ body.modal-open{overflow:hidden}
 .card-inquiry{display:flex;align-items:center;justify-content:center;width:100%;margin-top:6px;padding:7px 5px;border:1px solid #398d78;border-radius:8px;background:#173d35;color:#e5fff5;font-size:10px;font-weight:800;text-decoration:none;cursor:pointer}
 .card-inquiry:hover{background:#1c604d;border-color:#62c39f}
 .card-add-cart:disabled,.card-buy-now:disabled{opacity:.48;cursor:not-allowed}
+
+/* AIB category image map v2 - stable category selectors */
+.category-zone .cat{
+  background-repeat:no-repeat!important;
+  background-size:cover!important;
+  background-position:center!important;
+  min-height:138px!important;
+  border:1px solid #b08a4d!important;
+  position:relative!important;
+  isolation:isolate!important;
+  overflow:hidden!important;
+}
+.category-zone .cat::after{
+  content:""!important;display:block!important;position:absolute!important;inset:0!important;
+  z-index:0!important;pointer-events:none!important;
+  background:linear-gradient(90deg,rgba(4,10,16,.68),rgba(4,10,16,.24) 55%,rgba(4,10,16,.62))!important;
+}
+.category-zone .cat>span{position:relative!important;z-index:1!important}
+.category-zone .cat>span:last-child{color:#fff!important;font-weight:900!important;text-shadow:0 2px 6px #000!important}
+.category-zone .cat[onclick*="category('cars'"]{background-image:url('https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=1200&q=90')!important}
+.category-zone .cat[onclick*="category('car_parts'"]{background-image:url('https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&w=1200&q=90')!important}
+.category-zone .cat[onclick*="category('car_engines'"]{background-image:url('https://images.unsplash.com/photo-1581092918056-0c4c3acd3781?auto=format&fit=crop&w=1200&q=90')!important}
+.category-zone .cat[onclick*="category('car_engine_parts'"]{background-image:url('https://images.unsplash.com/photo-1487754180451-c456f719a1fc?auto=format&fit=crop&w=1200&q=90')!important}
+.category-zone .cat[onclick*="category('trucks'"]{background-image:url('https://images.unsplash.com/photo-1519003722824-194d4455a60c?auto=format&fit=crop&w=1200&q=90')!important}
+.category-zone .cat[onclick*="category('truck_parts'"]{background-image:url('https://images.unsplash.com/photo-1581092334651-ddf26d9a09d0?auto=format&fit=crop&w=1200&q=90')!important}
+.category-zone .cat[onclick*="category('truck_engines'"]{background-image:url('https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=1200&q=90')!important}
+.category-zone .cat[onclick*="category('truck_engine_parts'"]{background-image:url('https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?auto=format&fit=crop&w=1200&q=90')!important}
+.category-zone .cat[onclick*="category('heavy'"]{background-image:url('https://images.unsplash.com/photo-1580901368919-7738efb0f87e?auto=format&fit=crop&w=1200&q=90')!important}
+.category-zone .cat[onclick*="category('heavy_parts'"]{background-image:url('https://images.unsplash.com/photo-1530267981375-f0de937f5f13?auto=format&fit=crop&w=1200&q=90')!important}
+.category-zone .cat[onclick*="category('heavy_engines'"]{background-image:url('https://images.unsplash.com/photo-1581092918056-0c4c3acd3781?auto=format&fit=crop&w=1200&q=90')!important}
+.category-zone .cat[onclick*="category('heavy_engine_parts'"]{background-image:url('https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&w=1200&q=90')!important}
+.category-zone .cat[onclick*="category('agri'"]{background-image:url('https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&w=1200&q=90')!important}
+.category-zone .cat[onclick*="category('agri_parts'"]{background-image:url('https://images.unsplash.com/photo-1579412690850-bd41cd0af397?auto=format&fit=crop&w=1200&q=90')!important}
+.category-zone .cat[onclick*="category('agri_engines'"]{background-image:url('https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=1200&q=90')!important}
+.category-zone .cat[onclick*="category('agri_engine_parts'"]{background-image:url('https://images.unsplash.com/photo-1487754180451-c456f719a1fc?auto=format&fit=crop&w=1200&q=90')!important}
+@media(max-width:650px){.category-zone .cat{min-height:112px!important}}
+
 </style><style id="aib-unified-white-theme">
 /* AIB unified premium white theme — shared visual layer */
 :root{
