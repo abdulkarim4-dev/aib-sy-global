@@ -183,6 +183,82 @@ body.menu-open{overflow:hidden}body.menu-open .menu-backdrop{opacity:1;visibilit
  .hamb{background:#fff!important;border-color:#e2e6eb!important;box-shadow:0 5px 16px rgba(24,35,45,.1)!important}
  .hamb span{background:linear-gradient(90deg,#5b91b4,#c6a15e)!important}
 }
+
+/* AIB premium landing cards - ivory, navy and restrained gold */
+@media screen{
+  .section-head{margin-bottom:18px!important}
+  .section-head h2{font-weight:900!important;letter-spacing:-.25px!important;color:#202a33!important}
+  .section-head h2:before{width:4px!important;border-radius:5px!important;background:linear-gradient(180deg,#6d9fba,#c6a15e)!important}
+  .section-head p{color:#788590!important}
+  .cats,.services,.engine-slides{
+    padding:12px 18px 30px!important;
+    scrollbar-color:#c4a366 #e9edf0!important;
+  }
+  .cats .cat,.services .service,.engine-slide{
+    border:1px solid rgba(190,151,82,.58)!important;
+    border-radius:22px!important;
+    background:#172532!important;
+    box-shadow:0 15px 32px rgba(22,35,46,.16),0 3px 8px rgba(22,35,46,.08),inset 0 1px rgba(255,255,255,.24)!important;
+    transform:translateZ(0);
+  }
+  .cats .cat img,.services .service img,.engine-slide>img{
+    opacity:1!important;
+    filter:brightness(.91) saturate(1.08) contrast(1.04)!important;
+    transition:transform .45s ease,filter .35s ease!important;
+  }
+  .cats .cat:after,.services .service:after,.engine-slide:after{
+    inset:0!important;
+    background:linear-gradient(180deg,rgba(12,22,31,.02) 12%,rgba(12,22,31,.10) 42%,rgba(9,18,27,.88) 100%)!important;
+    z-index:0!important;
+  }
+  .cats .cat span{
+    right:14px!important;left:14px!important;bottom:14px!important;
+    padding:13px 15px!important;
+    border:1px solid rgba(225,196,139,.58)!important;
+    border-radius:13px!important;
+    background:linear-gradient(110deg,rgba(12,27,39,.88),rgba(20,35,47,.72))!important;
+    color:#fff!important;font-size:17px!important;font-weight:900!important;
+    text-shadow:0 2px 7px rgba(0,0,0,.7)!important;
+    box-shadow:0 7px 20px rgba(0,0,0,.18),inset 0 1px rgba(255,255,255,.12)!important;
+    backdrop-filter:blur(7px)!important;
+  }
+  .services .service>div,.engine-slide>div{
+    padding:22px 21px 20px!important;
+    background:linear-gradient(180deg,transparent,rgba(8,18,27,.18))!important;
+  }
+  .services .service h3,.engine-slide h3{
+    color:#fff!important;font-size:19px!important;font-weight:900!important;
+    line-height:1.55!important;text-shadow:0 2px 8px rgba(0,0,0,.7)!important;
+    margin-bottom:7px!important;
+  }
+  .services .service p,.engine-slide p{
+    color:#f0f3f5!important;font-size:12px!important;line-height:1.9!important;
+    text-shadow:0 1px 6px rgba(0,0,0,.8)!important;
+  }
+  .cats .cat:hover,.services .service:hover,.engine-slide:hover{
+    border-color:#d7b875!important;
+    box-shadow:0 20px 42px rgba(20,34,46,.23),0 0 0 2px rgba(198,161,94,.18)!important;
+  }
+  .cats .cat:hover img,.services .service:hover img,.engine-slide:hover>img{
+    filter:brightness(1) saturate(1.14) contrast(1.05)!important;
+  }
+  .stats .stat{
+    border:1px solid #e6dcc9!important;
+    border-top:3px solid #c6a15e!important;
+    border-radius:17px!important;
+    background:linear-gradient(145deg,#fff,#faf8f3)!important;
+    box-shadow:0 9px 24px rgba(26,39,50,.07)!important;
+  }
+}
+@media(max-width:850px){
+  .cats,.services,.engine-slides{padding-inline:12px!important}
+  .cats .cat,.services .service,.engine-slide{border-radius:20px!important}
+}
+@media(max-width:520px){
+  .cats .cat,.services .service,.engine-slide{height:245px!important}
+  .cats .cat span{font-size:16px!important;padding:12px!important}
+  .services .service h3,.engine-slide h3{font-size:18px!important}
+}
 </style></head><body><header class="wrap top"><div class="brand"><a class="brand-logo-link" href="/" aria-label="العودة إلى الصفحة الرئيسية"><img class="brand-mark" src="/aib-logo.webp?v=aib-original-full-20261108" alt="شعار مجموعة AIB"></a><div><b>AIB GROUP</b><small>مجموعة AIB التجارية</small></div></div><div class="menu"><button class="hamb" id="menuToggle" type="button" aria-label="فتح القائمة الرئيسية" aria-expanded="false" aria-controls="mainMenu"><span></span><span></span><span></span></button></div></header><div class="menu-backdrop" id="menuBackdrop" onclick="closeMainMenu()" aria-hidden="true"></div><aside class="menu-drawer" id="mainMenu" aria-label="القائمة الرئيسية" aria-hidden="true"><div class="menu-drawer-head"><div><small>AIB TRADING GROUP</small><strong>القائمة الرئيسية</strong></div><button class="menu-close" type="button" onclick="closeMainMenu()" aria-label="إغلاق القائمة">×</button></div><div class="menu-welcome"><span class="menu-welcome-mark">AIB</span><div><strong>أهلاً بك في مجموعة AIB</strong><small>تجارة وخدمات متكاملة</small></div></div><nav class="menu-list"><a href="#categories" onclick="closeMainMenu()"><i>01</i><span><b>أقسام المتجر</b><small>السيارات وقطع الغيار والمعدات</small></span><em>‹</em></a><a href="#services" onclick="closeMainMenu()"><i>02</i><span><b>خدماتنا</b><small>الصيانة والتصليح والحلول الفنية</small></span><em>‹</em></a><a href="/shop"><i>03</i><span><b>متجر AIB</b><small>تصفح المنتجات والمخزون</small></span><em>‹</em></a><a href="#contact" onclick="closeMainMenu()"><i>04</i><span><b>تواصل معنا</b><small>الهاتف والبريد ووسائل التواصل</small></span><em>‹</em></a></nav><div class="menu-drawer-footer"><span>ثقة في التجارة · خبرة في قطع الغيار</span><a href="/accounting">بوابة المحاسبة <b>←</b></a></div></aside>
 <main class="wrap"><section class="hero"><div class="hero-in"><div class="eyebrow">AIB TRADING GROUP</div><h1>خبرة تجارية وخدمات متكاملة في عالم السيارات والمعدات</h1><p>مجموعة AIB التجارية تجمع بين تجارة السيارات والشاحنات والمحركات وقطع الغيار والمعدات الثقيلة، إلى جانب خدمات الصيانة والتصليح.</p><div class="hero-actions"><a class="btn" href="/shop">اكتشف متجر AIB</a><a class="btn alt" href="#services">تعرّف على خدماتنا</a></div></div></section>
 <section class="section" id="companyStatsSection"><div class="section-head"><div><h2>مجموعة AIB بالأرقام</h2><p>إحصائيات مباشرة من سجلات وفواتير الشركة</p></div></div><div class="stats"><div class="stat"><small>عدد العملاء المسجلين</small><strong id="customers">—</strong></div><div class="stat"><small>عمليات المبيع</small><strong id="sales">—</strong></div><div class="stat"><small>عمليات الشراء</small><strong id="purchases">—</strong></div></div></section>
