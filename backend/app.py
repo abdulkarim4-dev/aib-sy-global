@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Any
-import os, secrets, json, base64, binascii, smtplib
+import os, secrets, json, base64, binascii, smtplib, hashlib
 from email.message import EmailMessage
 from urllib.request import Request as UrlRequest, urlopen
 from urllib.error import HTTPError, URLError
@@ -186,6 +186,18 @@ class EmailVerification(Base):
     expires_at: Mapped[datetime]=mapped_column(DateTime(timezone=True))
     attempts: Mapped[int]=mapped_column(Integer, default=0)
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
+class OperationVerification(Base):
+    __tablename__="operation_verifications"
+    id: Mapped[int]=mapped_column(primary_key=True)
+    user_id: Mapped[int]=mapped_column(ForeignKey("users.id"),index=True)
+    action: Mapped[str]=mapped_column(String(40),index=True)
+    code_hash: Mapped[str]=mapped_column(String(300))
+    grant_hash: Mapped[Optional[str]]=mapped_column(String(64),nullable=True)
+    expires_at: Mapped[datetime]=mapped_column(DateTime(timezone=True))
+    attempts: Mapped[int]=mapped_column(Integer,default=0,nullable=False)
+    verified_at: Mapped[Optional[datetime]]=mapped_column(DateTime(timezone=True),nullable=True)
+    used_at: Mapped[Optional[datetime]]=mapped_column(DateTime(timezone=True),nullable=True)
+    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True),default=lambda:datetime.now(timezone.utc))
 class PasswordChangeRequest(Base):
     __tablename__="password_change_requests"
     id: Mapped[int]=mapped_column(primary_key=True)
@@ -413,6 +425,87 @@ def send_notification_email(email:str, subject:str, body:str):
 def send_verification_email(email:str, code:str):
     send_aib_email(email,"رمز التحقق - مجموعة AIB",
         f"رمز التحقق الخاص بك في تطبيق AIB هو: {code}\nصلاحية الرمز 10 دقائق. لا تشاركه مع أحد.")
+
+def operation_verification_required(u:User, action:str)->bool:
+    if action in {"cash_movement","cash_transfer"}:
+        return True
+    return u.role!="owner" and action in {"invoice_create","invoice_payment"}
+
+def masked_email(email:str)->str:
+    local,_,domain=email.partition("@")
+    visible=local[:2] if len(local)>2 else local[:1]
+    return visible+"***@"+domain
+
+class OperationVerificationStartPayload(BaseModel):
+    action: str
+class OperationVerificationConfirmPayload(BaseModel):
+    challenge_id: int
+    code: str = Field(min_length=6,max_length=6)
+
+@app.post("/operation-verifications/start")
+def start_operation_verification(p:OperationVerificationStartPayload,request:Request,s:Session=Depends(db),u:User=Depends(current_user)):
+    if p.action not in {"invoice_create","invoice_payment","cash_movement","cash_transfer"}:
+        raise HTTPException(400,"نوع العملية غير مدعوم للتحقق")
+    if not operation_verification_required(u,p.action):
+        return {"required":False}
+    email=(u.email or "").strip().lower()
+    if not email or not u.email_verified:
+        raise HTTPException(400,"يجب إضافة بريد إلكتروني موثق لحسابك قبل تنفيذ هذه العملية. راجع إعدادات الحساب.")
+    now=datetime.now(timezone.utc)
+    latest=s.scalar(select(OperationVerification).where(
+        OperationVerification.user_id==u.id,
+        OperationVerification.action==p.action
+    ).order_by(OperationVerification.id.desc()))
+    if latest and latest.created_at>now-timedelta(seconds=30):
+        raise HTTPException(429,"تم إرسال رمز قبل قليل. انتظر 30 ثانية ثم أعد المحاولة.")
+    s.query(OperationVerification).filter(
+        OperationVerification.user_id==u.id,
+        OperationVerification.action==p.action,
+        OperationVerification.used_at.is_(None)
+    ).update({"expires_at":now},synchronize_session=False)
+    code=f"{secrets.randbelow(1000000):06d}"
+    row=OperationVerification(user_id=u.id,action=p.action,code_hash=password_hash.hash(code),expires_at=now+timedelta(minutes=10))
+    s.add(row);s.flush()
+    try:
+        send_verification_email(email,code)
+    except Exception:
+        s.rollback()
+        raise
+    audit(s,u,"operation_verification_sent","operation",row.id,{"action":p.action},request)
+    s.commit()
+    return {"required":True,"challenge_id":row.id,"email":masked_email(email),"expires_in":600,"message":"تم إرسال رمز تأكيد العملية إلى بريدك الإلكتروني"}
+
+@app.post("/operation-verifications/confirm")
+def confirm_operation_verification(p:OperationVerificationConfirmPayload,request:Request,s:Session=Depends(db),u:User=Depends(current_user)):
+    row=s.get(OperationVerification,p.challenge_id)
+    now=datetime.now(timezone.utc)
+    if not row or row.user_id!=u.id or row.used_at is not None or row.verified_at is not None or row.expires_at<now or row.attempts>=5:
+        raise HTTPException(400,"رمز التحقق منتهي أو غير صالح. اطلب رمزاً جديداً.")
+    if not password_hash.verify(p.code,row.code_hash):
+        row.attempts+=1;s.commit()
+        raise HTTPException(400,"رمز التحقق غير صحيح")
+    grant=secrets.token_urlsafe(32)
+    row.grant_hash=hashlib.sha256(grant.encode("utf-8")).hexdigest()
+    row.verified_at=now
+    audit(s,u,"operation_verification_confirmed","operation",row.id,{"action":row.action},request)
+    s.commit()
+    return {"ok":True,"verification_token":grant,"expires_in":600}
+
+def consume_operation_verification(s:Session,u:User,action:str,token:Optional[str]):
+    if not operation_verification_required(u,action):
+        return
+    if not token:
+        raise HTTPException(403,"يلزم تأكيد العملية برمز البريد الإلكتروني")
+    token_hash=hashlib.sha256(token.encode("utf-8")).hexdigest()
+    row=s.scalar(select(OperationVerification).where(
+        OperationVerification.user_id==u.id,
+        OperationVerification.action==action,
+        OperationVerification.grant_hash==token_hash
+    ).with_for_update())
+    now=datetime.now(timezone.utc)
+    if not row or row.verified_at is None or row.used_at is not None or row.expires_at<now:
+        raise HTTPException(403,"رمز تأكيد العملية غير صالح أو منتهي أو مستخدم مسبقاً")
+    row.used_at=now
 
 def notify_account_change(email:str, details:str):
     if email:
@@ -738,7 +831,7 @@ def update_inventory_product_images(product_id:int, p:InventoryImagesPayload, re
     s.commit()
     return {"ok":True,"images":product.images,"count":len(product.images)}
 
-class RecordCreate(BaseModel): section:str; invoice_no:Optional[str]=None; currency:str="USD"; data:dict
+class RecordCreate(BaseModel): section:str; invoice_no:Optional[str]=None; currency:str="USD"; data:dict; verification_token:Optional[str]=None
 @app.post("/records")
 def create_record(p:RecordCreate, request:Request, s:Session=Depends(db), u:User=Depends(require_permission("invoices","create"))):
     if p.section not in {"deposit","purchase","consignSale","directSale","repair","carPurchase","carSale"}: raise HTTPException(400,"قسم غير معروف")
@@ -749,6 +842,7 @@ def create_record(p:RecordCreate, request:Request, s:Session=Depends(db), u:User
     serial=int(s.scalar(select(func.count(Record.id)).where(Record.section==p.section)) or 0)+1
     invoice_no=f"{section_codes[p.section]}-{serial:05d}-B"
     prepared_data=prepare_record_inventory(s,p.section,p.data)
+    consume_operation_verification(s,u,"invoice_create",p.verification_token)
     r=Record(section=p.section,invoice_no=invoice_no,currency=p.currency,data=prepared_data,created_by=u.id)
     s.add(r); s.flush(); recalculate_inventory(s); audit(s,u,"record_created","record",r.id,{"section":r.section,"invoice_no":r.invoice_no},request); s.commit(); return {"id":r.id,"invoice_no":r.invoice_no,"created_at":r.created_at}
 @app.get("/records")
@@ -767,6 +861,7 @@ class PaymentPayload(BaseModel):
     method: str
     paid_at: Optional[datetime] = None
     cash_box: str = "صندوق المبيع"
+    verification_token: Optional[str] = None
 
 def invoice_cash_description(record:Record, action:str="دفعة فاتورة")->str:
     data=record.data or {}
@@ -802,6 +897,7 @@ def add_invoice_payment(record_id:int,p:PaymentPayload,request:Request,s:Session
     paid=float(s.scalar(select(func.coalesce(func.sum(InvoicePayment.amount),0)).where(InvoicePayment.record_id==record_id)) or 0)
     if round(paid+p.amount,2)>round(total,2): raise HTTPException(400,"مجموع الدفعات يتجاوز إجمالي الفاتورة")
     if not p.cash_box.strip(): raise HTTPException(400,"اختر الصندوق الذي ستدخل إليه الدفعة")
+    consume_operation_verification(s,u,"invoice_payment",p.verification_token)
     x=InvoicePayment(record_id=record_id,amount=p.amount,method=p.method,cash_box=p.cash_box,paid_at=p.paid_at or datetime.now(timezone.utc),created_by=u.id)
     s.add(x); s.flush()
     movement="withdrawal" if r.section in {"purchase","carPurchase"} else "deposit"
@@ -924,13 +1020,14 @@ def apply_approved_change(request_id:int,p:ApprovedChangeApplyPayload,request:Re
     audit(s,u,"change_request_completed","record",rec.id,{"request_id":cr.id,"action":cr.action},request)
     s.commit()
     return {"ok":True,"status":"completed"}
-class CashPayload(BaseModel): box_name:str; movement:str; amount:float=Field(gt=0); currency:str="USD"; description:str=""
+class CashPayload(BaseModel): box_name:str; movement:str; amount:float=Field(gt=0); currency:str="USD"; description:str=""; verification_token:Optional[str]=None
 class CashTransferPayload(BaseModel):
     source_box:str
     destination_box:str
     amount:float=Field(gt=0)
     currency:str="USD"
     description:str=""
+    verification_token:Optional[str]=None
 def ensure_cash_balance(s:Session, box_name:str, currency:str, amount:float):
     # Serialize all withdrawals/transfers for the same box and currency.
     s.execute(select(func.pg_advisory_xact_lock(func.hashtext(box_name),func.hashtext(currency))))
@@ -988,12 +1085,14 @@ def cash_move(p:CashPayload,request:Request,s:Session=Depends(db),u:User=Depends
     if p.movement not in ("deposit","withdrawal"): raise HTTPException(400,"اختر إيداعاً أو سحباً؛ التحويل بين الصناديق له عملية مستقلة")
     if p.currency not in ("USD","SYP"): raise HTTPException(400,"عملة غير مدعومة")
     if p.movement=="withdrawal": ensure_cash_balance(s,p.box_name,p.currency,p.amount)
-    m=CashMove(**p.model_dump(),created_by=u.id); s.add(m); s.flush(); audit(s,u,"cash_movement_created","cash",m.id,{"box":p.box_name,"movement":p.movement,"amount":p.amount,"currency":p.currency},request); s.commit(); return {"id":m.id}
+    consume_operation_verification(s,u,"cash_movement",p.verification_token)
+    m=CashMove(**p.model_dump(exclude={"verification_token"}),created_by=u.id); s.add(m); s.flush(); audit(s,u,"cash_movement_created","cash",m.id,{"box":p.box_name,"movement":p.movement,"amount":p.amount,"currency":p.currency},request); s.commit(); return {"id":m.id}
 @app.post("/cash-transfers")
 def cash_transfer(p:CashTransferPayload,request:Request,s:Session=Depends(db),u:User=Depends(require_permission("cash","create"))):
     if p.source_box==p.destination_box: raise HTTPException(400,"يجب اختيار صندوقين مختلفين")
     if p.currency not in ("USD","SYP"): raise HTTPException(400,"عملة غير مدعومة")
     ensure_cash_balance(s,p.source_box,p.currency,p.amount)
+    consume_operation_verification(s,u,"cash_transfer",p.verification_token)
     import uuid
     group=str(uuid.uuid4())
     source=CashMove(box_name=p.source_box,movement="withdrawal",amount=p.amount,currency=p.currency,description=("تحويل إلى "+p.destination_box+" · "+p.description).strip(" ·"),created_by=u.id,transfer_group=group)
