@@ -675,9 +675,19 @@ def recalculate_inventory(s:Session):
             if not product: raise HTTPException(400,f"القطعة {item['sku']} غير مسجلة في دليل المخزون")
             qty=float(item.get("quantity") or 0)
             if qty<=0: raise HTTPException(400,f"كمية القطعة {product.sku} يجب أن تكون أكبر من صفر")
-            bucket="owned" if record.section in {"purchase","directSale"} else "consigned"
-            sign=-1 if record.section in {"directSale","consignSale"} else 1
-            totals[product.id][bucket]+=sign*qty
+            # Online orders may draw from both owned and consigned stock.
+            # Their allocation is recorded explicitly so each stock bucket remains accurate.
+            if record.section=="directSale" and ("owned_quantity" in item or "consigned_quantity" in item):
+                owned_qty=float(item.get("owned_quantity") or 0)
+                consigned_qty=float(item.get("consigned_quantity") or 0)
+                if owned_qty<0 or consigned_qty<0 or abs((owned_qty+consigned_qty)-qty)>0.0001:
+                    raise HTTPException(400,f"توزيع كمية القطعة {product.sku} بين المخزون غير صحيح")
+                totals[product.id]["owned"]-=owned_qty
+                totals[product.id]["consigned"]-=consigned_qty
+            else:
+                bucket="owned" if record.section in {"purchase","directSale"} else "consigned"
+                sign=-1 if record.section in {"directSale","consignSale"} else 1
+                totals[product.id][bucket]+=sign*qty
     for product in s.scalars(select(InventoryProduct)).all():
         owned=round(totals[product.id]["owned"],3)
         consigned=round(totals[product.id]["consigned"],3)
@@ -1387,8 +1397,8 @@ def create_online_order(p:OnlineOrderPayload,s:Session=Depends(db),customer:Stor
         if entry.product_id in seen: continue
         seen.add(entry.product_id);product=s.get(InventoryProduct,entry.product_id)
         if not product or not product.active: raise HTTPException(409,"أحد المنتجات غير متاح")
-        qty=int(entry.quantity);stock=float(product.owned_stock or 0)
-        if qty>stock: raise HTTPException(409,"الكمية المطلوبة تتجاوز المخزون")
+        qty=int(entry.quantity);stock=float(product.owned_stock or 0)+float(product.consigned_stock or 0)
+        if qty>stock: raise HTTPException(409,f"الكمية المطلوبة من {product.name} تتجاوز المخزون المتاح ({stock:g})")
         price=prices.get(product.sku)
         if not price or float(price.get("sale_price") or 0)<=0: raise HTTPException(409,"سعر أحد المنتجات غير محدد")
         if currency and currency!=price["currency"]: raise HTTPException(409,"لا يمكن جمع عملات مختلفة في طلب واحد")
@@ -1436,7 +1446,20 @@ def review_online_purchase_order(order_id:int,p:OnlineOrderReviewPayload,s:Sessi
             f"تمت مراجعة طلب الشراء رقم #{order.id} ولم تتم الموافقة على إثبات الدفع.\nملاحظة الإدارة: {order.review_note}")
         return {"ok":True,"status":"rejected"}
     if p.action!="approve": raise HTTPException(400,"إجراء غير صالح")
-    data={"customer":order.customer_data["full_name"],"customer_phone":order.customer_data["full_phone"],"customer_address":order.customer_data["shipping_address"],"amount":float(order.total),"items":[{"sku":x["sku"],"description":x["description"],"model":x["model"],"quantity":x["quantity"],"price":x["price"]} for x in order.items],"notes":"طلب إلكتروني – تم التحقق من إثبات الدفع واعتماده"}
+    allocated_items=[]
+    for x in order.items:
+        product=s.scalar(select(InventoryProduct).where(InventoryProduct.sku==str(x["sku"]).strip().upper()))
+        if not product or not product.active: raise HTTPException(409,f"المنتج {x.get('description') or x['sku']} لم يعد متاحاً")
+        qty=float(x["quantity"])
+        owned=float(product.owned_stock or 0)
+        consigned=float(product.consigned_stock or 0)
+        available=owned+consigned
+        if qty>available+0.0001:
+            raise HTTPException(409,f"المخزون تغيّر منذ إرسال الطلب. المتاح من {product.name} حالياً {available:g}")
+        from_owned=min(qty,owned)
+        from_consigned=qty-from_owned
+        allocated_items.append({"sku":x["sku"],"description":x["description"],"model":x.get("model",""),"quantity":qty,"price":x["price"],"owned_quantity":from_owned,"consigned_quantity":from_consigned})
+    data={"customer":order.customer_data["full_name"],"customer_phone":order.customer_data["full_phone"],"customer_address":order.customer_data["shipping_address"],"amount":float(order.total),"items":allocated_items,"notes":"طلب إلكتروني – تم التحقق من إثبات الدفع واعتماده"}
     prepared=prepare_record_inventory(s,"directSale",data)
     s.execute(text("SELECT pg_advisory_xact_lock(hashtext(:key))"),{"key":"aib-invoice:directSale"})
     serial=int(s.scalar(select(func.count(Record.id)).where(Record.section=="directSale")) or 0)+1
