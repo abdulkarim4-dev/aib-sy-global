@@ -1017,3 +1017,6 @@ refreshStoreSession().finally(()=>{updateStoreAccountButton();renderCart()});if(
 
 function toggleStorePassword(inputId,button){const field=document.getElementById(inputId);if(!field)return;const show=field.type==='password';field.type=show?'text':'password';button.textContent=show?'إخفاء':'إظهار';button.setAttribute('aria-label',show?'إخفاء كلمة المرور':'إظهار كلمة المرور');button.setAttribute('aria-pressed',String(show));}
 </script></body></html>
+/* Final override: supplied tourist-car showroom image */
+.category-zone .cat[onclick="category('cars',this)"]{background-image:linear-gradient(0deg,#07111bdc,#07111b45),url('/assets/aib-tourist-cars.jpg')!important;background-size:cover!important;background-position:center 55%!important}
+.category-zone .cat[onclick="category('cars',this)"]::before{background-image:url('/assets/aib-tourist-cars.jpg')!important}
