@@ -41,10 +41,10 @@ footer{border-top-color:#28516c}
 /* AIB unified premium white theme — shared visual layer */
 :root{
  color-scheme:light;
- --aib-page:#f4f5f7;--aib-surface:#ffffff;--aib-surface-soft:#fafbfc;
- --aib-line:#e3e6ea;--aib-text:#20262d;--aib-muted:#737d87;
- --aib-gold:#c49a50;--aib-gold-dark:#9e7535;--aib-gold-soft:#fbf5e9;
- --aib-shadow:0 8px 28px rgba(25,32,40,.07);
+ --aib-page:#f5f6f8;--aib-surface:#ffffff;--aib-surface-soft:#fbfcfd;
+ --aib-line:#e2e6eb;--aib-text:#202a33;--aib-muted:#687581;
+ --aib-gold:#c6a15e;--aib-gold-dark:#987033;--aib-gold-soft:#fbf6ec;
+ --aib-shadow:0 10px 30px rgba(24,35,45,.075);
 }
 @media screen{
  html,body{background:var(--aib-page)!important;color:var(--aib-text)!important}
@@ -126,6 +126,29 @@ footer{border-top-color:#28516c}
  .back,.secondary{background:#fff!important;color:#4c402c!important;border-color:#e3d5b9!important}
  .primary{background:linear-gradient(135deg,#d8b875,#b88a42)!important;color:#201a10!important}
  footer{border-top-color:var(--aib-line)!important}
+}
+/* AIB refined unified palette: porcelain white, graphite, champagne gold and calm blue */
+:root{
+ --aib-page:#f5f6f8;--aib-surface:#ffffff;--aib-surface-soft:#fbfcfd;
+ --aib-line:#e2e6eb;--aib-text:#202a33;--aib-muted:#687581;
+ --aib-gold:#c6a15e;--aib-gold-dark:#987033;--aib-gold-soft:#fbf6ec;
+ --aib-blue:#5b91b4;--aib-blue-soft:#eef5f9;
+ --aib-shadow:0 10px 30px rgba(24,35,45,.075);
+}
+@media screen{
+ html,body{background:var(--aib-page)!important;color:var(--aib-text)!important}
+ h1,h2,h3,h4,h5,h6,strong,b,label,legend{color:var(--aib-text)}
+ p,small,.muted,.hint,.subtle,.description{color:var(--aib-muted)}
+ input:focus,select:focus,textarea:focus{border-color:var(--aib-gold)!important;box-shadow:0 0 0 3px rgba(198,161,94,.16)!important}
+ .primary,.btn-primary,.button-primary,[type=submit],.save-btn,.action-primary,.login-submit,.submit-btn,.checkout-submit{
+  background:linear-gradient(135deg,#ddc58f,#bd944e)!important;color:#211b11!important;
+  border:1px solid #b68c48!important;box-shadow:0 6px 16px rgba(164,124,54,.2)!important
+ }
+ .eyebrow,.section-kicker{color:var(--aib-gold-dark)!important}
+ .section-head h2:before{background:linear-gradient(#6b9fbe,#c6a15e)!important}
+ .active,.selected,.tab.active,.nav-link.active{border-color:var(--aib-gold)!important}
+ .category-zone .cat,.cats .cat,.services .service,.engine-slide{border-color:#d9e0e6}
+ .hero{box-shadow:var(--aib-shadow)!important}
 }
 </style></head>
 <body>
