@@ -820,6 +820,65 @@ body.modal-open{overflow:hidden}
  .category-zone .cat,.cats .cat,.services .service,.engine-slide{border-color:#d9e0e6}
  .hero{box-shadow:var(--aib-shadow)!important}
 }
+
+
+/* AIB FINAL CATEGORY PHOTO MAP — authoritative exact-key rules */
+.category-zone .cat{
+  position:relative!important;
+  isolation:isolate!important;
+  display:flex!important;
+  min-height:132px!important;
+  overflow:hidden!important;
+  background-color:#263746!important;
+  background-size:cover!important;
+  background-position:center!important;
+  background-repeat:no-repeat!important;
+  border:1px solid #d8c29b!important;
+  color:#fff!important;
+  text-shadow:0 2px 5px rgba(0,0,0,.95)!important;
+}
+.category-zone .cat::before{display:none!important;content:none!important}
+.category-zone .cat::after{
+  content:""!important;
+  display:block!important;
+  position:absolute!important;
+  inset:0!important;
+  z-index:0!important;
+  background:linear-gradient(0deg,rgba(5,12,18,.88),rgba(5,12,18,.16) 82%)!important;
+  pointer-events:none!important;
+}
+.category-zone .cat>span{position:relative!important;z-index:1!important;color:#fff!important}
+.category-zone .cat .cat-icon{color:#fff!important;filter:drop-shadow(0 2px 5px #000)!important}
+
+/* Passenger cars */
+.category-zone .cat[onclick="category('cars',this)"]{background-image:url('https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=1200&q=85')!important}
+.category-zone .cat[onclick="category('car_parts',this)"]{background-image:url('https://images.unsplash.com/photo-1487754180451-c456f719a1fc?auto=format&fit=crop&w=1200&q=85')!important}
+.category-zone .cat[onclick="category('car_engines',this)"]{background-image:url('https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&w=1200&q=85')!important}
+.category-zone .cat[onclick="category('car_engine_parts',this)"]{background-image:url('https://www.febi.com/medien/_processed_/8/8/csm_febi_car_image_engine_components_lubricantes_cools_protects_767x575_6c86f264a0.jpg')!important}
+
+/* Trucks */
+.category-zone .cat[onclick="category('trucks',this)"]{background-image:url('https://images.unsplash.com/photo-1519003722824-194d4455a60c?auto=format&fit=crop&w=1200&q=85')!important}
+.category-zone .cat[onclick="category('truck_parts',this)"]{background-image:url('https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?auto=format&fit=crop&w=1200&q=85')!important}
+.category-zone .cat[onclick="category('truck_engines',this)"]{background-image:url('https://images.unsplash.com/photo-1581092918056-0c4c3acd3781?auto=format&fit=crop&w=1200&q=85')!important}
+.category-zone .cat[onclick="category('truck_engine_parts',this)"]{background-image:url('https://st5.depositphotos.com/1671840/65132/i/450/depositphotos_651326576-stock-photo-close-mechanics-engine.jpg')!important}
+
+/* Construction equipment */
+.category-zone .cat[onclick="category('heavy',this)"]{background-image:url('https://images.unsplash.com/photo-1580901368919-7738efb0f87e?auto=format&fit=crop&w=1200&q=85')!important}
+.category-zone .cat[onclick="category('heavy_parts',this)"]{background-image:url('https://images.unsplash.com/photo-1579412690850-bd41cd0af397?auto=format&fit=crop&w=1200&q=85')!important}
+.category-zone .cat[onclick="category('heavy_engines',this)"]{background-image:url('https://img.interempresas.net/fotos/1550905.jpeg')!important}
+.category-zone .cat[onclick="category('heavy_engine_parts',this)"]{background-image:url('https://www.febi.com/medien/_processed_/8/8/csm_febi_car_image_engine_components_lubricantes_cools_protects_767x575_6c86f264a0.jpg')!important}
+
+/* Agricultural equipment */
+.category-zone .cat[onclick="category('agri',this)"]{background-image:url('https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&w=1200&q=85')!important}
+.category-zone .cat[onclick="category('agri_parts',this)"]{background-image:url('https://images.unsplash.com/photo-1579412690850-bd41cd0af397?auto=format&fit=crop&w=1200&q=85')!important}
+.category-zone .cat[onclick="category('agri_engines',this)"]{background-image:url('https://img.interempresas.net/fotos/1550905.jpeg')!important}
+.category-zone .cat[onclick="category('agri_engine_parts',this)"]{background-image:url('https://www.febi.com/medien/_processed_/8/8/csm_febi_car_image_engine_components_lubricantes_cools_protects_767x575_6c86f264a0.jpg')!important}
+
+.category-zone .cat:hover,.category-zone .cat.active{
+  border-color:#d7ad62!important;
+  filter:brightness(1.08)!important;
+}
+@media(max-width:600px){.category-zone .cat{min-height:112px!important}}
 </style></head><body><header class="wrap top"><div class="brand"><a class="brand-logo-link" href="/" aria-label="العودة إلى الصفحة الرئيسية"><img src="/aib-logo.webp?v=aib-original-full-20261108" alt="AIB"></a><div><b>AIB GROUP</b><small>المتجر الإلكتروني الرسمي</small></div></div><button class="store-account-button" id="storeAccountButton" type="button" onclick="openStoreAuth()" aria-label="حساب العميل">تسجيل الدخول</button><button class="store-logout-button" id="storeLogoutButton" type="button" onclick="logoutStoreCustomer()" hidden>تسجيل الخروج</button><button class="cart-open" type="button" onclick="openCart()" aria-label="فتح سلة التسوق">🛒 <span>سلة التسوق</span><b id="cartCount">0</b></button></header><main class="wrap"><section class="hero"><div style="color:#72b9ec;font-size:12px;letter-spacing:2px;font-weight:bold">AIB ONLINE STORE</div><h1>تسوّق من مجموعة AIB</h1><p>اكتشف قطع الغيار والمحركات والسيارات والشاحنات والمعدات الثقيلة المتوفرة في مخزون الشركة.</p></section><section class="catalog-tools" aria-label="أدوات التسوق"><div class="catalog-tools-head"><div><span class="eyebrow">اكتشف منتجاتنا</span><h2>ابحث واختر بسهولة</h2><p>اكتب اسم القطعة أو رقمها أو الموديل للوصول السريع إلى المنتج.</p></div><span class="catalog-mark">AIB <small>STORE</small></span></div><div class="tools"><label class="search-field"><span aria-hidden="true">⌕</span><input id="q" placeholder="ابحث باسم المنتج أو رقم القطعة أو الموديل" oninput="load()"></label><label class="sort-field"><span>ترتيب حسب</span><select id="sort" onchange="load()"><option value="">الأحدث / الافتراضي</option><option value="name">اسم المنتج</option><option value="stock">الكمية المتوفرة</option></select></label></div></section><section id="categorySection" class="category-section" aria-label="أقسام التسوق">
 <button class="all-products-banner active" type="button" onclick="category('',this)"><span class="all-products-icon"><svg viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path d="M20 5h8l2 5 5 2 5-2 4 7-4 4v6l4 4-4 7-5-2-5 2-2 5h-8l-2-5-5-2-5 2-4-7 4-4v-6l-4-4 4-7 5 2 5-2z"/><circle cx="24" cy="24" r="7"/></svg></span><span><b>جميع المنتجات</b><small>عرض كامل منتجات متجر AIB من جميع الأقسام</small></span><span class="all-products-arrow">←</span></button>
 <div class="category-zone">
