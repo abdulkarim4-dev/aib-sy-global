@@ -164,7 +164,7 @@ async function requestOperationVerification(action){
  if(!startData.required)return null;
  const code=await aibPrompt('أرسلنا رمز تأكيد من 6 أرقام إلى بريدك الإلكتروني '+(startData.email||'الموثق')+' أدخل الرمز لإتمام العملية. لن يتم حفظ العملية قبل التحقق.',{title:'تأكيد العملية عبر البريد الإلكتروني',placeholder:'أدخل رمز التحقق المكوّن من 6 أرقام'});
  if(code===null)throw new Error('تم إلغاء العملية قبل التأكيد');
- const clean=String(code).trim();if(!/^\\d{6}$/.test(clean))throw new Error('أدخل رمز التحقق المكوّن من 6 أرقام');
+ const clean=String(code).trim();if(!/^\d{6}$/.test(clean))throw new Error('أدخل رمز التحقق المكوّن من 6 أرقام');
  const verifyResponse=await fetch(API+'/operation-verifications/confirm',{method:'POST',headers,body:JSON.stringify({challenge_id:startData.challenge_id,code:clean})});
  let verifyData={};try{verifyData=await verifyResponse.json()}catch{}
  if(!verifyResponse.ok)throw new Error(verifyData.detail||'تعذر تأكيد رمز البريد الإلكتروني');
@@ -173,7 +173,7 @@ async function requestOperationVerification(action){
 function operationActionForRequest(path,method){
  if(method!=='POST')return null;
  if(path==='/records')return 'invoice_create';
- if(/^\\/records\\/\\d+\\/payments$/.test(path))return 'invoice_payment';
+ if(/^\/records\/\d+\/payments$/.test(path))return 'invoice_payment';
  if(path==='/cash-movements')return 'cash_movement';
  if(path==='/cash-transfers')return 'cash_transfer';
  return null;
