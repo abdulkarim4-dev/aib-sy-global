@@ -787,8 +787,10 @@ def approve_employee_email(user_id:int,p:EmployeeEmailApprovalPayload,request:Re
     now=datetime.now(timezone.utc)
     if not row or row.expires_at<now: raise HTTPException(400,"رمز التأكيد منتهي. أعد إنشاء الحساب أو اطلب رمزاً جديداً.")
     if row.attempts>=5: raise HTTPException(429,"تم تجاوز محاولات الرمز. يلزم إصدار رمز جديد.")
-    if not password_hash.verify(p.code,row.code_hash):
-        row.attempts+=1;s.commit();raise HTTPException(400,"رمز تأكيد البريد غير صحيح")
+    # Normalize Arabic/Persian numerals and accidental spaces before checking the emailed code.
+    normalized_code=str(p.code).strip().translate(str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹","01234567890123456789"))
+    if len(normalized_code)!=6 or not normalized_code.isdigit() or not password_hash.verify(normalized_code,row.code_hash):
+        row.attempts+=1;s.commit();raise HTTPException(400,"رمز تأكيد البريد غير صحيح. أدخل الأرقام الستة كما ظهرت في الرسالة.")
     row.used_at=now;target.email_verified=True
     audit(s,u,"employee_email_confirmed_by_owner","user",target.id,{"email":target.email},request);s.commit()
     return {"ok":True,"email_verified":True,"username":target.username}
