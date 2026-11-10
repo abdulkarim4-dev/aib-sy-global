@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Any
-import os, secrets, json, base64, binascii, smtplib, hashlib
+import os, secrets, json, base64, binascii, smtplib, hashlib, html
 from email.message import EmailMessage
 from urllib.request import Request as UrlRequest, urlopen
 from urllib.error import HTTPError, URLError
@@ -384,7 +384,7 @@ def update_account_settings(p:AccountSettingsPayload, request:Request, s:Session
         notify_account_change(u.email,f"تغيير الاسم من «{old_name}» إلى «{u.full_name}»")
     return {"ok":True,"email":u.email,"full_name":u.full_name}
 
-def send_aib_email(email:str, subject:str, body:str):
+def send_aib_email(email:str, subject:str, body:str, html_body:Optional[str]=None):
     if not email or "@" not in email:
         raise HTTPException(400,"عنوان البريد الإلكتروني غير صالح")
     if settings.smtp_host and settings.smtp_user and settings.smtp_password and settings.smtp_from:
@@ -393,6 +393,7 @@ def send_aib_email(email:str, subject:str, body:str):
         message["From"]=settings.smtp_from
         message["To"]=email
         message.set_content(body)
+        if html_body: message.add_alternative(html_body,subtype="html")
         try:
             with smtplib.SMTP(settings.smtp_host,settings.smtp_port,timeout=25) as server:
                 server.ehlo();server.starttls();server.ehlo()
@@ -404,7 +405,7 @@ def send_aib_email(email:str, subject:str, body:str):
     if not settings.brevo_api_key or not settings.brevo_sender_email:
         raise HTTPException(503,"خدمة البريد غير مهيأة. تحقق من إعدادات Gmail SMTP في Render")
     payload={"sender":{"name":settings.brevo_sender_name,"email":settings.brevo_sender_email},
-             "to":[{"email":email}],"subject":subject,"textContent":body}
+             "to":[{"email":email}],"subject":subject,"textContent":body,**({"htmlContent":html_body} if html_body else {})}
     req=UrlRequest("https://api.brevo.com/v3/smtp/email",
         data=json.dumps(payload,ensure_ascii=False).encode("utf-8"),
         headers={"api-key":settings.brevo_api_key,"accept":"application/json","content-type":"application/json"},
@@ -418,9 +419,13 @@ def send_aib_email(email:str, subject:str, body:str):
     except (URLError,TimeoutError,OSError):
         raise HTTPException(502,"تعذر الاتصال بخدمة البريد. تحقق من إعدادات Render")
 
-def send_notification_email(email:str, subject:str, body:str):
+def aib_email_html(title:str, intro:str, rows:list[tuple[str,str]], accent:str="#bd9654", note:str="هذه رسالة آلية من مجموعة AIB التجارية."):
+    safe_rows="".join(f"<tr><td style='padding:11px 14px;color:#718096;border-bottom:1px solid #e8edf1;width:34%;font-weight:700'>{html.escape(str(k))}</td><td style='padding:11px 14px;color:#243342;border-bottom:1px solid #e8edf1;font-weight:600'>{v}</td></tr>" for k,v in rows)
+    return f"""<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"></head><body style="margin:0;background:#f2f5f7;font-family:Tahoma,Arial,sans-serif;color:#243342;padding:24px 10px"><div style="max-width:620px;margin:0 auto;background:#fff;border:1px solid #e3e9ee;border-radius:18px;overflow:hidden;box-shadow:0 12px 35px rgba(23,42,58,.08)"><div style="background:#172b3b;padding:23px 26px;text-align:center;border-bottom:4px solid {accent}"><div style="font-size:27px;font-weight:900;letter-spacing:3px;color:#fff">AIB</div><div style="color:#dce5ec;font-size:13px;margin-top:5px">مجموعة AIB التجارية</div></div><div style="padding:27px 25px"><h2 style="margin:0 0 14px;color:#203447;font-size:21px">{html.escape(title)}</h2><p style="margin:0 0 20px;line-height:2;color:#536474">{html.escape(intro)}</p><table role="presentation" style="width:100%;border-collapse:collapse;background:#fbfcfd;border:1px solid #e8edf1;border-radius:12px">{safe_rows}</table><p style="margin:22px 0 0;padding:13px 15px;border-right:4px solid {accent};background:#f7f9fa;color:#617181;font-size:12px;line-height:1.9">{html.escape(note)}</p></div><div style="padding:16px;text-align:center;background:#f8fafb;border-top:1px solid #e8edf1;color:#7b8994;font-size:11px">مجموعة AIB التجارية · للاستفسار تواصل مع فريقنا</div></div></body></html>"""
+
+def send_notification_email(email:str, subject:str, body:str, html_body:Optional[str]=None):
     try:
-        send_aib_email(email,subject,body)
+        send_aib_email(email,subject,body,html_body)
     except Exception as exc:
         print(f"AIB notification email failed: {type(exc).__name__}",flush=True)
 
@@ -1530,13 +1535,14 @@ def create_online_order(p:OnlineOrderPayload,s:Session=Depends(db),customer:Stor
     customer_message=(f"مرحباً {customer.full_name}،\nتم استلام طلب الشراء الإلكتروني رقم #{order.id} لدى مجموعة AIB.\n"
         f"المنتجات:\n{item_lines}\nالإجمالي: {float(order.total):.2f} {order.currency}\n"
         "الحالة: بانتظار مراجعة إثبات الدفع. سنرسل إليك تحديثاً عند اعتماد الطلب أو رفضه.")
-    send_notification_email(customer.email,"تأكيد استلام طلب الشراء - AIB",customer_message)
-    owner=s.scalar(select(User).where(User.role=="owner",User.active.is_(True)).order_by(User.id).limit(1))
-    admin_email=(owner.email if owner and owner.email_verified and owner.email else settings.smtp_user)
+    customer_html=aib_email_html("تم استلام طلبك بنجاح",f"مرحباً {customer.full_name}، استلمنا طلب الشراء الخاص بك، وسيقوم فريقنا بمراجعة إثبات الدفع وإبلاغك بالنتيجة.",[("رقم الطلب",f"#{order.id}"),("الإجمالي",f"{float(order.total):.2f} {html.escape(order.currency)}"),("حالة الطلب","بانتظار مراجعة إثبات الدفع")],note="احتفظ برقم الطلب لمتابعة حالته. لا يُعد الطلب معتمداً قبل مراجعة إثبات الدفع.")
+    send_notification_email(customer.email,"تأكيد استلام طلب الشراء - مجموعة AIB",customer_message,customer_html)
+    admin_email=settings.smtp_from or settings.smtp_user
     if admin_email:
-        send_notification_email(admin_email,f"طلب شراء إلكتروني جديد #{order.id}",
-            f"وصل طلب شراء جديد من {customer.full_name}\nالبريد: {customer.email}\nالهاتف: {data['full_phone']}\n"
-            f"الإجمالي: {float(order.total):.2f} {order.currency}\nالمنتجات:\n{item_lines}\nيرجى مراجعة الطلب وإثبات الدفع من لوحة المحاسبة.")
+        admin_body=(f"وصل طلب شراء جديد من {customer.full_name}\\nالبريد: {customer.email}\\nالهاتف: {data['full_phone']}\\n"
+            f"الإجمالي: {float(order.total):.2f} {order.currency}\\nالمنتجات:\\n{item_lines}\\nيرجى مراجعة الطلب وإثبات الدفع من لوحة المحاسبة.")
+        admin_html=aib_email_html(f"طلب شراء إلكتروني جديد #{order.id}","وصل طلب جديد من متجر AIB ويحتاج إلى مراجعة إثبات الدفع.",[("رقم الطلب",f"#{order.id}"),("العميل",html.escape(customer.full_name)),("البريد",html.escape(customer.email)),("الهاتف",html.escape(data["full_phone"])),("العنوان",html.escape(data["shipping_address"])),("الإجمالي",f"{float(order.total):.2f} {html.escape(order.currency)}")],accent="#168447",note="يرجى فتح بوابة المحاسبة لمراجعة الطلب والتحقق من إثبات الدفع.")
+        send_notification_email(admin_email,f"طلب شراء إلكتروني جديد #{order.id} – AIB",admin_body,admin_html)
     return {"ok":True,"order_id":order.id,"customer":data,"items":lines,"total":float(order.total),"currency":order.currency,"status":order.status}
 
 @app.get("/online-purchase-orders")
