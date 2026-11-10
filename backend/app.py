@@ -49,6 +49,16 @@ class User(Base):
     failed_logins: Mapped[int]=mapped_column(Integer, default=0)
     locked_until: Mapped[Optional[datetime]]=mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
+class AccountingLoginVerification(Base):
+    __tablename__="accounting_login_verifications"
+    id: Mapped[int]=mapped_column(primary_key=True)
+    user_id: Mapped[int]=mapped_column(ForeignKey("users.id"),index=True)
+    code_hash: Mapped[str]=mapped_column(String(300))
+    expires_at: Mapped[datetime]=mapped_column(DateTime(timezone=True))
+    attempts: Mapped[int]=mapped_column(Integer,default=0,nullable=False)
+    used_at: Mapped[Optional[datetime]]=mapped_column(DateTime(timezone=True),nullable=True)
+    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True),default=lambda:datetime.now(timezone.utc))
+
 class StoreCustomer(Base):
     __tablename__="store_customers"
     id: Mapped[int]=mapped_column(primary_key=True)
@@ -230,9 +240,11 @@ def db():
     finally: s.close()
 def audit(s:Session, user:Optional[User], action:str, entity:str, entity_id:Optional[int], details:dict, request:Optional[Request]=None):
     s.add(AuditEvent(user_id=user.id if user else None, action=action, entity=entity, entity_id=entity_id, details=details, ip_address=request.client.host if request and request.client else ""))
-def token_for(user:User):
+def token_for(user:User,email_otp_verified:bool=False):
     now=datetime.now(timezone.utc)
-    return jwt.encode({"sub":str(user.id),"iat":now,"exp":now+timedelta(minutes=settings.jwt_minutes)},settings.jwt_secret,algorithm="HS256")
+    claims={"sub":str(user.id),"iat":now,"exp":now+timedelta(minutes=settings.jwt_minutes)}
+    if user.role!="owner": claims["email_otp_verified"]=bool(email_otp_verified)
+    return jwt.encode(claims,settings.jwt_secret,algorithm="HS256")
 def current_user(token:str=Depends(oauth), s:Session=Depends(db)):
     try:
         payload=jwt.decode(token,settings.jwt_secret,algorithms=["HS256"])
@@ -241,6 +253,7 @@ def current_user(token:str=Depends(oauth), s:Session=Depends(db)):
     except Exception: raise HTTPException(401,"جلسة الدخول غير صالحة أو انتهت")
     u=s.get(User,uid)
     if not u or not u.active: raise HTTPException(401,"الحساب غير فعال")
+    if u.role!="owner" and not payload.get("email_otp_verified"): raise HTTPException(401,"يجب تسجيل الدخول مجدداً وتأكيد رمز البريد الإلكتروني")
     return u
 def current_store_customer(token:str=Depends(oauth), s:Session=Depends(db)):
     try:
@@ -339,6 +352,13 @@ def startup():
 
 @app.get("/health")
 def health(): return {"status":"ok","service":"AIB Accounting API"}
+class AccountingLoginConfirmPayload(BaseModel):
+    challenge_id:int
+    code:str=Field(min_length=6,max_length=6)
+
+def accounting_login_user_payload(u:User):
+    return {"id":u.id,"username":u.username,"name":u.full_name,"email":u.email,"role":u.role,"permissions":u.permissions or {}}
+
 @app.post("/auth/login")
 def login(form:OAuth2PasswordRequestForm=Depends(), request:Request=None, s:Session=Depends(db)):
     u=s.scalar(select(User).where(or_(User.username==form.username, (User.email==form.username) & (User.email_verified==True))))
@@ -351,8 +371,45 @@ def login(form:OAuth2PasswordRequestForm=Depends(), request:Request=None, s:Sess
         if u.failed_logins>=3: u.locked_until=now+timedelta(minutes=5); u.failed_logins=0
         audit(s,u,"login_failed","user",u.id,{},request); s.commit(); raise HTTPException(401,"اسم المستخدم أو كلمة المرور غير صحيحة")
     if not u.active: raise HTTPException(403,"الحساب غير فعال")
-    u.failed_logins=0; u.locked_until=None; audit(s,u,"login","user",u.id,{},request); s.commit()
-    return {"access_token":token_for(u),"token_type":"bearer","user":{"id":u.id,"username":u.username,"name":u.full_name,"email":u.email if u.email_verified else None,"role":u.role,"permissions":u.permissions or {}}}
+    u.failed_logins=0; u.locked_until=None
+    if u.role!="owner":
+        if not u.email or not u.email_verified:
+            audit(s,u,"login_blocked_unverified_email","user",u.id,{},request); s.commit()
+            raise HTTPException(403,"لا يمكن الدخول قبل تسجيل بريد إلكتروني موثق لهذا الموظف. اطلب من المالك توثيق البريد.")
+        latest=s.scalar(select(AccountingLoginVerification).where(AccountingLoginVerification.user_id==u.id).order_by(AccountingLoginVerification.id.desc()))
+        if latest and latest.used_at is None and latest.created_at>now-timedelta(seconds=30):
+            raise HTTPException(429,"تم إرسال رمز قبل قليل. انتظر 30 ثانية قبل طلب رمز جديد.")
+        code=f"{secrets.randbelow(1000000):06d}"
+        challenge=AccountingLoginVerification(user_id=u.id,code_hash=password_hash.hash(code),expires_at=now+timedelta(minutes=10))
+        s.add(challenge); s.flush()
+        try:
+            send_aib_email(u.email,"رمز الدخول إلى المحاسبة – مجموعة AIB",
+                f"مرحباً {u.full_name}، رمز الدخول لمرة واحدة هو: {code}\\nتنتهي صلاحيته خلال 10 دقائق. لا تشارك هذا الرمز مع أي شخص.",
+                f"""<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><body style="margin:0;background:#f2f5f7;padding:24px;font-family:Tahoma,Arial"><div style="max-width:520px;margin:auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e4eaf0"><div style="background:#172b3b;padding:22px;text-align:center;color:#fff"><b style="font-size:27px">AIB</b><div>مجموعة AIB التجارية</div></div><div style="padding:28px;text-align:center;color:#243342"><h2>تأكيد الدخول إلى برنامج المحاسبة</h2><p>مرحباً {html.escape(u.full_name)}، استخدم رمز التحقق التالي لإكمال تسجيل الدخول.</p><div style="font-size:32px;letter-spacing:8px;font-weight:900;color:#168447;background:#f1f7f3;border:1px dashed #168447;border-radius:12px;padding:18px">{code}</div><p style="color:#697887">الرمز صالح لمدة 10 دقائق ولمرة واحدة فقط.</p><small>إذا لم تطلب تسجيل الدخول، تجاهل هذه الرسالة.</small></div></div></body></html>""")
+        except Exception:
+            s.rollback()
+            raise HTTPException(503,"تعذر إرسال رمز الدخول إلى البريد المسجل. تحقق من إعدادات البريد أو تواصل مع المالك.")
+        audit(s,u,"accounting_login_code_sent","user",u.id,{"challenge_id":challenge.id},request); s.commit()
+        return {"requires_email_code":True,"challenge_id":challenge.id,"masked_email":masked_email(u.email),"expires_in":600}
+    audit(s,u,"login","user",u.id,{"method":"password"},request); s.commit()
+    return {"access_token":token_for(u),"token_type":"bearer","user":accounting_login_user_payload(u)}
+
+@app.post("/auth/login/confirm")
+def confirm_accounting_login(p:AccountingLoginConfirmPayload,request:Request,s:Session=Depends(db)):
+    now=datetime.now(timezone.utc)
+    row=s.get(AccountingLoginVerification,p.challenge_id)
+    if not row or row.used_at or row.expires_at<now: raise HTTPException(400,"رمز الدخول منتهي أو غير صالح. اطلب رمزاً جديداً.")
+    u=s.get(User,row.user_id)
+    if not u or not u.active or u.role=="owner" or not u.email or not u.email_verified: raise HTTPException(403,"الحساب غير مؤهل لتأكيد الدخول")
+    if row.attempts>=5: raise HTTPException(429,"تجاوزت عدد محاولات إدخال الرمز. اطلب رمزاً جديداً.")
+    if not password_hash.verify(p.code,row.code_hash):
+        row.attempts+=1; audit(s,u,"accounting_login_code_failed","user",u.id,{"challenge_id":row.id},request); s.commit()
+        raise HTTPException(401,"رمز التحقق غير صحيح")
+    row.used_at=now
+    s.query(AccountingLoginVerification).filter(AccountingLoginVerification.user_id==u.id,AccountingLoginVerification.used_at.is_(None),AccountingLoginVerification.id!=row.id).update({AccountingLoginVerification.used_at:now},synchronize_session=False)
+    audit(s,u,"login","user",u.id,{"method":"email_otp"},request); s.commit()
+    return {"access_token":token_for(u,email_otp_verified=True),"token_type":"bearer","user":accounting_login_user_payload(u)}
+
 @app.get("/auth/me")
 def me(u:User=Depends(current_user)): return {"id":u.id,"username":u.username,"name":u.full_name,"email":u.email,"role":u.role,"permissions":u.permissions or {}}
 
