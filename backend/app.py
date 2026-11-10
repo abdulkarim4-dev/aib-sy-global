@@ -49,6 +49,16 @@ class User(Base):
     failed_logins: Mapped[int]=mapped_column(Integer, default=0)
     locked_until: Mapped[Optional[datetime]]=mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
+class EmployeeEmailApproval(Base):
+    __tablename__="employee_email_approvals"
+    id: Mapped[int]=mapped_column(primary_key=True)
+    user_id: Mapped[int]=mapped_column(ForeignKey("users.id"),index=True)
+    code_hash: Mapped[str]=mapped_column(String(300))
+    expires_at: Mapped[datetime]=mapped_column(DateTime(timezone=True))
+    attempts: Mapped[int]=mapped_column(Integer,default=0,nullable=False)
+    used_at: Mapped[Optional[datetime]]=mapped_column(DateTime(timezone=True),nullable=True)
+    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True),default=lambda:datetime.now(timezone.utc))
+
 class AccountingLoginVerification(Base):
     __tablename__="accounting_login_verifications"
     id: Mapped[int]=mapped_column(primary_key=True)
@@ -749,9 +759,38 @@ def add_user(payload:UserCreate, request:Request, s:Session=Depends(db), u:User=
     email_confirm=(payload.email_confirm or "").strip().lower()
     if email!=email_confirm: raise HTTPException(400,"البريد الإلكتروني وتأكيده غير متطابقين")
     if (not email) or ("@" not in email) or ("." not in email.rsplit("@",1)[-1]) or len(email)>254: raise HTTPException(400,"البريد الإلكتروني مطلوب ويجب أن يكون صالحاً")
-    if email and s.scalar(select(User).where(User.email==email)): raise HTTPException(409,"البريد الإلكتروني مستخدم لحساب آخر")
-    nu=User(username=payload.username,full_name=payload.full_name,email=email,email_verified=True,password_hash=password_hash.hash(payload.password),role="employee")
-    nu.permissions={}; s.add(nu); s.flush(); audit(s,u,"user_created","user",nu.id,{"username":nu.username},request); s.commit(); return {"id":nu.id,"username":nu.username}
+    if s.scalar(select(User).where(User.email==email,User.deleted.is_(False))): raise HTTPException(409,"البريد الإلكتروني مستخدم لحساب نشط")
+    nu=User(username=payload.username,full_name=payload.full_name,email=email,email_verified=False,password_hash=password_hash.hash(payload.password),role="employee")
+    nu.permissions={}; s.add(nu); s.flush()
+    code=f"{secrets.randbelow(1000000):06d}"
+    approval=EmployeeEmailApproval(user_id=nu.id,code_hash=password_hash.hash(code),expires_at=datetime.now(timezone.utc)+timedelta(minutes=15))
+    s.add(approval)
+    try:
+        send_aib_email(email,"رمز تأكيد حساب الموظف – مجموعة AIB",
+            f"مرحباً {nu.full_name}، رمز تأكيد بريدك لتفعيل حساب AIB هو: {code}\\nأرسل الرمز إلى مسؤول الشركة عبر قناة واتساب الرسمية. الرمز صالح 15 دقيقة ولمرة واحدة.",
+            f"""<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><body style="margin:0;background:#f2f5f7;padding:24px;font-family:Tahoma,Arial"><div style="max-width:520px;margin:auto;background:white;border:1px solid #e4eaf0;border-radius:16px;overflow:hidden"><header style="background:#172b3b;color:white;text-align:center;padding:22px"><b style="font-size:28px">AIB</b><div>مجموعة AIB التجارية</div></header><main style="padding:28px;text-align:center;color:#243342"><h2>تأكيد البريد الإلكتروني</h2><p>مرحباً {html.escape(nu.full_name)}، أرسل هذا الرمز إلى مسؤول الشركة عبر واتساب لإكمال تفعيل حسابك.</p><div style="font-size:34px;letter-spacing:9px;font-weight:bold;color:#168447;background:#f1f7f3;border:1px dashed #168447;border-radius:12px;padding:18px">{code}</div><p>صالح لمدة 15 دقيقة ولمرة واحدة.</p><small>لا تشارك الرمز مع أي شخص غير مسؤول الشركة.</small></main></div></body></html>""")
+    except Exception:
+        s.rollback(); raise HTTPException(503,"تعذر إرسال رمز التأكيد إلى بريد الموظف. لم يتم إنشاء الحساب.")
+    audit(s,u,"user_created_pending_email_approval","user",nu.id,{"username":nu.username},request); s.commit()
+    return {"id":nu.id,"username":nu.username,"email":email,"email_verified":False,"approval_required":True}
+class EmployeeEmailApprovalPayload(BaseModel):
+    code:str=Field(min_length=6,max_length=6)
+
+@app.post("/users/{user_id}/confirm-email")
+def approve_employee_email(user_id:int,p:EmployeeEmailApprovalPayload,request:Request,s:Session=Depends(db),u:User=Depends(manager)):
+    target=s.get(User,user_id)
+    if not target or target.deleted or target.role=="owner": raise HTTPException(404,"الموظف غير موجود")
+    if target.email_verified: return {"ok":True,"email_verified":True}
+    row=s.scalar(select(EmployeeEmailApproval).where(EmployeeEmailApproval.user_id==user_id,EmployeeEmailApproval.used_at.is_(None)).order_by(EmployeeEmailApproval.id.desc()))
+    now=datetime.now(timezone.utc)
+    if not row or row.expires_at<now: raise HTTPException(400,"رمز التأكيد منتهي. أعد إنشاء الحساب أو اطلب رمزاً جديداً.")
+    if row.attempts>=5: raise HTTPException(429,"تم تجاوز محاولات الرمز. يلزم إصدار رمز جديد.")
+    if not password_hash.verify(p.code,row.code_hash):
+        row.attempts+=1;s.commit();raise HTTPException(400,"رمز تأكيد البريد غير صحيح")
+    row.used_at=now;target.email_verified=True
+    audit(s,u,"employee_email_confirmed_by_owner","user",target.id,{"email":target.email},request);s.commit()
+    return {"ok":True,"email_verified":True,"username":target.username}
+
 class UserPermissionsPayload(BaseModel):
     permissions: dict
 @app.patch("/users/{user_id}/permissions")
@@ -797,6 +836,9 @@ def delete_user(user_id:int, request:Request, s:Session=Depends(db), u:User=Depe
     target.active=False
     target.deleted=True
     target.locked_until=None
+    # Release the unique email so a newly created employee can reuse it.
+    target.email=None
+    target.email_verified=False
     s.commit()
     return {"ok":True,"deleted_id":user_id}
 
