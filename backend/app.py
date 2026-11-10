@@ -700,7 +700,7 @@ def review_password_change_request(request_id:int, approve:bool, request:Request
         notify_account_change(target.email,"تم اعتماد تغيير كلمة المرور من قبل المالك")
     return {"status":row.status}
 
-class UserCreate(BaseModel): username:str=Field(min_length=3,max_length=80); full_name:str=Field(min_length=2,max_length=160); email:str=Field(min_length=5,max_length=254); email_confirm:str=Field(min_length=5,max_length=254); password:str=Field(min_length=12); role:str="employee"
+class UserCreate(BaseModel): username:str=Field(min_length=3,max_length=80); full_name:str=Field(min_length=2,max_length=160); email:str=Field(min_length=5,max_length=254); email_confirm:str|None=None; password:str=Field(min_length=12); role:str="employee"
 class CompanyProfilePayload(BaseModel):
     data: dict
 
@@ -756,8 +756,6 @@ def add_user(payload:UserCreate, request:Request, s:Session=Depends(db), u:User=
     if payload.role not in ("employee","owner"): raise HTTPException(400,"دور غير صالح")
     if s.scalar(select(User).where(User.username==payload.username)): raise HTTPException(409,"اسم المستخدم مستخدم")
     email=(payload.email or "").strip().lower()
-    email_confirm=(payload.email_confirm or "").strip().lower()
-    if email!=email_confirm: raise HTTPException(400,"البريد الإلكتروني وتأكيده غير متطابقين")
     if (not email) or ("@" not in email) or ("." not in email.rsplit("@",1)[-1]) or len(email)>254: raise HTTPException(400,"البريد الإلكتروني مطلوب ويجب أن يكون صالحاً")
     if s.scalar(select(User).where(User.email==email,User.deleted.is_(False))): raise HTTPException(409,"البريد الإلكتروني مستخدم لحساب نشط")
     # Older soft-deleted accounts may still hold the unique email value.
