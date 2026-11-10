@@ -283,12 +283,13 @@ function vehicleContractHtml(r,d,total,currency,paid,remaining,date){
  const p=d.company_party_snapshot||companyProfile||{};
  const own=contractProfileRows(p);
  const isSale=r.section==='carSale';
+ const isAli10Contract=String(me?.username||'').trim().toLowerCase()==='ali10';
  const seller=isSale?contractParty('البائع – صاحب الشركة',own):contractParty('البائع – الطرف الآخر',contractOtherRows('seller',d));
  const buyer=isSale?contractParty('المشتري – الطرف الآخر',contractOtherRows('buyer',d)):contractParty('المشتري – صاحب الشركة',own);
  const vehicle=[['الشركة المصنعة',d.car_make],['الطراز / الفئة',d.car_model],['سنة الصنع',d.car_year],['رقم الشاسيه VIN',d.car_vin],['رقم المحرك',d.car_engine_no],['رقم اللوحة',d.car_plate],['اللون',d.car_color],['قراءة العداد (كم)',d.car_odometer],['بلد المنشأ / الاستيراد',d.car_origin],['حالة السيارة',d.car_condition],['رقم وثيقة الملكية / التسجيل',d.car_document_no],['مكان التسليم',d.car_delivery_place],['نتيجة الفحص والملاحظات',d.car_inspection]].filter(x=>String(x[1]??'').trim()!=='');
  const vehicleHtml=vehicle.map(([k,v])=>'<div class="vc-field"><b>'+esc(k)+'</b><span>'+esc(String(v||'—'))+'</span></div>').join('');
  return '<div class="vc-inner" dir="rtl">'+
- '<div class="vc-top"><div class="vc-brand"><img src="/aib-logo.webp?v=aib-original-full-20261108" alt="AIB" style="display:block;width:30mm;height:auto;max-height:16mm;object-fit:contain;margin:auto auto 1mm">AIB <span>GROUP</span></div><div><div class="vc-kicker">مجموعة AIB التجارية</div><h1>عقد '+(isSale?'بيع':'شراء')+' سيارة</h1><div class="vc-sub">وثيقة اتفاق وتوثيق بيانات المركبة والطرفين</div></div><div class="vc-number">رقم الفاتورة<br><b class="invoice-code-print">'+esc(r.invoice_no||'—')+'</b><br><small>التاريخ: '+esc(d.car_deal_date||date)+'</small></div></div>'+
+ '<div class="vc-top"><div class="vc-brand"><img src="/aib-logo.webp?v=aib-original-full-20261108" alt="AIB" style="display:block;width:30mm;height:auto;max-height:16mm;object-fit:contain;margin:auto auto 1mm">AIB <span>GROUP</span></div><div><div class="vc-kicker">'+(isAli10Contract?'مجموعة AIB – شركة الإبراهيم':'مجموعة AIB التجارية')+'</div><h1>عقد '+(isSale?'بيع':'شراء')+' سيارة</h1><div class="vc-sub">وثيقة اتفاق وتوثيق بيانات المركبة والطرفين</div></div><div class="vc-number">رقم الفاتورة<br><b class="invoice-code-print">'+esc(r.invoice_no||'—')+'</b><br><small>التاريخ: '+esc(d.car_deal_date||date)+'</small></div></div>'+
  '<div class="vc-intro">في تاريخ <b>'+esc(d.car_deal_date||date)+'</b> اتفق الطرفان المبيّنة بياناتهما أدناه على '+(isSale?'بيع':'شراء')+' المركبة وفق البيانات والشروط الواردة في هذا العقد.</div>'+
  '<section class="vc-section"><h2><span>01</span> بيانات السيارة</h2><div class="vc-vehicle">'+vehicleHtml+'</div></section>'+
  '<section class="vc-section"><h2><span>02</span> بيانات طرفي العقد</h2><div class="vc-parties">'+seller+buyer+'</div></section>'+
@@ -296,7 +297,7 @@ function vehicleContractHtml(r,d,total,currency,paid,remaining,date){
  '<div class="vc-terms"><b>الإقرار والشروط:</b> يقر الطرفان بصحة البيانات الواردة في هذا العقد، وبأنهما عاينا السيارة أو أتيحت لهما فرصة معاينتها. يتعهد البائع بتسليم السيارة ووثائقها المتاحة، ويتعهد المشتري بتسديد المتبقي وفق الاتفاق. ولا يُعتد بأي شرط إضافي ما لم يدوّن خطياً ويوقّع عليه الطرفان.<br><b>مكان التسليم:</b> '+esc(d.car_delivery_place||'—')+'　 <b>ملاحظات وشروط إضافية:</b> '+esc(d.notes||'لا يوجد')+'</div>'+
  '<div class="vc-signatures"><div class="vc-sign"><h3>البائع</h3><div class="vc-line">الاسم: '+esc((isSale?[p.first_name,p.last_name].filter(Boolean).join(' '):d.seller_full_name||d.customer)||'')+'</div><div class="vc-line">التوقيع: <span></span></div><div class="vc-fingerprint"><small>بصمة البائع</small></div></div><div class="vc-sign"><h3>المشتري</h3><div class="vc-line">الاسم: '+esc((isSale?([d.buyer_first_name,d.buyer_last_name].filter(Boolean).join(' ')||d.buyer_full_name||d.customer):[p.first_name,p.last_name].filter(Boolean).join(' '))||'')+'</div><div class="vc-line">التوقيع: <span></span></div><div class="vc-fingerprint"><small>بصمة المشتري</small></div></div></div>'+
  '<div class="vc-witness"><span>الشاهد الأول: __________________________</span><span>الشاهد الثاني: __________________________</span><span>تاريخ التوقيع: ______________</span></div>'+
- '<div class="vc-foot"><span>مجموعة AIB التجارية</span><span>عقد داخلي – يحتفظ كل طرف بنسخة</span></div></div>';
+ '<div class="vc-foot"><span>'+(isAli10Contract?'مجموعة AIB – شركة الإبراهيم · 0944554074':'مجموعة AIB التجارية')+'</span><span>عقد داخلي – يحتفظ كل طرف بنسخة</span></div></div>';
 }
 async function printRecord(id){
  if(!hasPerm('invoices','print')){aibAlert('ليس لديك إذن طباعة الفواتير');return}
