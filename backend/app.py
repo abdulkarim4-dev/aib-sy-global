@@ -760,6 +760,10 @@ def add_user(payload:UserCreate, request:Request, s:Session=Depends(db), u:User=
     if email!=email_confirm: raise HTTPException(400,"البريد الإلكتروني وتأكيده غير متطابقين")
     if (not email) or ("@" not in email) or ("." not in email.rsplit("@",1)[-1]) or len(email)>254: raise HTTPException(400,"البريد الإلكتروني مطلوب ويجب أن يكون صالحاً")
     if s.scalar(select(User).where(User.email==email,User.deleted.is_(False))): raise HTTPException(409,"البريد الإلكتروني مستخدم لحساب نشط")
+    # Older soft-deleted accounts may still hold the unique email value.
+    for archived in s.scalars(select(User).where(User.email==email,User.deleted.is_(True))).all():
+        archived.email=None
+        archived.email_verified=False
     nu=User(username=payload.username,full_name=payload.full_name,email=email,email_verified=False,password_hash=password_hash.hash(payload.password),role="employee")
     nu.permissions={}; s.add(nu); s.flush()
     code=f"{secrets.randbelow(1000000):06d}"
