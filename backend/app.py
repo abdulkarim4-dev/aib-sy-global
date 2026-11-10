@@ -1561,8 +1561,9 @@ def review_online_purchase_order(order_id:int,p:OnlineOrderReviewPayload,s:Sessi
     if p.action=="reject":
         order.status="rejected";order.review_note=p.note or "إثبات الدفع غير مقبول";order.reviewed_by=u.id;order.reviewed_at=datetime.now(timezone.utc);s.commit()
         customer_email=(order.customer_data or {}).get("email")
-        send_notification_email(customer_email,f"تحديث طلب الشراء #{order.id} - AIB",
-            f"تمت مراجعة طلب الشراء رقم #{order.id} ولم تتم الموافقة على إثبات الدفع.\nملاحظة الإدارة: {order.review_note}")
+        rejection_body=f"تمت مراجعة طلب الشراء رقم #{order.id} ولم تتم الموافقة على إثبات الدفع.\\nملاحظة الإدارة: {order.review_note}"
+        rejection_html=aib_email_html(f"تحديث حالة الطلب #{order.id}","نأسف لإبلاغك بأنه لم تتم الموافقة على إثبات الدفع المرفق. يرجى مراجعة الملاحظة أدناه والتواصل مع فريق AIB عند الحاجة.",[("رقم الطلب",f"#{order.id}"),("الحالة","لم تتم الموافقة على إثبات الدفع"),("ملاحظة الإدارة",html.escape(order.review_note))],accent="#b94a48",note="يمكنك التواصل مع فريقنا لتوضيح سبب الرفض قبل إعادة إرسال الطلب.")
+        send_notification_email(customer_email,f"تحديث طلب الشراء #{order.id} - مجموعة AIB",rejection_body,rejection_html)
         return {"ok":True,"status":"rejected"}
     if p.action!="approve": raise HTTPException(400,"إجراء غير صالح")
     allocated_items=[]
@@ -1591,8 +1592,9 @@ def review_online_purchase_order(order_id:int,p:OnlineOrderReviewPayload,s:Sessi
     audit(s,u,"online_order_approved","online_purchase_order",order.id,{"record_id":record.id,"invoice_no":record.invoice_no,"payment_method":"sham_cash"},request=None)
     s.commit()
     customer_email=(order.customer_data or {}).get("email")
-    send_notification_email(customer_email,f"تم اعتماد طلب الشراء #{order.id} - AIB",
-        f"تم اعتماد طلب الشراء رقم #{order.id} بعد مراجعة إثبات الدفع.\nرقم فاتورة المبيع: {record.invoice_no}\nالإجمالي: {float(order.total):.2f} {order.currency}")
+    approval_body=f"تم اعتماد طلب الشراء رقم #{order.id} بعد مراجعة إثبات الدفع.\\nرقم فاتورة المبيع: {record.invoice_no}\\nالإجمالي: {float(order.total):.2f} {order.currency}"
+    approval_html=aib_email_html("تم اعتماد طلبك بنجاح",f"مرحباً {(order.customer_data or {}).get('full_name','')}، تمت مراجعة إثبات الدفع واعتماد طلبك. شكراً لثقتك بمجموعة AIB.",[("رقم الطلب",f"#{order.id}"),("رقم الفاتورة",html.escape(record.invoice_no)),("الإجمالي",f"{float(order.total):.2f} {html.escape(order.currency)}"),("الحالة","تم اعتماد الطلب")],accent="#168447",note="احتفظ برقم الفاتورة لمتابعة طلبك. سيقوم فريقنا بالتواصل معك بشأن التسليم.")
+    send_notification_email(customer_email,f"تم اعتماد طلب الشراء #{order.id} - مجموعة AIB",approval_body,approval_html)
     return {"ok":True,"status":"approved","record_id":record.id,"invoice_no":record.invoice_no,"customer":order.customer_data}
 
 @app.get("/public/products")
