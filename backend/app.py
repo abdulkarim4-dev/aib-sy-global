@@ -356,6 +356,9 @@ class AccountingLoginConfirmPayload(BaseModel):
     challenge_id:int
     code:str=Field(min_length=6,max_length=6)
 
+class AccountingLoginResendPayload(BaseModel):
+    challenge_id:int
+
 def accounting_login_user_payload(u:User):
     return {"id":u.id,"username":u.username,"name":u.full_name,"email":u.email,"role":u.role,"permissions":u.permissions or {}}
 
@@ -393,6 +396,26 @@ def login(form:OAuth2PasswordRequestForm=Depends(), request:Request=None, s:Sess
         return {"requires_email_code":True,"challenge_id":challenge.id,"masked_email":masked_email(u.email),"expires_in":600}
     audit(s,u,"login","user",u.id,{"method":"password"},request); s.commit()
     return {"access_token":token_for(u),"token_type":"bearer","user":accounting_login_user_payload(u)}
+
+@app.post("/auth/login/resend")
+def resend_accounting_login_code(p:AccountingLoginResendPayload,request:Request,s:Session=Depends(db)):
+    now=datetime.now(timezone.utc)
+    previous=s.get(AccountingLoginVerification,p.challenge_id)
+    if not previous or previous.used_at: raise HTTPException(400,"طلب التحقق غير صالح. ابدأ تسجيل الدخول من جديد.")
+    u=s.get(User,previous.user_id)
+    if not u or not u.active or u.role=="owner" or not u.email or not u.email_verified: raise HTTPException(403,"الحساب غير مؤهل لتأكيد الدخول")
+    if previous.created_at>now-timedelta(seconds=30): raise HTTPException(429,"انتظر 30 ثانية قبل إعادة إرسال الرمز.")
+    code=f"{secrets.randbelow(1000000):06d}"
+    challenge=AccountingLoginVerification(user_id=u.id,code_hash=password_hash.hash(code),expires_at=now+timedelta(minutes=10))
+    s.add(challenge);s.flush()
+    try:
+        send_aib_email(u.email,"رمز الدخول إلى المحاسبة – مجموعة AIB",
+            f"رمز الدخول الجديد هو: {code}\\nصالح لمدة 10 دقائق ولمرة واحدة فقط.",
+            f"""<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><body style="margin:0;background:#f2f5f7;padding:24px;font-family:Tahoma,Arial"><div style="max-width:520px;margin:auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e4eaf0"><div style="background:#172b3b;padding:22px;text-align:center;color:#fff"><b style="font-size:27px">AIB</b><div>مجموعة AIB التجارية</div></div><div style="padding:28px;text-align:center;color:#243342"><h2>رمز دخول جديد</h2><div style="font-size:32px;letter-spacing:8px;font-weight:900;color:#168447;background:#f1f7f3;border:1px dashed #168447;border-radius:12px;padding:18px">{code}</div><p style="color:#697887">صالح لمدة 10 دقائق ولمرة واحدة فقط.</p></div></div></body></html>""")
+    except Exception:
+        s.rollback();raise HTTPException(503,"تعذر إرسال الرمز. حاول لاحقاً.")
+    audit(s,u,"accounting_login_code_resent","user",u.id,{"challenge_id":challenge.id},request);s.commit()
+    return {"ok":True,"challenge_id":challenge.id,"masked_email":masked_email(u.email),"expires_in":600}
 
 @app.post("/auth/login/confirm")
 def confirm_accounting_login(p:AccountingLoginConfirmPayload,request:Request,s:Session=Depends(db)):
