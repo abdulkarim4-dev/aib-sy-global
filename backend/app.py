@@ -138,6 +138,7 @@ class InventoryProduct(Base):
     consigned_stock: Mapped[Any]=mapped_column(Numeric(18,3), default=0)
     active: Mapped[bool]=mapped_column(Boolean, default=True)
     images: Mapped[list]=mapped_column(JSON, default=list, nullable=False)
+    shipping_included: Mapped[bool]=mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
 
 class InvoicePayment(Base):
@@ -281,6 +282,7 @@ def startup():
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted BOOLEAN NOT NULL DEFAULT FALSE"))
         conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_email_unique ON users (email) WHERE email IS NOT NULL"))
         conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS images JSONB NOT NULL DEFAULT '[]'::jsonb"))
+        conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS shipping_included BOOLEAN NOT NULL DEFAULT FALSE"))
         conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS first_name VARCHAR(80) NOT NULL DEFAULT ''"))
         conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS last_name VARCHAR(80) NOT NULL DEFAULT ''"))
         conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS shipping_address TEXT NOT NULL DEFAULT ''"))
@@ -807,10 +809,22 @@ def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=
             price=float(item.get("price") or 0)
             if sku and price>0 and sku not in latest_purchase:
                 latest_purchase[sku]={"purchase_price":round(price,2),"sale_price":round(price*1.35,2),"currency":currency}
-    return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owned_stock":float(p.owned_stock or 0),"consigned_stock":float(p.consigned_stock or 0),"images":p.images or [],**latest_purchase.get(p.sku,{"purchase_price":0,"sale_price":0,"currency":"—"})} for p in rows]
+    return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owned_stock":float(p.owned_stock or 0),"consigned_stock":float(p.consigned_stock or 0),"images":p.images or [],"shipping_included":bool(p.shipping_included),**latest_purchase.get(p.sku,{"purchase_price":0,"sale_price":0,"currency":"—"})} for p in rows]
 
 class InventoryImagesPayload(BaseModel):
     images: list[str] = Field(default_factory=list, max_length=20)
+
+class InventoryShippingPayload(BaseModel):
+    included: bool = False
+
+@app.put("/inventory/products/{product_id}/shipping")
+def update_inventory_product_shipping(product_id:int, p:InventoryShippingPayload, request:Request, s:Session=Depends(db), u:User=Depends(require_permission("inventory","edit"))):
+    product=s.get(InventoryProduct,product_id)
+    if not product or not product.active: raise HTTPException(404,"القطعة غير موجودة في المخزون")
+    product.shipping_included=bool(p.included)
+    audit(s,u,"inventory_shipping_updated","inventory_product",product.id,{"sku":product.sku,"shipping_included":product.shipping_included},request)
+    s.commit()
+    return {"ok":True,"shipping_included":product.shipping_included}
 
 @app.put("/inventory/products/{product_id}/images")
 def update_inventory_product_images(product_id:int, p:InventoryImagesPayload, request:Request, s:Session=Depends(db), u:User=Depends(require_permission("inventory","edit"))):
@@ -1630,7 +1644,7 @@ def public_products(q:Optional[str]=None, category:Optional[str]=None, s:Session
         # Keep the N20 engine visible as an out-of-stock catalog item; do not expose other zero-stock items.
         if stock <= 0 and (p.model or "").strip().upper() != "N20B20B": continue
         price=latest_purchase.get(p.sku,{})
-        out.append({"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"category":cat,"stock":stock,"images":p.images or [],"sale_price":price.get("sale_price"),"currency":price.get("currency","")})
+        out.append({"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"category":cat,"stock":stock,"images":p.images or [],"shipping_included":bool(p.shipping_included),"sale_price":price.get("sale_price"),"currency":price.get("currency","")})
     return out
 
 # Serve the connected responsive web app from the same origin as the API.
