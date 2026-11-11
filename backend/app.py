@@ -6,11 +6,12 @@ from urllib.request import Request as UrlRequest, urlopen
 from urllib.error import HTTPError, URLError
 import jwt
 from fastapi import FastAPI, Depends, HTTPException, Request, status
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
 from pwdlib import PasswordHash
-from sqlalchemy import create_engine, String, Boolean, DateTime, Integer, ForeignKey, JSON, Text, Numeric, select, func, text, or_
+from sqlalchemy import create_engine, String, Boolean, DateTime, Integer, ForeignKey, JSON, Text, Numeric, select, func, text, or_, case
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker, Session
 
 class Settings(BaseSettings):
@@ -243,6 +244,7 @@ class AuditEvent(Base):
 password_hash=PasswordHash.recommended()
 oauth=OAuth2PasswordBearer(tokenUrl="/auth/login")
 app=FastAPI(title="AIB Accounting API", version="1.0.0")
+app.add_middleware(GZipMiddleware, minimum_size=900, compresslevel=5)
 
 def db():
     s=SessionLocal()
@@ -339,15 +341,15 @@ def startup():
                 if not row.invoice_no:
                     row.invoice_no=f"{code}-{serial:05d}-B"
         s.commit()
-    with SessionLocal() as s:
-        for move in s.scalars(select(CashMove).where(CashMove.box_name=="صندوق مبيع الأمانة")).all():
-            move.box_name="صندوق الأمانة"
-        for payment in s.scalars(select(InvoicePayment).where(InvoicePayment.cash_box=="صندوق مبيع الأمانة")).all():
-            payment.cash_box="صندوق الأمانة"
-        for record in s.scalars(select(Record)).all():
-            if isinstance(record.data,dict) and record.data.get("cash_box")=="صندوق مبيع الأمانة":
-                record.data={**record.data,"cash_box":"صندوق الأمانة"}
-        s.commit()
+    # One-time legacy cash-box rename using set-based SQL instead of loading every row.
+    with engine.begin() as conn:
+        conn.execute(text("UPDATE cash_moves SET box_name=:new WHERE box_name=:old"), {"new":"صندوق الأمانة","old":"صندوق مبيع الأمانة"})
+        conn.execute(text("UPDATE invoice_payments SET cash_box=:new WHERE cash_box=:old"), {"new":"صندوق الأمانة","old":"صندوق مبيع الأمانة"})
+        conn.execute(text("""
+            UPDATE records
+            SET data = jsonb_set(data::jsonb, '{cash_box}', to_jsonb(CAST(:new AS text)))::json
+            WHERE data->>'cash_box' = :old
+        """), {"new":"صندوق الأمانة","old":"صندوق مبيع الأمانة"})
     with engine.begin() as conn:
         conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS transfer_group VARCHAR(36)"))
         conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS voided BOOLEAN NOT NULL DEFAULT FALSE"))
@@ -943,20 +945,33 @@ def recalculate_inventory(s:Session):
         product.owned_stock=max(0,owned)
         product.consigned_stock=max(0,consigned)
 
-def latest_inventory_store_categories(s:Session)->dict:
-    """Read storefront placement from latest purchase/consignment intake item JSON."""
-    latest={}
-    rows=s.scalars(select(Record).where(Record.deleted.is_(False),Record.section.in_(["purchase","deposit"])).order_by(Record.created_at.desc(),Record.id.desc())).all()
+def latest_store_catalog_data(s:Session)->tuple[dict,dict]:
+    """Build latest storefront categories and prices in one history scan."""
+    latest_categories={}
+    latest_prices={}
+    allowed={"car":{"cars","car_parts","car_engines","car_engine_parts"},"truck":{"trucks","truck_parts","truck_engines","truck_engine_parts"},"heavy":{"heavy","heavy_parts","heavy_engines","heavy_engine_parts"},"agri":{"agri","agri_parts","agri_engines","agri_engine_parts"}}
+    rows=s.scalars(select(Record).where(
+        Record.deleted.is_(False),
+        Record.section.in_(["purchase","deposit"])
+    ).order_by(Record.created_at.desc(),Record.id.desc())).all()
     for record in rows:
         for item in (record.data or {}).get("items",[]):
             if not isinstance(item,dict): continue
             sku=str(item.get("sku") or "").strip().upper()
-            family=str(item.get("store_family") or "").strip()
-            category=str(item.get("store_category") or "").strip()
-            allowed={"car":{"cars","car_parts","car_engines","car_engine_parts"},"truck":{"trucks","truck_parts","truck_engines","truck_engine_parts"},"heavy":{"heavy","heavy_parts","heavy_engines","heavy_engine_parts"},"agri":{"agri","agri_parts","agri_engines","agri_engine_parts"}}
-            if sku and category in allowed.get(family,set()):
-                latest.setdefault(sku,{"store_family":family,"store_category":category})
-    return latest
+            if not sku: continue
+            if record.section=="purchase" and sku not in latest_prices:
+                price=float(item.get("price") or 0)
+                if price>0:
+                    latest_prices[sku]={"purchase_price":round(price,2),"sale_price":round(price*1.35,2),"currency":record.currency or "USD"}
+            if sku not in latest_categories:
+                family=str(item.get("store_family") or "").strip()
+                category=str(item.get("store_category") or "").strip()
+                if category in allowed.get(family,set()):
+                    latest_categories[sku]={"store_family":family,"store_category":category}
+    return latest_categories,latest_prices
+
+def latest_inventory_store_categories(s:Session)->dict:
+    return latest_store_catalog_data(s)[0]
 
 @app.get("/inventory/products")
 def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=Depends(require_permission("inventory","view"))):
@@ -965,18 +980,7 @@ def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=
         term=f"%{q.strip()}%"
         query=query.where(or_(InventoryProduct.sku.ilike(term),InventoryProduct.name.ilike(term),InventoryProduct.model.ilike(term)))
     rows=s.scalars(query.order_by(InventoryProduct.sku).limit(300)).all()
-    store_categories=latest_inventory_store_categories(s)
-    latest_purchase={}
-    purchase_records=s.scalars(select(Record).where(Record.section=="purchase",Record.deleted.is_(False)).order_by(Record.created_at.desc(),Record.id.desc())).all()
-    for record in purchase_records:
-        currency=record.currency or "USD"
-        for item in (record.data or {}).get("items",[]):
-            if not isinstance(item,dict):
-                continue
-            sku=str(item.get("sku") or "").strip().upper()
-            price=float(item.get("price") or 0)
-            if sku and price>0 and sku not in latest_purchase:
-                latest_purchase[sku]={"purchase_price":round(price,2),"sale_price":round(price*1.35,2),"currency":currency}
+    store_categories,latest_purchase=latest_store_catalog_data(s)
     return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owned_stock":float(p.owned_stock or 0),"consigned_stock":float(p.consigned_stock or 0),"images":p.images or [],"shipping_included":bool(p.shipping_included),**store_categories.get(p.sku,{}),**latest_purchase.get(p.sku,{"purchase_price":0,"sale_price":0,"currency":"—"})} for p in rows]
 
 class InventoryImagesPayload(BaseModel):
@@ -1031,9 +1035,18 @@ def create_record(p:RecordCreate, request:Request, s:Session=Depends(db), u:User
 def list_records(section:Optional[str]=None, s:Session=Depends(db), u:User=Depends(require_permission("invoices","view"))):
     q=select(Record).where(Record.deleted==False)
     if section: q=q.where(Record.section==section)
+    rows=s.scalars(q.order_by(Record.id.desc())).all()
+    if not rows: return []
+    record_ids=[r.id for r in rows]
+    payments=s.scalars(
+        select(InvoicePayment).where(InvoicePayment.record_id.in_(record_ids)).order_by(InvoicePayment.record_id,InvoicePayment.id)
+    ).all()
+    payments_by_record={}
+    for payment in payments:
+        payments_by_record.setdefault(payment.record_id,[]).append(payment)
     out=[]
-    for r in s.scalars(q.order_by(Record.id.desc())).all():
-        pays=s.scalars(select(InvoicePayment).where(InvoicePayment.record_id==r.id).order_by(InvoicePayment.id)).all()
+    for r in rows:
+        pays=payments_by_record.get(r.id,[])
         total=float(r.data.get("amount",r.data.get("price",r.data.get("sale",0))) or 0)
         paid=sum(float(x.amount) for x in pays)
         out.append({"id":r.id,"section":r.section,"invoice_no":r.invoice_no,"currency":r.currency,"data":r.data,"created_by":r.created_by,"created_at":r.created_at,"updated_at":r.updated_at,"payments":[{"id":x.id,"amount":float(x.amount),"method":x.method,"cash_box":x.cash_box,"paid_at":x.paid_at} for x in pays],"paid_total":round(paid,2),"remaining":round(max(total-paid,0),2),"payment_status":"paid" if total>0 and paid>=total else "partial" if paid>0 else "unpaid"})
@@ -1400,12 +1413,17 @@ def my_requests(s:Session=Depends(db),u:User=Depends(current_user)):
 
 @app.get("/cash-summary")
 def cash_summary(s:Session=Depends(db),u:User=Depends(require_permission("cash","view"))):
-    rows=s.scalars(select(CashMove).where(CashMove.voided.is_(False))).all(); out={}
-    for m in rows:
-        key=f"{m.box_name}|{m.currency}"
-        sign=1 if m.movement in ("deposit","transfer_in") else -1
-        out[key]=out.get(key,0)+sign*float(m.amount)
-    return [{"box_name":k.rsplit("|",1)[0],"currency":k.rsplit("|",1)[1],"balance":v} for k,v in out.items()]
+    rows=s.execute(
+        select(
+            CashMove.box_name,
+            CashMove.currency,
+            func.sum(case(
+                (CashMove.movement.in_(("deposit","transfer_in")),CashMove.amount),
+                else_=-CashMove.amount
+            )).label("balance")
+        ).where(CashMove.voided.is_(False)).group_by(CashMove.box_name,CashMove.currency)
+    ).all()
+    return [{"box_name":box_name,"currency":currency,"balance":float(balance or 0)} for box_name,currency,balance in rows]
 
 
 # Public storefront data: read-only aggregates from the live accounting database.
@@ -1767,16 +1785,7 @@ def public_products(q:Optional[str]=None, category:Optional[str]=None, s:Session
         term=f"%{q.strip()}%"
         query=query.where(or_(InventoryProduct.sku.ilike(term),InventoryProduct.name.ilike(term),InventoryProduct.model.ilike(term)))
     rows=s.scalars(query.order_by(InventoryProduct.sku).limit(300)).all()
-    store_categories=latest_inventory_store_categories(s)
-    latest_purchase={}
-    purchase_records=s.scalars(select(Record).where(Record.section=="purchase",Record.deleted.is_(False)).order_by(Record.created_at.desc(),Record.id.desc())).all()
-    for record in purchase_records:
-        for item in (record.data or {}).get("items",[]):
-            if not isinstance(item,dict): continue
-            sku=str(item.get("sku") or "").strip().upper()
-            price=float(item.get("price") or 0)
-            if sku and price>0 and sku not in latest_purchase:
-                latest_purchase[sku]={"sale_price":round(price*1.35,2),"currency":record.currency or "USD"}
+    store_categories,latest_purchase=latest_store_catalog_data(s)
     out=[]
     for p in rows:
         name=(p.name+" "+(p.model or "")).lower()
