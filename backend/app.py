@@ -902,6 +902,8 @@ def prepare_record_inventory(s:Session, section:str, raw_data:dict, allow_legacy
         family=str(item.get("store_family") or "").strip()
         category=str(item.get("store_category") or "").strip()
         allowed={"car":{"cars","car_parts","car_engines","car_engine_parts"},"truck":{"trucks","truck_parts","truck_engines","truck_engine_parts"},"heavy":{"heavy","heavy_parts","heavy_engines","heavy_engine_parts"},"agri":{"agri","agri_parts","agri_engines","agri_engine_parts"}}
+        if section in {"purchase","deposit"} and name and (not family or not category):
+            raise HTTPException(400,"يجب اختيار القسم الرئيسي والقسم الفرعي للمنتج عند الشراء أو وضع الأمانة")
         if family or category:
             if category not in allowed.get(family,set()):
                 raise HTTPException(400,"اختر القسم الرئيسي والفرعي للمنتج بشكل صحيح قبل الحفظ")
