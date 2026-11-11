@@ -1726,6 +1726,11 @@ def create_online_order(p:OnlineOrderPayload,s:Session=Depends(db),customer:Stor
         send_notification_email(admin_email,f"طلب شراء إلكتروني جديد #{order.id} – AIB",admin_body,admin_html)
     return {"ok":True,"order_id":order.id,"customer":data,"items":lines,"total":float(order.total),"currency":order.currency,"status":order.status}
 
+@app.get("/online-purchase-orders/count")
+def count_online_purchase_orders(s:Session=Depends(db),u:User=Depends(manager)):
+    pending=int(s.scalar(select(func.count(OnlinePurchaseOrder.id)).where(OnlinePurchaseOrder.status=="pending")) or 0)
+    return {"pending":pending}
+
 @app.get("/online-purchase-orders")
 def list_online_purchase_orders(s:Session=Depends(db),u:User=Depends(manager)):
     return [{"id":o.id,"customer":o.customer_data,"items":o.items,"total":float(o.total),"currency":o.currency,"payment_proof":o.payment_proof,"proof_type":o.proof_type,"status":o.status,"record_id":o.record_id,"review_note":o.review_note,"created_at":o.created_at} for o in s.scalars(select(OnlinePurchaseOrder).order_by(OnlinePurchaseOrder.id.desc())).all()]
