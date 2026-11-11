@@ -1767,6 +1767,7 @@ def public_products(q:Optional[str]=None, category:Optional[str]=None, s:Session
         term=f"%{q.strip()}%"
         query=query.where(or_(InventoryProduct.sku.ilike(term),InventoryProduct.name.ilike(term),InventoryProduct.model.ilike(term)))
     rows=s.scalars(query.order_by(InventoryProduct.sku).limit(300)).all()
+    store_categories=latest_inventory_store_categories(s)
     latest_purchase={}
     purchase_records=s.scalars(select(Record).where(Record.section=="purchase",Record.deleted.is_(False)).order_by(Record.created_at.desc(),Record.id.desc())).all()
     for record in purchase_records:
