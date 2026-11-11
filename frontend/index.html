@@ -300,6 +300,21 @@ function vehicleContractHtml(r,d,total,currency,paid,remaining,date){
  '<div class="vc-witness"><span>الشاهد الأول: __________________________</span><span>الشاهد الثاني: __________________________</span><span>تاريخ التوقيع: ______________</span></div>'+
  '<div class="vc-foot"><span>'+(isAli10Contract?'مجموعة AIB · شركة الإبراهيم · 0944554074':'مجموعة AIB التجارية')+'</span><span>عقد داخلي – يحتفظ كل طرف بنسخة</span></div></div>';
 }
+async function chooseInvoiceBrand(){
+ if(me?.role!=='owner')return 'default';
+ return new Promise(resolve=>{
+  const root=document.getElementById('aibDialog'),titleEl=document.getElementById('aibDialogTitle'),messageEl=document.getElementById('aibDialogMessage'),actions=document.getElementById('aibDialogActions');
+  titleEl.textContent='اختيار اسم الشركة على الفاتورة';messageEl.textContent='اختر الجهة التي تريد أن تظهر في رأس الفاتورة وختمها، مع بقاء التصميم والمقاسات كما هي.';root.dir='rtl';actions.innerHTML='';
+  const field=document.createElement('select');field.className='aib-dialog-input';field.style.cssText='width:100%;margin:12px 0;padding:12px;border:1px solid #9aaab4;border-radius:10px;background:#fff;color:#243746;font:inherit';
+  [['aab_ibrahim','مجموعة AAB — شركة الإبراهيم لتجارة الشاحنات'],['aab_electrical','مجموعة AAB التجارية — صالة محمد الشيباني للأدوات الكهربائية'],['default','مجموعة AIB التجارية (الاسم الحالي)']].forEach(([value,label])=>{const o=document.createElement('option');o.value=value;o.textContent=label;field.appendChild(o)});
+  messageEl.after(field);
+  const finish=value=>{field.remove();root.classList.add('hidden');document.removeEventListener('keydown',onKey);resolve(value)};
+  const onKey=e=>{if(e.key==='Escape')finish(null);if(e.key==='Enter'){e.preventDefault();finish(field.value)}};
+  const cancel=document.createElement('button');cancel.className='btn secondary';cancel.type='button';cancel.textContent='إلغاء';cancel.onclick=()=>finish(null);actions.appendChild(cancel);
+  const ok=document.createElement('button');ok.className='btn aib-confirm-main';ok.type='button';ok.textContent='متابعة الطباعة';ok.onclick=()=>finish(field.value);actions.appendChild(ok);
+  root.classList.remove('hidden');document.addEventListener('keydown',onKey);field.focus();
+ });
+}
 async function printRecord(id){
  if(!hasPerm('invoices','print')){aibAlert('ليس لديك إذن طباعة الفواتير');return}
  let r=records.find(x=>x.id===id)||(await api('/records')).find(x=>x.id===id);
@@ -310,10 +325,16 @@ async function printRecord(id){
  const payLabels=lang==='en'?{cash:'Cash',baraka_bank:'Bank transfer – Al Baraka Bank',sham_cash:'Sham Cash',syriatel_cash:'Syriatel Cash'}:PAYMENT_LABELS;
  const companyAddress=lang==='en'?'Aleppo – Bab Al-Hawa Road, Kafr Karmain area, 150 meters south of Al-Shamal and Al-Janoubi fuel station, on the right side of the road towards Aleppo':'طريق حلب – باب الهوى، منطقة كفر كرمين، جنوب كازية السلام والجنوبي، مئة وخمسين متراً على يمين الطريق باتجاه حلب';
  const isAli10Invoice=String(me?.username||'').trim().toLowerCase()==='ali10';
- if(isAli10Invoice){
-  I.company=lang==='en'?'AIB Group':'مجموعة AIB';
-  I.tagline=lang==='en'?'Al Ibrahim Company – Importing trucks and selling truck spare parts':'شركة الإبراهيم لاستيراد الشاحنات ومبيع قطع غيار الشاحنات';
-  I.thanks=lang==='en'?'Thank you for choosing AIB Group – Al Ibrahim Company':'نشكركم على ثقتكم بمجموعة AIB – شركة الإبراهيم';
+ const invoiceBrand=me?.role==='owner'?await chooseInvoiceBrand():(isAli10Invoice?'aab_ibrahim':'default');
+ if(!invoiceBrand)return;
+ if(invoiceBrand==='aab_ibrahim'){
+  I.company=lang==='en'?'AAB Group':'مجموعة AAB';
+  I.tagline=lang==='en'?'Al Ibrahim Company for Truck Trading':'شركة الإبراهيم لتجارة الشاحنات';
+  I.thanks=lang==='en'?'Thank you for choosing AAB Group – Al Ibrahim Company':'نشكركم على ثقتكم بمجموعة AAB – شركة الإبراهيم لتجارة الشاحنات';
+ }else if(invoiceBrand==='aab_electrical'){
+  I.company=lang==='en'?'AAB Trading Group':'مجموعة AAB التجارية';
+  I.tagline=lang==='en'?'Mohammad Al-Shaibani Electrical Appliances Showroom':'صالة محمد الشيباني للأدوات الكهربائية';
+  I.thanks=lang==='en'?'Thank you for choosing AAB Trading Group – Mohammad Al-Shaibani Showroom':'نشكركم على ثقتكم بمجموعة AAB التجارية – صالة محمد الشيباني للأدوات الكهربائية';
  }
 
  const total=Number(d.amount??d.price??d.sale??0)||0;
