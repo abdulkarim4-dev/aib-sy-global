@@ -1825,16 +1825,16 @@ def aib_original_logo():
 @app.get("/logos/{filename}", include_in_schema=False)
 def brand_logo(filename: str):
     allowed_logos = {
-        "aib-group.svg",
-        "ibrahim-trucks.svg",
-        "mohamed-alshaibani-home.svg",
+        "aib-group-logo.webp",
+        "ibrahim-trucks-logo.webp",
+        "mohamed-alshaibani-home-appliances-logo.webp",
     }
     if filename not in allowed_logos:
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Logo not found")
     return FileResponse(
         FRONTEND_DIR / "logos" / filename,
-        media_type="image/svg+xml",
+        media_type="image/webp",
         headers={"Cache-Control": "public, max-age=3600"},
     )
 
