@@ -306,7 +306,7 @@ async function chooseInvoiceBrand(){
   const root=document.getElementById('aibDialog'),titleEl=document.getElementById('aibDialogTitle'),messageEl=document.getElementById('aibDialogMessage'),actions=document.getElementById('aibDialogActions');
   titleEl.textContent='اختيار اسم الشركة على الفاتورة';messageEl.textContent='اختر الجهة التي تريد أن تظهر في رأس الفاتورة وختمها، مع بقاء التصميم والمقاسات كما هي.';root.dir='rtl';actions.innerHTML='';
   const field=document.createElement('select');field.className='aib-dialog-input';field.style.cssText='width:100%;margin:12px 0;padding:12px;border:1px solid #9aaab4;border-radius:10px;background:#fff;color:#243746;font:inherit';
-  [['aab_ibrahim','مجموعة AIB — شركة الإبراهيم لتجارة الشاحنات'],['aab_electrical','مجموعة AIB التجارية — صالة محمد الشيباني للأدوات الكهربائية'],['default','مجموعة AIB التجارية (الاسم الحالي)']].forEach(([value,label])=>{const o=document.createElement('option');o.value=value;o.textContent=label;field.appendChild(o)});
+  [['aab_ibrahim','مجموعة AIB — شركة الإبراهيم لتجارة الشاحنات'],['aab_electrical','مجموعة AIB التجارية — صالة محمد الشيباني للأدوات المنزلية'],['default','مجموعة AIB التجارية (الاسم الحالي)']].forEach(([value,label])=>{const o=document.createElement('option');o.value=value;o.textContent=label;field.appendChild(o)});
   messageEl.after(field);
   const finish=value=>{field.remove();root.classList.add('hidden');document.removeEventListener('keydown',onKey);resolve(value)};
   const onKey=e=>{if(e.key==='Escape')finish(null);if(e.key==='Enter'){e.preventDefault();finish(field.value)}};
@@ -334,8 +334,8 @@ async function printRecord(id){
   I.thanks=lang==='en'?'Thank you for choosing AIB Group – Al Ibrahim Company':'نشكركم على ثقتكم بمجموعة AIB – شركة الإبراهيم لتجارة الشاحنات';
  }else if(invoiceBrand==='aab_electrical'){
   I.company=lang==='en'?'AIB Trading Group':'مجموعة AIB التجارية';
-  I.tagline=lang==='en'?'Mohammad Al-Shaibani Electrical Appliances Showroom':'صالة محمد الشيباني للأدوات الكهربائية';
-  I.thanks=lang==='en'?'Thank you for choosing AIB Trading Group – Mohammad Al-Shaibani Showroom':'نشكركم على ثقتكم بمجموعة AIB التجارية – صالة محمد الشيباني للأدوات الكهربائية';
+  I.tagline=lang==='en'?'Mohammad Al-Shaibani Home Appliances Showroom':'صالة محمد الشيباني للأدوات المنزلية';
+  I.thanks=lang==='en'?'Thank you for choosing AIB Trading Group – Mohammad Al-Shaibani Showroom':'نشكركم على ثقتكم بمجموعة AIB التجارية – صالة محمد الشيباني للأدوات المنزلية';
  }
 
  const total=Number(d.amount??d.price??d.sale??0)||0;
