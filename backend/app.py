@@ -899,6 +899,14 @@ def prepare_record_inventory(s:Session, section:str, raw_data:dict, allow_legacy
             if not name: item["description"]=product.name
             if not model: item["model"]=product.model
         item["sku"]=sku
+        family=str(item.get("store_family") or "").strip()
+        category=str(item.get("store_category") or "").strip()
+        allowed={"car":{"cars","car_parts","car_engines","car_engine_parts"},"truck":{"trucks","truck_parts","truck_engines","truck_engine_parts"},"heavy":{"heavy","heavy_parts","heavy_engines","heavy_engine_parts"},"agri":{"agri","agri_parts","agri_engines","agri_engine_parts"}}
+        if section in {"purchase","deposit"} and name and (not family or not category):
+            raise HTTPException(400,"يجب اختيار القسم الرئيسي والقسم الفرعي للمنتج عند الشراء أو وضع الأمانة")
+        if family or category:
+            if category not in allowed.get(family,set()):
+                raise HTTPException(400,"اختر القسم الرئيسي والفرعي للمنتج بشكل صحيح قبل الحفظ")
         prepared.append(item)
     data["items"]=prepared
     return data
@@ -935,6 +943,21 @@ def recalculate_inventory(s:Session):
         product.owned_stock=max(0,owned)
         product.consigned_stock=max(0,consigned)
 
+def latest_inventory_store_categories(s:Session)->dict:
+    """Read storefront placement from latest purchase/consignment intake item JSON."""
+    latest={}
+    rows=s.scalars(select(Record).where(Record.deleted.is_(False),Record.section.in_(["purchase","deposit"])).order_by(Record.created_at.desc(),Record.id.desc())).all()
+    for record in rows:
+        for item in (record.data or {}).get("items",[]):
+            if not isinstance(item,dict): continue
+            sku=str(item.get("sku") or "").strip().upper()
+            family=str(item.get("store_family") or "").strip()
+            category=str(item.get("store_category") or "").strip()
+            allowed={"car":{"cars","car_parts","car_engines","car_engine_parts"},"truck":{"trucks","truck_parts","truck_engines","truck_engine_parts"},"heavy":{"heavy","heavy_parts","heavy_engines","heavy_engine_parts"},"agri":{"agri","agri_parts","agri_engines","agri_engine_parts"}}
+            if sku and category in allowed.get(family,set()):
+                latest.setdefault(sku,{"store_family":family,"store_category":category})
+    return latest
+
 @app.get("/inventory/products")
 def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=Depends(require_permission("inventory","view"))):
     query=select(InventoryProduct).where(InventoryProduct.active.is_(True))
@@ -942,6 +965,7 @@ def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=
         term=f"%{q.strip()}%"
         query=query.where(or_(InventoryProduct.sku.ilike(term),InventoryProduct.name.ilike(term),InventoryProduct.model.ilike(term)))
     rows=s.scalars(query.order_by(InventoryProduct.sku).limit(300)).all()
+    store_categories=latest_inventory_store_categories(s)
     latest_purchase={}
     purchase_records=s.scalars(select(Record).where(Record.section=="purchase",Record.deleted.is_(False)).order_by(Record.created_at.desc(),Record.id.desc())).all()
     for record in purchase_records:
@@ -953,7 +977,7 @@ def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=
             price=float(item.get("price") or 0)
             if sku and price>0 and sku not in latest_purchase:
                 latest_purchase[sku]={"purchase_price":round(price,2),"sale_price":round(price*1.35,2),"currency":currency}
-    return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owned_stock":float(p.owned_stock or 0),"consigned_stock":float(p.consigned_stock or 0),"images":p.images or [],"shipping_included":bool(p.shipping_included),**latest_purchase.get(p.sku,{"purchase_price":0,"sale_price":0,"currency":"—"})} for p in rows]
+    return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owned_stock":float(p.owned_stock or 0),"consigned_stock":float(p.consigned_stock or 0),"images":p.images or [],"shipping_included":bool(p.shipping_included),**store_categories.get(p.sku,{}),**latest_purchase.get(p.sku,{"purchase_price":0,"sale_price":0,"currency":"—"})} for p in rows]
 
 class InventoryImagesPayload(BaseModel):
     images: list[str] = Field(default_factory=list, max_length=20)
@@ -1783,10 +1807,22 @@ def public_products(q:Optional[str]=None, category:Optional[str]=None, s:Session
         elif family=="truck": cat="trucks"
         elif family=="heavy": cat="heavy"
         else: cat="agri"
+        explicit_category=store_categories.get(p.sku,{})
+        if explicit_category:
+            family=explicit_category["store_family"]
+            cat=explicit_category["store_category"]
         if category:
-            # Show each inventory item only in its exact matching store category.
-            # Parent vehicle/equipment categories must not duplicate their engines or spare parts.
-            if cat != category: continue
+            # Preserve legacy landing-page filters while supporting exact shop subcategories.
+            legacy_groups = {
+                "parts": {"car_parts", "car_engine_parts", "truck_parts", "truck_engine_parts", "heavy_parts", "heavy_engine_parts", "agri_parts", "agri_engine_parts"},
+                "engines": {"car_engines", "car_engine_parts", "truck_engines", "truck_engine_parts", "heavy_engines", "heavy_engine_parts", "agri_engines", "agri_engine_parts"},
+                "heavy": {"heavy", "heavy_parts", "heavy_engines", "heavy_engine_parts"},
+            }
+            if category in legacy_groups:
+                if cat not in legacy_groups[category]: continue
+            elif cat != category:
+                # Exact shop subcategories do not duplicate their products into parent categories.
+                continue
         stock=float(p.owned_stock or 0)+float(p.consigned_stock or 0)
         # Keep the N20 engine visible as an out-of-stock catalog item; do not expose other zero-stock items.
         if stock <= 0 and (p.model or "").strip().upper() != "N20B20B": continue
