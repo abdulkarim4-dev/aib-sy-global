@@ -1822,6 +1822,23 @@ def aib_original_logo():
     logo_data = base64.b64decode((FRONTEND_DIR / "aib-logo.webp.b64").read_text(encoding="ascii").strip())
     return Response(content=logo_data, media_type="image/webp", headers={"Cache-Control": "public, max-age=86400"})
 
+@app.get("/logos/{filename}", include_in_schema=False)
+def brand_logo(filename: str):
+    allowed_logos = {
+        "aib-group.svg",
+        "ibrahim-trucks.svg",
+        "mohamed-alshaibani-home.svg",
+    }
+    if filename not in allowed_logos:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Logo not found")
+    return FileResponse(
+        FRONTEND_DIR / "logos" / filename,
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
+
+
 @app.get("/logo.jpg", include_in_schema=False)
 def logo_jpg():
     return FileResponse(FRONTEND_DIR / "logo.jpg", media_type="image/jpeg", headers={"Cache-Control": "public, max-age=3600"})
