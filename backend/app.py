@@ -1828,16 +1828,13 @@ def brand_logo(filename: str):
         "aib-group.svg",
         "ibrahim-trucks.svg",
         "mohamed-alshaibani-home.svg",
-        "aib-group.webp",
-        "ibrahim-trucks.webp",
-        "mohamed-alshaibani-home.webp",
     }
     if filename not in allowed_logos:
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Logo not found")
     return FileResponse(
         FRONTEND_DIR / "logos" / filename,
-        media_type="image/webp" if filename.endswith(".webp") else "image/svg+xml",
+        media_type="image/svg+xml",
         headers={"Cache-Control": "public, max-age=3600"},
     )
 
