@@ -25,3 +25,12 @@
 
 ## Heavy construction equipment
 No complete, independently verified, openly licensed global make/model/generation dataset was identified for excavators, loaders, dozers, graders and related machinery in this update. Existing AIB curated options remain a partial fallback; they are not represented as exhaustive. Do not fill gaps with invented models or generic generation numbers.
+
+
+## Heavy equipment manufacturer directory
+
+Manufacturer names only were referenced from the public SpecCodex Excavators & Compaction directory: https://speccodex.com/grupa/bagger . This is not a redistributed model database and does not provide a complete historical model/generation list. Existing AIB model examples remain partial; missing model names are not fabricated.
+
+## Tractor directory coverage
+
+The updated `tractor-brands.json` contains all 334 manufacturer records in the upstream Open Tractor Data `data/brands.json` snapshot, including farm and lawn tractor categories. The source provides manufacturer-level model counts and year ranges, not the complete individual model-name records.

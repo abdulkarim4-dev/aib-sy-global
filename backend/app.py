@@ -1873,7 +1873,7 @@ def shop_page():
 @app.get("/data/{filename}", include_in_schema=False)
 def public_reference_data(filename: str):
     # Only expose the two curated public reference catalogues; never serve arbitrary files.
-    allowed = {"vehiclesdb-catalog.json", "tractor-brands.json"}
+    allowed = {"vehiclesdb-catalog.json", "tractor-brands.json", "heavy-equipment-brands.json"}
     if filename not in allowed:
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Reference data not found")
