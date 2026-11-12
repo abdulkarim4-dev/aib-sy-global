@@ -1870,6 +1870,23 @@ def shop_page():
         headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0", "Pragma": "no-cache"},
     )
 
+@app.get("/data/{filename}", include_in_schema=False)
+def public_reference_data(filename: str):
+    # Only expose the two curated public reference catalogues; never serve arbitrary files.
+    allowed = {"vehiclesdb-catalog.json", "tractor-brands.json"}
+    if filename not in allowed:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Reference data not found")
+    path = (FRONTEND_DIR / "data" / filename).resolve()
+    if path.parent != (FRONTEND_DIR / "data").resolve() or not path.is_file():
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Reference data not found")
+    return FileResponse(
+        path,
+        media_type="application/json",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
 @app.get("/accounting", include_in_schema=False)
 def accounting_app():
     return FileResponse(FRONTEND_DIR / "index.html")
