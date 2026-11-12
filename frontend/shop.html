@@ -1153,7 +1153,26 @@ function aibCatalogEntries(){
  return [...merged.values()];
 }
 function updateAibModelOptions(){const brand=document.getElementById('aibSearchBrand')?.value||'',sel=document.getElementById('aibSearchModel');if(!sel)return;const entries=aibCatalogEntries().filter(x=>!brand||x.brand===brand);let models=entries.flatMap(x=>x.models).map(x=>x.trim()).filter(Boolean);const current=sel.value;models=[...new Set(models)].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));let html='<option value="">كل الطرازات المتاحة في قاعدة البيانات</option>'+models.map(x=>'<option value="'+esc(x)+'">'+esc(x)+'</option>').join('');if(!models.length&&brand){const count=entries.find(x=>x.modelCount)?.modelCount;html+='<option value="">'+(count?'المصدر يسجل '+fmt(count)+' طرازاً لهذه الشركة، لكن ملف البيانات المفتوح لا يتضمن أسماءها التفصيلية':'لا توجد أسماء طرازات موثقة لهذا المصنع في المصادر الحالية')+'</option>'}sel.innerHTML=html;if(models.includes(current))sel.value=current}
-function updateAibCatalogOptions(){const sel=document.getElementById('aibSearchBrand');if(!sel)return;const current=sel.value;const entries=aibCatalogEntries(),brands=[...new Set(entries.map(x=>x.brand))].sort((a,b)=>a.localeCompare(b));sel.innerHTML='<option value="">كل الشركات المتاحة ('+brands.length+')</option>'+brands.map(x=>'<option value="'+esc(x)+'">'+esc(x)+'</option>').join('');if(brands.includes(current))sel.value=current;updateAibModelOptions();updateAibGenerationOptions()}
+
+function aibLogoSlug(name){
+ const k=String(name||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+ const map={mercedesbenz:'mercedes',volvotrucks:'volvo',landrover:'landrover',mitsubishifuso:'mitsubishi',fordtrucks:'ford',johndeere:'johndeere',caterpillar:'caterpillar',komatsu:'komatsu',newholland:'newholland',masseyferguson:'masseyferguson',ashokleyland:'ashokleyland',sinotruk:'sinotruk',udtrucks:'udtrucks',westernstar:'westernstar',freightliner:'freightliner',peterbilt:'peterbilt',kenworth:'kenworth'};
+ return map[k]||k;
+}
+function renderAibBrandPicker(){
+ const sel=document.getElementById('aibSearchBrand');if(!sel)return;
+ let root=document.getElementById('aibBrandPicker');
+ if(!root){root=document.createElement('div');root.id='aibBrandPicker';root.className='aib-brand-picker';sel.insertAdjacentElement('afterend',root);sel.classList.add('aib-brand-native-select')}
+ const entries=aibCatalogEntries().slice().sort((a,b)=>a.brand.localeCompare(b.brand));
+ const current=sel.value;
+ const logo=(name)=>'<img class="aib-brand-logo" src="https://cdn.simpleicons.org/'+encodeURIComponent(aibLogoSlug(name))+'" alt="" loading="lazy" onerror="this.outerHTML=\'<span class="aib-brand-monogram">'+esc(String(name).slice(0,2).toUpperCase())+'</span>\'">';
+ const chosen=entries.find(x=>x.brand===current);
+ root.innerHTML='<button type="button" class="aib-brand-trigger" aria-expanded="false" onclick="toggleAibBrandPicker()"><span class="aib-brand-current">'+(chosen?logo(chosen.brand):'<span class="aib-brand-monogram">✦</span>')+'<span>'+(chosen?esc(chosen.brand):'كل الشركات المتاحة ('+entries.length+')')+'</span></span><span>⌄</span></button><div class="aib-brand-menu" hidden><input class="aib-brand-filter" type="search" placeholder="ابحث عن الشركة..." oninput="filterAibBrandPicker(this.value)"><div class="aib-brand-options"><button type="button" class="aib-brand-option" onclick="chooseAibBrand(\'\')"><span class="aib-brand-monogram">✦</span>كل الشركات المتاحة</button>'+entries.map(x=>'<button type="button" class="aib-brand-option" data-name="'+esc(x.brand.toLowerCase())+'" onclick="chooseAibBrand('+JSON.stringify(x.brand).replace(/</g,'\\u003c')+')">'+logo(x.brand)+'<span>'+esc(x.brand)+'</span></button>').join('')+'</div></div>';
+}
+function toggleAibBrandPicker(){const m=document.querySelector('#aibBrandPicker .aib-brand-menu'),b=document.querySelector('#aibBrandPicker .aib-brand-trigger');if(!m||!b)return;m.hidden=!m.hidden;b.setAttribute('aria-expanded',String(!m.hidden));if(!m.hidden)m.querySelector('input')?.focus()}
+function filterAibBrandPicker(q){const v=String(q||'').toLowerCase();document.querySelectorAll('#aibBrandPicker .aib-brand-option[data-name]').forEach(b=>b.hidden=!b.dataset.name.includes(v))}
+function chooseAibBrand(v){const s=document.getElementById('aibSearchBrand');if(!s)return;s.value=v;s.dispatchEvent(new Event('change',{bubbles:true}));renderAibBrandPicker();const m=document.querySelector('#aibBrandPicker .aib-brand-menu');if(m)m.hidden=true}
+function updateAibCatalogOptions(){const sel=document.getElementById('aibSearchBrand');if(!sel)return;const current=sel.value;const entries=aibCatalogEntries(),brands=[...new Set(entries.map(x=>x.brand))].sort((a,b)=>a.localeCompare(b));sel.innerHTML='<option value="">كل الشركات المتاحة ('+brands.length+')</option>'+brands.map(x=>'<option value="'+esc(x)+'">'+esc(x)+'</option>').join('');if(brands.includes(current))sel.value=current;renderAibBrandPicker();updateAibModelOptions();updateAibGenerationOptions()}
 async function loadAibReferenceCatalog(){try{const [v,t,h]=await Promise.all([fetch('/data/vehiclesdb-catalog.json',{cache:'force-cache'}),fetch('/data/tractor-brands.json',{cache:'force-cache'}),fetch('/data/heavy-equipment-brands.json',{cache:'force-cache'})]);if(v.ok){const j=await v.json();if(Array.isArray(j.makes))AIB_REMOTE_VEHICLES=j}if(t.ok){const j=await t.json();if(Array.isArray(j.brands))AIB_REMOTE_TRACTORS=j}if(h.ok){const j=await h.json();if(Array.isArray(j.brands))AIB_REMOTE_HEAVY=j}updateAibCatalogOptions();}catch(e){console.warn('AIB reference catalogs could not be loaded:',e)}}
 async function updateAibGenerationOptions(){
  const gen=document.getElementById('aibSearchGeneration'),brand=document.getElementById('aibSearchBrand')?.value||'',model=document.getElementById('aibSearchModel')?.value||'',group=document.getElementById('searchGroup')?.value||'';
@@ -1203,7 +1222,20 @@ function toggleStorePassword(inputId,button){const field=document.getElementById
 .cart-actions{gap:10px!important}.cart-clear{background:#fff!important;color:#566777!important;border:1px solid #d4dee6!important;border-radius:11px!important}.cart-checkout{background:linear-gradient(135deg,#2788bd,#17618e)!important;border:1px solid #17618e!important;border-radius:11px!important;box-shadow:0 6px 16px #17618e25!important}
 @media(max-width:560px){.cart-panel{padding:12px!important}.cart-row{grid-template-columns:minmax(0,1fr) auto!important;gap:9px!important}.cart-product-name{grid-column:1;grid-row:1}.cart-price-block{grid-column:1;grid-row:2;min-width:0}.cart-qty{grid-column:2;grid-row:1}.cart-remove{grid-column:2;grid-row:2;text-align:center}.cart-grand-total{align-items:flex-start;flex-direction:column}.cart-grand-total strong{font-size:20px}.cart-category-total{font-size:11px}}
 </style>
-</body></html>
+
+<style id="aib-brand-picker-premium">
+.aib-vehicle-search label:has(#aibSearchBrand){position:relative;z-index:8}
+.aib-brand-native-select{position:absolute!important;width:1px!important;height:1px!important;opacity:0!important;pointer-events:none!important;clip-path:inset(50%)!important}
+.aib-brand-picker{position:relative;width:100%;direction:rtl}
+.aib-brand-trigger{width:100%;min-height:46px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;border:1px solid #45647b;border-radius:11px;background:linear-gradient(145deg,#172633,#101a23);color:#f5f8fa;font:700 12px Tahoma,Arial,sans-serif;text-align:right;cursor:pointer}
+.aib-brand-current{display:flex;align-items:center;gap:10px;min-width:0}.aib-brand-logo{width:27px;height:27px;object-fit:contain;flex:0 0 27px;padding:4px;border-radius:7px;background:#f5f7f9}
+.aib-brand-monogram{width:27px;height:27px;flex:0 0 27px;display:grid;place-items:center;border-radius:7px;background:linear-gradient(145deg,#315a75,#1b3448);border:1px solid #527d9a;color:#eaf5fc;font-size:10px;font-weight:900}
+.aib-brand-menu{position:absolute;top:calc(100% + 7px);right:0;left:0;z-index:100;border:1px solid #45647b;border-radius:13px;background:#111c26;box-shadow:0 20px 45px #0009;overflow:hidden}
+.aib-brand-menu[hidden]{display:none!important}.aib-brand-filter{width:calc(100% - 18px);margin:9px;padding:10px;border:1px solid #3c566b;border-radius:8px;background:#0c151d;color:#fff;font:12px Tahoma,Arial,sans-serif}
+.aib-brand-options{max-height:250px;overflow:auto;padding:6px}.aib-brand-option{width:100%;display:flex;align-items:center;gap:10px;padding:8px 9px;border:1px solid transparent;border-radius:8px;background:transparent;color:#e6edf2;text-align:right;font:12px Tahoma,Arial,sans-serif;cursor:pointer}
+.aib-brand-option:hover{background:#1c3446;border-color:#345a74}.aib-brand-option[hidden]{display:none!important}
+@media(max-width:700px){.aib-brand-options{max-height:220px}.aib-brand-logo,.aib-brand-monogram{width:25px;height:25px;flex-basis:25px}}
+</style></body></html>
 
 /* AIB premium search card refresh */
 .catalog-tools{position:relative;isolation:isolate;overflow:hidden;padding:clamp(16px,2.4vw,26px)!important;border:1px solid #3c566b!important;border-radius:20px!important;background:radial-gradient(ellipse at 95% 0%,rgba(49,132,190,.16),transparent 36%),linear-gradient(145deg,#1d2b37 0%,#121b24 72%)!important;box-shadow:0 18px 42px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.035)!important}
