@@ -1001,9 +1001,8 @@ body.modal-open{overflow:hidden}
     <button type="button" class="global-market-tab" data-global-category="agri" onclick="setGlobalMarketCategory('agri',this)">🚜 المعدات الزراعية</button>
   </div>
   <div class="global-market-form">
-    <label class="global-market-keyword"><span>ماذا تبحث عنه؟</span><input id="globalMarketQuery" type="search" placeholder="مثال: Toyota Land Cruiser أو Volvo FH أو CAT 320" onkeydown="if(event.key==='Enter'){event.preventDefault();runGlobalMarketSearch()}"></label>
-    <label><span>الماركة</span><input id="globalMarketBrand" type="text" placeholder="Toyota / Volvo / CAT"></label>
-    <label><span>الموديل</span><input id="globalMarketModel" type="text" placeholder="اسم أو رقم الموديل"></label>
+    <label><span>الشركة المصنّعة</span><select id="globalMarketBrand" onchange="updateGlobalMarketModels()"><option value="">اختر الشركة أولاً</option></select></label>
+    <label><span>الطراز / السلسلة</span><select id="globalMarketModel" disabled><option value="">اختر الشركة أولاً</option></select></label>
     <label><span>بلد العرض</span><select id="globalMarketCountry"><option value="">كل دول العالم</option><option>Germany</option><option>Turkey</option><option>Netherlands</option><option>Belgium</option><option>France</option><option>Italy</option><option>United States</option><option>United Kingdom</option><option>United Arab Emirates</option><option>Saudi Arabia</option><option>China</option><option>Japan</option></select></label>
     <label><span>من سنة</span><input id="globalMarketYearFrom" type="number" min="1950" max="2099" placeholder="2015"></label>
     <label><span>إلى سنة</span><input id="globalMarketYearTo" type="number" min="1950" max="2099" placeholder="2026"></label>
@@ -1172,29 +1171,91 @@ function toggleStorePassword(inputId,button){const field=document.getElementById
 <script id="aib-global-market-search-script">
 let aibGlobalMarketCategory='cars';
 const aibGlobalMarketConfig={
- cars:{label:'سيارات للبيع',terms:'cars vehicles for sale',sites:['autoline.info','truck1.eu','mobile.de','autoscout24.com']},
- trucks:{label:'شاحنات للبيع',terms:'trucks lorries tractor units for sale',sites:['autoline.info','truck1.eu']},
- excavators:{label:'حفارات للبيع',terms:'excavators mini excavators crawler excavators for sale',sites:['machineryline.com','truck1.eu','autoline.info']},
- agri:{label:'معدات زراعية للبيع',terms:'agricultural machinery tractors harvesters farm equipment for sale',sites:['agroline.com','truck1.eu','machineryline.com']}
+ cars:{label:'السيارات',terms:'cars vehicles for sale',sites:['mobile.de','autoscout24.com','autoline.info'],brands:{
+ Toyota:['Corolla','Camry','Yaris','RAV4','Land Cruiser','Hilux','Prado','Fortuner','Highlander','Prius'],
+ Mercedes:['A-Class','C-Class','E-Class','S-Class','GLA','GLC','GLE','GLS','G-Class','Sprinter'],
+ BMW:['1 Series','3 Series','5 Series','7 Series','X1','X3','X5','X6','X7'],
+ Volkswagen:['Golf','Passat','Polo','Tiguan','Touareg','T-Roc','Transporter'],
+ Audi:['A3','A4','A6','A8','Q3','Q5','Q7','Q8'],
+ Hyundai:['Accent','Elantra','Sonata','Tucson','Santa Fe','Creta','i10','i20'],
+ Kia:['Picanto','Rio','Cerato','K5','Sportage','Sorento','Seltos'],
+ Nissan:['Sunny','Altima','Sentra','Qashqai','X-Trail','Patrol','Navara'],
+ Ford:['Focus','Fiesta','Mondeo','Kuga','Ranger','Explorer','Transit'],
+ Renault:['Clio','Megane','Captur','Duster','Kangoo','Master'],
+ Peugeot:['208','308','3008','5008','Partner','Expert'],
+ Volvo:['XC40','XC60','XC90','S60','S90','V60','V90']
+ }},
+ trucks:{label:'الشاحنات',terms:'trucks lorries tractor units for sale',sites:['autoline.info','truck1.eu'],brands:{
+ Volvo:['FH','FH16','FM','FMX','FE','FL'],
+ Mercedes:['Actros','Arocs','Atego','Axor','Econic','Antos'],
+ Scania:['R-Series','S-Series','G-Series','P-Series','L-Series'],
+ MAN:['TGX','TGS','TGM','TGL'],
+ DAF:['XF','XG','XG+','CF','LF'],
+ Iveco:['S-Way','Stralis','Eurocargo','Trakker','Daily'],
+ Renault:['T High','T','C','K','D'],
+ Ford:['F-MAX','Cargo','Transit'],
+ Isuzu:['N-Series','F-Series','Giga'],
+ Hino:['300 Series','500 Series','700 Series']
+ }},
+ excavators:{label:'الحفارات',terms:'excavators mini excavators crawler excavators for sale',sites:['machineryline.com','truck1.eu','autoline.info'],brands:{
+ Caterpillar:['301.7','302','303','305','306','308','313','315','320','323','325','330','336','345','349','352','374'],
+ Komatsu:['PC30','PC55','PC78','PC138','PC200','PC210','PC220','PC240','PC290','PC300','PC350','PC400'],
+ Volvo:['EC140','EC160','EC180','EC200','EC210','EC220','EC250','EC300','EC350','EC380','EC480'],
+ Hitachi:['ZX48','ZX55','ZX85','ZX130','ZX135','ZX160','ZX180','ZX200','ZX210','ZX240','ZX250','ZX300','ZX350'],
+ JCB:['18Z','19C','35Z','50Z','85Z','JS130','JS145','JS160','JS220','JS300'],
+ Hyundai:['R55','R60','R80','R140','R160','R180','R210','R220','R250','R300','R330'],
+ Doosan:['DX55','DX80','DX140','DX160','DX180','DX210','DX225','DX255','DX300','DX340'],
+ Kubota:['KX018','KX027','KX030','KX057','KX080','U17','U35','U55'],
+ SANY:['SY55','SY75','SY135','SY155','SY215','SY235','SY265','SY365'],
+ CASE:['CX50','CX75','CX130','CX145','CX210','CX245','CX300','CX350']
+ }},
+ agri:{label:'المعدات الزراعية',terms:'agricultural machinery tractors harvesters farm equipment for sale',sites:['agroline.com','machineryline.com','truck1.eu'],brands:{
+ John_Deere:['5E Series','5M Series','6M Series','6R Series','7R Series','8R Series','9R Series','S-Series Combine','T-Series Combine','W-Series Combine'],
+ New_Holland:['T4','T5','T6','T7','T8','T9','CR Combine','CX Combine','TX Combine','FR Forage Harvester'],
+ Massey_Ferguson:['MF 4700','MF 5700','MF 6700','MF 7700','MF 8700','MF 8S','MF 9S'],
+ Case_IH:['Farmall','Maxxum','Puma','Optum','Magnum','Steiger','Axial-Flow'],
+ Fendt:['200 Vario','300 Vario','500 Vario','700 Vario','800 Vario','900 Vario','1000 Vario'],
+ Claas:['Arion','Axion','Xerion','Axos','Ares','Lexion','Trion','Tucano'],
+ Deutz_Fahr:['5 Series','6 Series','7 Series','8 Series','9 Series','Agrotron','Agrofarm'],
+ Kubota:['M4','M5','M6','M7','L Series','BX Series'],
+ Valtra:['A Series','G Series','N Series','T Series','Q Series','S Series'],
+ Case:['Farmall','Maxxum','Puma','Magnum','Steiger']
+ }}
 };
+function globalMarketLabel(v){return String(v||'').replace(/_/g,' ');}
+function populateGlobalMarketBrands(){
+ const select=document.getElementById('globalMarketBrand');if(!select)return;
+ const cfg=aibGlobalMarketConfig[aibGlobalMarketCategory];
+ select.innerHTML='<option value="">اختر الشركة المصنّعة</option>'+Object.keys(cfg.brands).map(b=>'<option value="'+b+'">'+globalMarketLabel(b)+'</option>').join('');
+ const model=document.getElementById('globalMarketModel');if(model){model.innerHTML='<option value="">اختر الشركة أولاً</option>';model.disabled=true;}
+}
+function updateGlobalMarketModels(){
+ const brand=document.getElementById('globalMarketBrand')?.value||'';
+ const model=document.getElementById('globalMarketModel');if(!model)return;
+ const models=aibGlobalMarketConfig[aibGlobalMarketCategory].brands[brand]||[];
+ model.innerHTML='<option value="">كل الطرازات</option>'+models.map(m=>'<option value="'+m+'">'+m+'</option>').join('');
+ model.disabled=!brand;
+}
 function setGlobalMarketCategory(category,button){
  if(!aibGlobalMarketConfig[category])return;
  aibGlobalMarketCategory=category;
  document.querySelectorAll('.global-market-tab').forEach(el=>el.classList.toggle('active',el===button));
- const input=document.getElementById('globalMarketQuery');
- if(input){input.placeholder=category==='cars'?'مثال: Toyota Land Cruiser أو BMW X5':category==='trucks'?'مثال: Volvo FH 500 أو Mercedes Actros':category==='excavators'?'مثال: Caterpillar 320 أو Komatsu PC200':'مثال: John Deere 8R أو New Holland T7';}
+ populateGlobalMarketBrands();
  const status=document.getElementById('globalMarketStatus');
- if(status)status.textContent='الفئة المحددة: '+aibGlobalMarketConfig[category].label+'. أدخل المواصفات ثم اضغط «ابحث عالمياً».';
+ if(status)status.textContent='اختر الشركة المصنّعة أولاً، ثم اختر الطراز من القائمة التي ستظهر.';
 }
 function runGlobalMarketSearch(){
  const cfg=aibGlobalMarketConfig[aibGlobalMarketCategory];if(!cfg)return;
  const val=id=>(document.getElementById(id)?.value||'').trim();
- const parts=[cfg.terms,val('globalMarketQuery'),val('globalMarketBrand'),val('globalMarketModel'),val('globalMarketCountry'),val('globalMarketYearFrom')?'from year '+val('globalMarketYearFrom'):'',val('globalMarketYearTo')?'to year '+val('globalMarketYearTo'):'',val('globalMarketMaxPrice')?'maximum price '+val('globalMarketMaxPrice'):'' ].filter(Boolean);
+ const brand=val('globalMarketBrand'),model=val('globalMarketModel');
+ if(!brand){const st=document.getElementById('globalMarketStatus');if(st)st.textContent='يرجى اختيار الشركة المصنّعة أولاً.';document.getElementById('globalMarketBrand')?.focus();return;}
+ const parts=[cfg.terms,globalMarketLabel(brand),model,val('globalMarketCountry'),val('globalMarketYearFrom')?'from year '+val('globalMarketYearFrom'):'',val('globalMarketYearTo')?'to year '+val('globalMarketYearTo'):'',val('globalMarketMaxPrice')?'maximum price '+val('globalMarketMaxPrice'):''].filter(Boolean);
  const siteQuery=cfg.sites.map(site=>'site:'+site).join(' OR ');
- const query='('+siteQuery+') '+parts.join(' ')+' listing';
+ const query='('+siteQuery+') '+parts.join(' ')+' for sale listing';
  const url='https://www.google.com/search?'+new URLSearchParams({q:query,hl:'en'}).toString();
  const status=document.getElementById('globalMarketStatus');
- if(status)status.textContent='جارٍ فتح نتائج البحث العالمي عن '+cfg.label+' عبر '+cfg.sites.length+' أسواق متخصصة. يمكنك مقارنة الإعلانات والتواصل مع البائع من الموقع الأصلي.';
+ if(status)status.textContent='جارٍ فتح نتائج '+globalMarketLabel(brand)+(model?' '+model:'')+' من الأسواق العالمية. الإعلانات والأسعار لدى المواقع الأصلية.';
  window.open(url,'_blank','noopener');
 }
+populateGlobalMarketBrands();
 </script></body></html>
