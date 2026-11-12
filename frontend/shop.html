@@ -1181,7 +1181,7 @@ async function updateAibGenerationOptions(){
   if(!generations.length){setMessage('لا توجد أجيال موثقة لهذا الطراز في المصدر');return}
   const current=gen.value;
   const ordered=generations.slice().sort((a,b)=>(a.yearStart||0)-(b.yearStart||0));
-  gen.innerHTML='<option value="">كل أجيال '+esc(model)+'</option>'+ordered.map(x=>{const years=(x.yearStart||'؟')+' – '+(x.yearEnd||'مستمر');return '<option value="'+esc(x.name)+'">'+esc(x.name)+' · '+esc(years)+'</option>'}).join('');
+  gen.innerHTML='<option value="">كل أجيال '+esc(model)+'</option>'+ordered.map(x=>'<option value="'+esc(x.name)+'">'+esc(x.name)+'</option>').join('');
   if(ordered.some(x=>x.name===current))gen.value=current;
  }catch(e){if(stillCurrent()){AIB_GENERATION_CACHE.delete(slug);setMessage('بيانات الأجيال غير متاحة لهذا الطراز حالياً');console.warn('AIB generation lookup failed:',e)}}
 }function populateAibVehicleOptions(data){window.aibCurrentInventoryRows=data;updateAibCatalogOptions()}
