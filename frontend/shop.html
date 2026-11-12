@@ -1355,8 +1355,9 @@ const aibGlobalMarketExtraBrands={
   Rostselmash:['Acros','Vector','RSM 161','Torum','Nova','Niva'],
   Gomselmash:['Polesie','GS Series'],
   Deawoo_Agriculture:['Farmtrac','Powertrac']
- },
-
+ }
+};
+const aibGlobalMarketMoreBrands={
   // Additional international manufacturers and representative model families.
   // Historical variants are expanded progressively; this is not claimed as a complete archive.
   cars:{
@@ -1421,6 +1422,10 @@ const aibGlobalMarketExtraBrands={
   }
 };
 for(const [group,brands] of Object.entries(aibGlobalMarketExtraBrands)){
+ const target=aibGlobalMarketConfig[group].brands;
+ for(const [brand,models] of Object.entries(brands)) if(!target[brand]) target[brand]=models;
+}
+for(const [group,brands] of Object.entries(aibGlobalMarketMoreBrands)){
  const target=aibGlobalMarketConfig[group].brands;
  for(const [brand,models] of Object.entries(brands)) if(!target[brand]) target[brand]=models;
 }
