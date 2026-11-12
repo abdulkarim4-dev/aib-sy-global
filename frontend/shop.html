@@ -1173,7 +1173,7 @@ function renderAibBrandPicker(){
   const fallback='<span class="aib-brand-monogram">'+esc(String(name||'?').trim().slice(0,2).toUpperCase())+'</span>';
   const src=domain?'https://www.google.com/s2/favicons?domain='+encodeURIComponent(domain)+'&sz=64':'https://cdn.simpleicons.org/'+simple;
   const alt='https://cdn.simpleicons.org/'+simple;
-  return '<img class="aib-brand-logo" src="'+src+'" data-fallback="'+alt+'" alt="" loading="lazy" onerror="if(this.dataset.fallback){this.src=this.dataset.fallback;this.dataset.fallback=\'\'}else{this.outerHTML='+JSON.stringify(fallback)+'}">';
+  return '<img class="aib-brand-logo" src="'+src+'" data-fallback="'+alt+'" alt="" loading="lazy" onerror="if(this.dataset.fallback){this.src=this.dataset.fallback;this.dataset.fallback=\\'\\'}else{this.hidden=true;this.nextElementSibling.hidden=false}"><span class="aib-brand-monogram" hidden>'+esc(String(name||'?').trim().slice(0,2).toUpperCase())+'</span>';
  };
 
  const chosen=entries.find(x=>x.brand===current);
