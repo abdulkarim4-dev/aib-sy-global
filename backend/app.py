@@ -945,8 +945,15 @@ def recalculate_inventory(s:Session):
         product.owned_stock=max(0,owned)
         product.consigned_stock=max(0,consigned)
 
+_store_catalog_cache={"at":0.0,"value":None}
+
 def latest_store_catalog_data(s:Session)->tuple[dict,dict]:
-    """Build latest storefront categories and prices in one history scan."""
+    """Reuse the recent catalog snapshot instead of rescanning all invoice history on every request."""
+    import time
+    now=time.monotonic()
+    cached=_store_catalog_cache["value"]
+    if cached is not None and now-_store_catalog_cache["at"]<45:
+        return cached
     latest_categories={}
     latest_prices={}
     allowed={"car":{"cars","car_parts","car_engines","car_engine_parts"},"truck":{"trucks","truck_parts","truck_engines","truck_engine_parts"},"heavy":{"heavy","heavy_parts","heavy_engines","heavy_engine_parts"},"agri":{"agri","agri_parts","agri_engines","agri_engine_parts"}}
@@ -968,7 +975,10 @@ def latest_store_catalog_data(s:Session)->tuple[dict,dict]:
                 category=str(item.get("store_category") or "").strip()
                 if category in allowed.get(family,set()):
                     latest_categories[sku]={"store_family":family,"store_category":category}
-    return latest_categories,latest_prices
+    result=(latest_categories,latest_prices)
+    _store_catalog_cache["value"]=result
+    _store_catalog_cache["at"]=now
+    return result
 
 def latest_inventory_store_categories(s:Session)->dict:
     return latest_store_catalog_data(s)[0]
