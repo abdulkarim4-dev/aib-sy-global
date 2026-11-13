@@ -920,7 +920,7 @@ def prepare_record_inventory(s:Session, section:str, raw_data:dict, allow_legacy
         item["sku"]=sku
         family=str(item.get("store_family") or "").strip()
         category=str(item.get("store_category") or "").strip()
-        allowed={"car":{"cars","car_parts","car_engines","car_engine_parts"},"truck":{"trucks","truck_parts","truck_engines","truck_engine_parts"},"heavy":{"heavy","heavy_parts","heavy_engines","heavy_engine_parts"},"agri":{"agri","agri_parts","agri_engines","agri_engine_parts"}}
+        allowed={"car":{"cars","car_parts","car_engines","car_engine_parts"},"truck":{"trucks","truck_parts","truck_engines","truck_engine_parts"},"heavy":{"heavy","heavy_parts","heavy_engines","heavy_engine_parts"},"agri":{"agri","agri_parts","agri_engines","agri_engine_parts"},"special":{"generators","hydraulic_compressors","water_pumps","road_equipment","special_parts","special_engines"}}
         if section in {"purchase","deposit"} and name and (not family or not category):
             raise HTTPException(400,"يجب اختيار القسم الرئيسي والقسم الفرعي للمنتج عند الشراء أو وضع الأمانة")
         if family or category:
@@ -973,7 +973,7 @@ def latest_store_catalog_data(s:Session)->tuple[dict,dict]:
         return cached
     latest_categories={}
     latest_prices={}
-    allowed={"car":{"cars","car_parts","car_engines","car_engine_parts"},"truck":{"trucks","truck_parts","truck_engines","truck_engine_parts"},"heavy":{"heavy","heavy_parts","heavy_engines","heavy_engine_parts"},"agri":{"agri","agri_parts","agri_engines","agri_engine_parts"}}
+    allowed={"car":{"cars","car_parts","car_engines","car_engine_parts"},"truck":{"trucks","truck_parts","truck_engines","truck_engine_parts"},"heavy":{"heavy","heavy_parts","heavy_engines","heavy_engine_parts"},"agri":{"agri","agri_parts","agri_engines","agri_engine_parts"},"special":{"generators","hydraulic_compressors","water_pumps","road_equipment","special_parts","special_engines"}}
     rows=s.scalars(select(Record).where(
         Record.deleted.is_(False),
         Record.section.in_(["purchase","deposit"])
@@ -1530,6 +1530,7 @@ def store_customer_token(customer:StoreCustomer):
 
 def store_product_category(name:str, model:str):
     value=(name+" "+(model or "")).lower()
+    if any(x in value for x in ["مولد","generator","كمبريسر","compressor","ضاغط","مضخة","pump","تزفيت","asphalt","paver","roller","مدحلة","فرادة"]): return "special"
     if any(x in value for x in ["حفار","excavator","تركس","لودر","loader","كاتربلر","caterpillar","volvo ec","hyundai r"]): return "heavy"
     if any(x in value for x in ["شاحنة","truck","fh","scania","قاطر"]): return "trucks"
     if any(x in value for x in ["محرك","engine","gearbox","جير","دفرنس","ناقل"]): return "engines"
