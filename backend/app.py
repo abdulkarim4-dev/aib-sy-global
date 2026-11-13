@@ -7,7 +7,7 @@ from urllib.request import Request as UrlRequest, urlopen
 from urllib.error import HTTPError, URLError
 import jwt
 from fastapi import FastAPI, Depends, HTTPException, Request, status
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel, Field
@@ -1691,6 +1691,17 @@ def store_google_start(customer:StoreCustomer=Depends(current_store_customer)):
     response.set_cookie("aib_google_link_nonce",nonce,max_age=600,httponly=True,secure=True,samesite="lax",path="/store/auth/google")
     return response
 
+@app.get("/store/auth/google/login/start")
+def store_google_login_start():
+    if not settings.google_client_id or not settings.google_client_secret or not settings.google_redirect_uri:
+        raise HTTPException(503,"تسجيل Google غير مهيأ بعد. تحقق من إعدادات OAuth في Render")
+    nonce=secrets.token_urlsafe(32)
+    state=jwt.encode({"typ":"store_google_auth","nonce":nonce,"exp":datetime.now(timezone.utc)+timedelta(minutes=10)},settings.jwt_secret,algorithm="HS256")
+    params={"client_id":settings.google_client_id,"redirect_uri":settings.google_redirect_uri,"response_type":"code","scope":"openid email profile","state":state,"prompt":"select_account"}
+    response=Response(content=json.dumps({"authorization_url":"https://accounts.google.com/o/oauth2/v2/auth?"+urlencode(params)}),media_type="application/json")
+    response.set_cookie("aib_google_auth_nonce",nonce,max_age=600,httponly=True,secure=True,samesite="lax",path="/store/auth/google")
+    return response
+
 @app.get("/store/auth/google/callback")
 def store_google_callback(request:Request, code:str="", state:str="", error:str="", s:Session=Depends(db)):
     fail_url="/shop?google=error"
@@ -1698,10 +1709,15 @@ def store_google_callback(request:Request, code:str="", state:str="", error:str=
         return RedirectResponse(fail_url,303)
     try:
         payload=jwt.decode(state,settings.jwt_secret,algorithms=["HS256"])
-        if payload.get("typ")!="store_google_link" or not secrets.compare_digest(str(payload.get("nonce","")),request.cookies.get("aib_google_link_nonce","")):
+        flow=payload.get("typ")
+        if flow=="store_google_auth":
+            nonce_cookie=request.cookies.get("aib_google_auth_nonce","")
+        elif flow=="store_google_link":
+            nonce_cookie=request.cookies.get("aib_google_link_nonce","")
+        else:
+            raise ValueError("invalid oauth flow")
+        if not secrets.compare_digest(str(payload.get("nonce","")),nonce_cookie):
             raise ValueError("invalid oauth state")
-        customer=s.get(StoreCustomer,int(payload["sub"]))
-        if not customer or not customer.active: raise ValueError("customer unavailable")
         token_data={"code":code,"client_id":settings.google_client_id,"client_secret":settings.google_client_secret,"redirect_uri":settings.google_redirect_uri,"grant_type":"authorization_code"}
         req=UrlRequest("https://oauth2.googleapis.com/token",data=urlencode(token_data).encode(),headers={"Content-Type":"application/x-www-form-urlencoded"},method="POST")
         with urlopen(req,timeout=20) as resp: token_response=json.loads(resp.read().decode())
@@ -1712,16 +1728,44 @@ def store_google_callback(request:Request, code:str="", state:str="", error:str=
         if identity.get("aud")!=settings.google_client_id or identity.get("iss") not in ("accounts.google.com","https://accounts.google.com") or identity.get("email_verified") not in (True,"true"):
             raise ValueError("Google identity verification failed")
         google_sub=str(identity.get("sub") or "")
-        if not google_sub: raise ValueError("Google subject missing")
+        email=str(identity.get("email") or "").strip().lower()
+        if not google_sub or not email: raise ValueError("Google identity is incomplete")
         linked=s.scalar(select(StoreCustomer).where(StoreCustomer.google_sub==google_sub))
-        if linked and linked.id!=customer.id: raise ValueError("حساب Google مرتبط بحساب متجر آخر")
-        customer.google_sub=google_sub
+        if flow=="store_google_link":
+            customer=s.get(StoreCustomer,int(payload["sub"]))
+            if not customer or not customer.active: raise ValueError("customer unavailable")
+            if linked and linked.id!=customer.id: raise ValueError("حساب Google مرتبط بحساب متجر آخر")
+            customer.google_sub=google_sub
+            s.commit()
+            return RedirectResponse("/shop?google=success",303)
+        if linked:
+            customer=linked
+        else:
+            customer=s.scalar(select(StoreCustomer).where(StoreCustomer.email==email))
+            if customer:
+                if customer.google_sub and customer.google_sub!=google_sub:
+                    raise ValueError("هذا البريد مرتبط بحساب Google مختلف")
+                customer.google_sub=google_sub
+                customer.active=True
+                s.query(StoreEmailVerification).filter(StoreEmailVerification.customer_id==customer.id).delete(synchronize_session=False)
+            else:
+                full_name=str(identity.get("name") or email.split("@",1)[0]).strip()[:160] or email.split("@",1)[0]
+                customer=StoreCustomer(email=email,full_name=full_name,password_hash=password_hash.hash(secrets.token_urlsafe(48)),cart=[],active=True,google_sub=google_sub)
+                s.add(customer)
+                s.flush()
+        customer.failed_logins=0
+        customer.locked_until=None
         s.commit()
-        return RedirectResponse("/shop?google=success",303)
+        access_token=store_customer_token(customer)
+        response=RedirectResponse("/shop#google_token="+access_token,303)
+        response.delete_cookie("aib_google_auth_nonce",path="/store/auth/google")
+        return response
     except Exception as exc:
         s.rollback()
-        print("Google account linking failed: "+type(exc).__name__,flush=True)
-        return RedirectResponse(fail_url,303)
+        print("Google OAuth failed: "+type(exc).__name__,flush=True)
+        response=RedirectResponse(fail_url,303)
+        response.delete_cookie("aib_google_auth_nonce",path="/store/auth/google")
+        return response
 
 @app.get("/store/auth/me")
 def store_me(customer:StoreCustomer=Depends(current_store_customer)):
