@@ -1,11 +1,13 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Any
 import os, secrets, json, base64, binascii, smtplib, hashlib, html
+from urllib.parse import urlencode
 from email.message import EmailMessage
 from urllib.request import Request as UrlRequest, urlopen
 from urllib.error import HTTPError, URLError
 import jwt
 from fastapi import FastAPI, Depends, HTTPException, Request, status
+from fastapi.responses import RedirectResponse
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel, Field
@@ -29,6 +31,9 @@ class Settings(BaseSettings):
     brevo_api_key: str = ""
     brevo_sender_email: str = ""
     brevo_sender_name: str = "مجموعة AIB التجارية"
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_redirect_uri: str = "https://aib-sy-global.onrender.com/store/auth/google/callback"
     class Config: env_file = ".env"
 settings = Settings()
 engine = create_engine(settings.database_url, pool_pre_ping=True)
@@ -87,6 +92,7 @@ class StoreCustomer(Base):
     phone_country_code: Mapped[str]=mapped_column(String(8),default="+963")
     phone_number: Mapped[str]=mapped_column(String(32),default="")
     avatar_data: Mapped[Optional[str]]=mapped_column(Text,nullable=True)
+    google_sub: Mapped[Optional[str]]=mapped_column(String(255),nullable=True,unique=True,index=True)
 
 class OnlinePurchaseOrder(Base):
     __tablename__="online_purchase_orders"
@@ -314,6 +320,8 @@ def startup():
         conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS phone_country_code VARCHAR(8) NOT NULL DEFAULT '+963'"))
         conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS phone_number VARCHAR(32) NOT NULL DEFAULT ''"))
         conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS avatar_data TEXT"))
+        conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS google_sub VARCHAR(255)"))
+        conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_store_customers_google_sub ON store_customers (google_sub) WHERE google_sub IS NOT NULL"))
 
         conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS voided BOOLEAN NOT NULL DEFAULT FALSE"))
         conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS record_id INTEGER REFERENCES records(id)"))
@@ -1667,6 +1675,53 @@ def confirm_store_password_reset(p:StorePasswordResetConfirmPayload, request:Req
     s.commit()
     notify_account_change(customer.email,"تم تغيير كلمة المرور الخاصة بحساب المتجر")
     return {"ok":True,"message":"تم تحديث كلمة المرور. يمكنك تسجيل الدخول الآن."}
+
+@app.get("/store/auth/google/config")
+def store_google_config():
+    return {"configured":bool(settings.google_client_id and settings.google_client_secret and settings.google_redirect_uri)}
+
+@app.get("/store/auth/google/start")
+def store_google_start(customer:StoreCustomer=Depends(current_store_customer)):
+    if not settings.google_client_id or not settings.google_client_secret:
+        raise HTTPException(503,"ربط Google غير مهيأ بعد. أضف بيانات OAuth في إعدادات Render")
+    nonce=secrets.token_urlsafe(32)
+    state=jwt.encode({"sub":str(customer.id),"typ":"store_google_link","nonce":nonce,"exp":datetime.now(timezone.utc)+timedelta(minutes=10)},settings.jwt_secret,algorithm="HS256")
+    params={"client_id":settings.google_client_id,"redirect_uri":settings.google_redirect_uri,"response_type":"code","scope":"openid email profile","state":state,"prompt":"select_account"}
+    response=Response(content=json.dumps({"authorization_url":"https://accounts.google.com/o/oauth2/v2/auth?"+urlencode(params)}),media_type="application/json")
+    response.set_cookie("aib_google_link_nonce",nonce,max_age=600,httponly=True,secure=True,samesite="lax",path="/store/auth/google")
+    return response
+
+@app.get("/store/auth/google/callback")
+def store_google_callback(request:Request, code:str="", state:str="", error:str="", s:Session=Depends(db)):
+    fail_url="/shop?google=error"
+    if error or not code or not state:
+        return RedirectResponse(fail_url,303)
+    try:
+        payload=jwt.decode(state,settings.jwt_secret,algorithms=["HS256"])
+        if payload.get("typ")!="store_google_link" or not secrets.compare_digest(str(payload.get("nonce","")),request.cookies.get("aib_google_link_nonce","")):
+            raise ValueError("invalid oauth state")
+        customer=s.get(StoreCustomer,int(payload["sub"]))
+        if not customer or not customer.active: raise ValueError("customer unavailable")
+        token_data={"code":code,"client_id":settings.google_client_id,"client_secret":settings.google_client_secret,"redirect_uri":settings.google_redirect_uri,"grant_type":"authorization_code"}
+        req=UrlRequest("https://oauth2.googleapis.com/token",data=urlencode(token_data).encode(),headers={"Content-Type":"application/x-www-form-urlencoded"},method="POST")
+        with urlopen(req,timeout=20) as resp: token_response=json.loads(resp.read().decode())
+        id_token=token_response.get("id_token")
+        if not id_token: raise ValueError("Google did not return an ID token")
+        verify_req=UrlRequest("https://oauth2.googleapis.com/tokeninfo?id_token="+id_token,headers={"Accept":"application/json"})
+        with urlopen(verify_req,timeout=20) as resp: identity=json.loads(resp.read().decode())
+        if identity.get("aud")!=settings.google_client_id or identity.get("iss") not in ("accounts.google.com","https://accounts.google.com") or identity.get("email_verified") not in (True,"true"):
+            raise ValueError("Google identity verification failed")
+        google_sub=str(identity.get("sub") or "")
+        if not google_sub: raise ValueError("Google subject missing")
+        linked=s.scalar(select(StoreCustomer).where(StoreCustomer.google_sub==google_sub))
+        if linked and linked.id!=customer.id: raise ValueError("حساب Google مرتبط بحساب متجر آخر")
+        customer.google_sub=google_sub
+        s.commit()
+        return RedirectResponse("/shop?google=success",303)
+    except Exception as exc:
+        s.rollback()
+        print("Google account linking failed: "+type(exc).__name__,flush=True)
+        return RedirectResponse(fail_url,303)
 
 @app.get("/store/auth/me")
 def store_me(customer:StoreCustomer=Depends(current_store_customer)):
