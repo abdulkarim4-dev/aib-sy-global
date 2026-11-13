@@ -86,6 +86,7 @@ class StoreCustomer(Base):
     shipping_address: Mapped[str]=mapped_column(Text,default="")
     phone_country_code: Mapped[str]=mapped_column(String(8),default="+963")
     phone_number: Mapped[str]=mapped_column(String(32),default="")
+    avatar_data: Mapped[Optional[str]]=mapped_column(Text,nullable=True)
 
 class OnlinePurchaseOrder(Base):
     __tablename__="online_purchase_orders"
@@ -312,6 +313,7 @@ def startup():
         conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS shipping_address TEXT NOT NULL DEFAULT ''"))
         conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS phone_country_code VARCHAR(8) NOT NULL DEFAULT '+963'"))
         conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS phone_number VARCHAR(32) NOT NULL DEFAULT ''"))
+        conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS avatar_data TEXT"))
 
         conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS voided BOOLEAN NOT NULL DEFAULT FALSE"))
         conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS record_id INTEGER REFERENCES records(id)"))
@@ -1475,6 +1477,18 @@ class StorePasswordResetConfirmPayload(BaseModel):
     code: str = Field(min_length=6, max_length=6)
     new_password: str = Field(min_length=10, max_length=256)
 
+class StoreProfilePayload(BaseModel):
+    full_name: str = Field(min_length=2,max_length=160)
+    first_name: str = Field(default="",max_length=80)
+    last_name: str = Field(default="",max_length=80)
+    shipping_address: str = Field(default="",max_length=1000)
+    phone_country_code: str = Field(default="+963",min_length=2,max_length=8)
+    phone_number: str = Field(default="",max_length=32)
+    avatar_data: Optional[str] = Field(default=None,max_length=1400000)
+class StoreChangePasswordPayload(BaseModel):
+    current_password: str = Field(min_length=1,max_length=256)
+    new_password: str = Field(min_length=10,max_length=256)
+
 class StoreCartItemPayload(BaseModel):
     product_id: int = Field(gt=0)
     quantity: int = Field(ge=1, le=999)
@@ -1656,7 +1670,36 @@ def confirm_store_password_reset(p:StorePasswordResetConfirmPayload, request:Req
 
 @app.get("/store/auth/me")
 def store_me(customer:StoreCustomer=Depends(current_store_customer)):
-    return {"id":customer.id,"email":customer.email,"full_name":customer.full_name}
+    return {"id":customer.id,"email":customer.email,"full_name":customer.full_name,"first_name":customer.first_name or "","last_name":customer.last_name or "","shipping_address":customer.shipping_address or "","phone_country_code":customer.phone_country_code or "+963","phone_number":customer.phone_number or "","avatar_data":customer.avatar_data}
+
+@app.put("/store/auth/profile")
+def update_store_profile(p:StoreProfilePayload, s:Session=Depends(db), customer:StoreCustomer=Depends(current_store_customer)):
+    if p.avatar_data is not None and p.avatar_data and not (p.avatar_data.startswith("data:image/jpeg;base64,") or p.avatar_data.startswith("data:image/png;base64,") or p.avatar_data.startswith("data:image/webp;base64,")):
+        raise HTTPException(400,"صيغة الصورة غير مدعومة. استخدم JPG أو PNG أو WEBP")
+    customer.full_name=p.full_name.strip()
+    customer.first_name=p.first_name.strip()
+    customer.last_name=p.last_name.strip()
+    customer.shipping_address=p.shipping_address.strip()
+    customer.phone_country_code=p.phone_country_code.strip()
+    customer.phone_number=p.phone_number.strip()
+    if p.avatar_data is not None: customer.avatar_data=p.avatar_data or None
+    s.commit()
+    return {"ok":True,"message":"تم حفظ بيانات حسابك","customer":{"id":customer.id,"email":customer.email,"full_name":customer.full_name,"first_name":customer.first_name,"last_name":customer.last_name,"shipping_address":customer.shipping_address,"phone_country_code":customer.phone_country_code,"phone_number":customer.phone_number,"avatar_data":customer.avatar_data}}
+
+@app.post("/store/auth/change-password")
+def change_store_password(p:StoreChangePasswordPayload, s:Session=Depends(db), customer:StoreCustomer=Depends(current_store_customer)):
+    if not password_hash.verify(p.current_password,customer.password_hash):
+        raise HTTPException(400,"كلمة المرور الحالية غير صحيحة")
+    if password_hash.verify(p.new_password,customer.password_hash):
+        raise HTTPException(400,"اختر كلمة مرور جديدة مختلفة عن الحالية")
+    customer.password_hash=password_hash.hash(p.new_password)
+    customer.failed_logins=0
+    customer.locked_until=None
+    s.query(StorePasswordReset).filter(StorePasswordReset.customer_id==customer.id).delete(synchronize_session=False)
+    s.commit()
+    notify_account_change(customer.email,"تم تغيير كلمة المرور الخاصة بحساب المتجر")
+    return {"ok":True,"message":"تم تغيير كلمة المرور بنجاح"}
+
 
 def serialize_store_cart(s:Session, customer:StoreCustomer):
     prices=store_latest_prices(s)
