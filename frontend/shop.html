@@ -1242,16 +1242,14 @@ function categoryName(c){return ({parts:'قطع الغيار',engines:'المح�
  const panel=document.getElementById('searchFiltersPanel');if(!panel)return;
  const toggle=document.querySelector('.search-page-filter-toggle');
  const tools=document.querySelector('.catalog-tools');
- // Keep range, price, distance, color, fuel and sorting controls out of the main search card.
- // Their original nodes are moved into the dedicated filters panel so their values and handlers are preserved.
+ const vehicleFilters=document.querySelector('.aib-vehicle-search');
+ // Move the complete detailed-filter group out of the main search card.
+ // This keeps year, price, mileage, color, fuel, make/model and related controls together.
+ if(vehicleFilters&&vehicleFilters.parentElement!==panel)panel.appendChild(vehicleFilters);
  if(tools){
   const sort=tools.querySelector('.sort-field')||document.getElementById('sort')?.closest('label');
   if(sort&&sort.parentElement!==panel)panel.appendChild(sort);
  }
- ['aibYearFrom','aibYearTo','aibMinPrice','aibMaxPrice','aibMinKm','aibMaxKm','aibColor','aibFuel'].forEach(id=>{
-  const field=document.getElementById(id),label=field&&field.closest('label');
-  if(label&&label.parentElement!==panel)panel.appendChild(label);
- });
  if(!searchPageMode){
   panel.hidden=true;
   if(toggle){toggle.hidden=true;toggle.setAttribute('aria-expanded','false');}
