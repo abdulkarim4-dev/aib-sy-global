@@ -1610,6 +1610,22 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape'&&document.ge
 }
 
 
+
+/* Position hamburger inside the store header, not over search content */
+header.top{position:relative!important}
+header.top>.aib-menu-trigger{
+ position:absolute!important;
+ left:16px!important;
+ right:auto!important;
+ top:14px!important;
+ bottom:auto!important;
+ transform:none!important;
+ z-index:20!important;
+ margin:0!important;
+}
+@media(max-width:600px){
+ header.top>.aib-menu-trigger{left:12px!important;top:12px!important}
+}
 /* AIB store side navigation */
 .top{position:relative!important}
 .top{position:relative!important;isolation:isolate!important}
