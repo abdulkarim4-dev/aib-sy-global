@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     smtp_from: str = ""
     brevo_api_key: str = ""
+    gemini_api_key: str = ""
     brevo_sender_email: str = ""
     brevo_sender_name: str = "مجموعة AIB التجارية"
     google_client_id: str = ""
@@ -2148,3 +2149,76 @@ def logo_svg():
 @app.get("/accounting-portal", include_in_schema=False)
 def accounting_portal():
     return FileResponse(FRONTEND_DIR / "accounting-portal.html")
+
+
+# Google Gemini assistant endpoints. API credentials remain server-side only.
+class GeminiChatPayload(BaseModel):
+    message: str = Field(min_length=1, max_length=4000)
+    history: list[dict[str, str]] = Field(default_factory=list, max_length=12)
+
+_gemini_rate_limits = {}
+
+def _gemini_reply(message: str, history: list[dict[str, str]], system_prompt: str) -> str:
+    if not settings.gemini_api_key:
+        raise HTTPException(503, "مساعد Gemini غير مفعّل بعد. أضف GEMINI_API_KEY في إعدادات Render.")
+    now = datetime.now(timezone.utc).timestamp()
+    # A lightweight per-process guard against accidental repeated requests.
+    key = "global"
+    recent = [stamp for stamp in _gemini_rate_limits.get(key, []) if now - stamp < 60]
+    if len(recent) >= 50:
+        raise HTTPException(429, "تم تجاوز عدد الطلبات مؤقتاً. حاول بعد دقيقة.")
+    recent.append(now)
+    _gemini_rate_limits[key] = recent
+    contents = []
+    for item in history[-12:]:
+        role = item.get("role", "")
+        text_value = str(item.get("text", ""))[:4000]
+        if role in ("user", "model") and text_value.strip():
+            contents.append({"role": role, "parts": [{"text": text_value}]})
+    contents.append({"role": "user", "parts": [{"text": message.strip()}]})
+    payload = {
+        "system_instruction": {"parts": [{"text": system_prompt}]},
+        "contents": contents,
+        "generationConfig": {"temperature": 0.4, "maxOutputTokens": 900}
+    }
+    req = UrlRequest(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent",
+        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        headers={"Content-Type": "application/json", "x-goog-api-key": settings.gemini_api_key},
+        method="POST"
+    )
+    try:
+        with urlopen(req, timeout=45) as response:
+            result = json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        if exc.code == 429:
+            raise HTTPException(429, "وصلنا إلى حد الاستخدام المؤقت لدى Google. حاول لاحقاً.")
+        if exc.code in (401, 403):
+            raise HTTPException(502, "تعذر التحقق من مفتاح Gemini. راجع قيمة GEMINI_API_KEY في Render.")
+        if exc.code >= 500:
+            raise HTTPException(503, "خدمة Gemini مشغولة حالياً. حاول بعد قليل.")
+        raise HTTPException(502, "تعذر إكمال طلب Gemini. تحقق من إعدادات المفتاح والطراز.")
+    except (URLError, TimeoutError):
+        raise HTTPException(504, "انتهت مهلة الاتصال بخدمة Gemini. حاول مجدداً.")
+    except Exception:
+        raise HTTPException(502, "حدث خطأ أثناء الاتصال بمساعد Gemini.")
+    candidates = result.get("candidates") or []
+    parts = ((candidates[0].get("content") or {}).get("parts") or []) if candidates else []
+    answer = "\n".join(str(part.get("text", "")) for part in parts if part.get("text"))
+    if not answer.strip():
+        raise HTTPException(502, "لم يُرجع Gemini إجابة نصية. أعد صياغة السؤال.")
+    return answer.strip()
+
+@app.post("/ai/store-chat")
+def gemini_store_chat(payload: GeminiChatPayload):
+    return {"reply": _gemini_reply(
+        payload.message, payload.history,
+        "أنت مساعد خدمة العملاء لمتجر مجموعة AIB التجارية لبيع السيارات وقطع الغيار والمحركات والشاحنات والمعدات الثقيلة والزراعية. أجب بالعربية الواضحة ما لم يكتب العميل بلغة أخرى. ساعد في فهم أقسام المتجر والبحث عن المنتجات وشرح خطوات الطلب بشكل عام. لا تخترع أسعاراً أو كميات أو توفر منتجات أو مواصفات غير موجودة في السؤال، ولا تدّع أنك ترى المخزون أو الطلبات أو حساب العميل. اطلب من العميل البحث في المتجر أو التواصل مع الشركة عند الحاجة إلى تأكيد السعر أو التوفر. لا تطلب كلمات مرور أو رموز تحقق أو بيانات بطاقات."
+    )}
+
+@app.post("/ai/accounting-chat")
+def gemini_accounting_chat(payload: GeminiChatPayload, u: User = Depends(current_user)):
+    return {"reply": _gemini_reply(
+        payload.message, payload.history,
+        "أنت مساعد ذكي داخلي لبرنامج المحاسبة والإدارة في مجموعة AIB التجارية. أجب بالعربية الواضحة، واشرح الإجراءات المحاسبية وتنظيم الفواتير والصناديق والمخزون والتقارير. المستخدم الحالي دوره " + str(u.role) + ". لا تدّع أنك قرأت سجلات قاعدة البيانات أو أرصدة الصناديق أو بيانات العملاء؛ لم تُرسل إليك بيانات هذه السجلات. لا تكشف أو تطلب كلمات المرور أو مفاتيح API أو رموز التحقق. لا تقترح تنفيذ قيود مالية أو حذف بيانات دون مراجعة المستخدم والصلاحيات المعتمدة في التطبيق."
+    )}
