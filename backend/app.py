@@ -116,6 +116,7 @@ class StorePasswordReset(Base):
     id: Mapped[int]=mapped_column(primary_key=True)
     customer_id: Mapped[int]=mapped_column(ForeignKey("store_customers.id"), index=True)
     code_hash: Mapped[str]=mapped_column(String(300))
+    pending_password_hash: Mapped[Optional[str]]=mapped_column(String(300),nullable=True)
     expires_at: Mapped[datetime]=mapped_column(DateTime(timezone=True))
     attempts: Mapped[int]=mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
@@ -314,6 +315,7 @@ def startup():
         conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_email_unique ON users (email) WHERE email IS NOT NULL"))
         conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS images JSONB NOT NULL DEFAULT '[]'::jsonb"))
         conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS shipping_included BOOLEAN NOT NULL DEFAULT FALSE"))
+        conn.execute(text("ALTER TABLE store_password_resets ADD COLUMN IF NOT EXISTS pending_password_hash VARCHAR(300)"))
         conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS first_name VARCHAR(80) NOT NULL DEFAULT ''"))
         conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS last_name VARCHAR(80) NOT NULL DEFAULT ''"))
         conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS shipping_address TEXT NOT NULL DEFAULT ''"))
@@ -1494,8 +1496,9 @@ class StoreProfilePayload(BaseModel):
     phone_number: str = Field(default="",max_length=32)
     avatar_data: Optional[str] = Field(default=None,max_length=1400000)
 class StoreChangePasswordPayload(BaseModel):
-    current_password: str = Field(min_length=1,max_length=256)
     new_password: str = Field(min_length=10,max_length=256)
+class StorePasswordChangeConfirmPayload(BaseModel):
+    token: str = Field(min_length=32,max_length=256)
 
 class StoreCartItemPayload(BaseModel):
     product_id: int = Field(gt=0)
@@ -1786,18 +1789,45 @@ def update_store_profile(p:StoreProfilePayload, s:Session=Depends(db), customer:
     return {"ok":True,"message":"تم حفظ بيانات حسابك","customer":{"id":customer.id,"email":customer.email,"full_name":customer.full_name,"first_name":customer.first_name,"last_name":customer.last_name,"shipping_address":customer.shipping_address,"phone_country_code":customer.phone_country_code,"phone_number":customer.phone_number,"avatar_data":customer.avatar_data}}
 
 @app.post("/store/auth/change-password")
-def change_store_password(p:StoreChangePasswordPayload, s:Session=Depends(db), customer:StoreCustomer=Depends(current_store_customer)):
-    if not password_hash.verify(p.current_password,customer.password_hash):
-        raise HTTPException(400,"كلمة المرور الحالية غير صحيحة")
+def request_store_password_change(p:StoreChangePasswordPayload, request:Request, s:Session=Depends(db), customer:StoreCustomer=Depends(current_store_customer)):
     if password_hash.verify(p.new_password,customer.password_hash):
         raise HTTPException(400,"اختر كلمة مرور جديدة مختلفة عن الحالية")
-    customer.password_hash=password_hash.hash(p.new_password)
+    now=datetime.now(timezone.utc)
+    latest=s.scalar(select(StorePasswordReset).where(StorePasswordReset.customer_id==customer.id).order_by(StorePasswordReset.id.desc()))
+    if latest and latest.pending_password_hash and latest.created_at>now-timedelta(seconds=60):
+        raise HTTPException(429,"تم إرسال رابط تأكيد مؤخراً. تحقق من بريدك الإلكتروني قبل طلب رابط جديد")
+    s.query(StorePasswordReset).filter(StorePasswordReset.customer_id==customer.id).delete(synchronize_session=False)
+    token=secrets.token_urlsafe(36)
+    row=StorePasswordReset(customer_id=customer.id,code_hash=hashlib.sha256(token.encode("utf-8")).hexdigest(),pending_password_hash=password_hash.hash(p.new_password),expires_at=now+timedelta(minutes=20))
+    s.add(row);s.flush()
+    link="https://aib-sy-global.onrender.com/shop?password_change_token="+token
+    try:
+        send_aib_email(customer.email,"تأكيد تغيير كلمة مرور حساب AIB",
+            f"مرحباً {customer.full_name}، لتأكيد تغيير كلمة المرور افتح الرابط التالي خلال 20 دقيقة:\n{link}\nإذا لم تطلب هذا التغيير فتجاهل الرسالة.",
+            f"<!doctype html><html lang='ar' dir='rtl'><meta charset='utf-8'><body style='font-family:Tahoma,Arial;background:#f2f5f7;padding:24px'><div style='max-width:520px;margin:auto;background:#fff;border:1px solid #e3e9ee;border-radius:16px;padding:28px;text-align:center;color:#243342'><h2>تأكيد تغيير كلمة المرور</h2><p>مرحباً {html.escape(customer.full_name)}، اضغط الزر أدناه لتأكيد كلمة المرور الجديدة.</p><a href='{html.escape(link,quote=True)}' style='display:inline-block;padding:14px 24px;border-radius:10px;background:#176b9b;color:#fff;text-decoration:none;font-weight:bold'>تأكيد تغيير كلمة المرور</a><p style='color:#718096;font-size:12px'>الرابط صالح لمدة 20 دقيقة ولمرة واحدة فقط.</p></div></body></html>")
+    except Exception:
+        s.rollback()
+        raise
+    s.commit()
+    return {"ok":True,"message":"أرسلنا رابط تأكيد تغيير كلمة المرور إلى بريدك الإلكتروني. لن تتغير كلمة المرور قبل فتح الرابط."}
+
+@app.post("/store/auth/change-password/confirm")
+def confirm_store_password_change(p:StorePasswordChangeConfirmPayload, s:Session=Depends(db)):
+    token_hash=hashlib.sha256(p.token.encode("utf-8")).hexdigest()
+    row=s.scalar(select(StorePasswordReset).where(StorePasswordReset.code_hash==token_hash))
+    now=datetime.now(timezone.utc)
+    if not row or not row.pending_password_hash or row.expires_at<now or row.attempts>=5:
+        raise HTTPException(400,"رابط التأكيد منتهي أو غير صالح. اطلب رابطاً جديداً")
+    customer=s.get(StoreCustomer,row.customer_id)
+    if not customer or not customer.active:
+        raise HTTPException(400,"تعذر العثور على حساب نشط لهذا الرابط")
+    customer.password_hash=row.pending_password_hash
     customer.failed_logins=0
     customer.locked_until=None
     s.query(StorePasswordReset).filter(StorePasswordReset.customer_id==customer.id).delete(synchronize_session=False)
     s.commit()
-    notify_account_change(customer.email,"تم تغيير كلمة المرور الخاصة بحساب المتجر")
-    return {"ok":True,"message":"تم تغيير كلمة المرور بنجاح"}
+    send_notification_email(customer.email,"تنبيه أمان: تغيير كلمة مرور حساب AIB","تم تأكيد تغيير كلمة مرور حساب المتجر. إذا لم تكن أنت، تواصل مع إدارة AIB فوراً.")
+    return {"ok":True,"message":"تم تأكيد الرابط وتغيير كلمة المرور بنجاح. يمكنك تسجيل الدخول بكلمة المرور الجديدة."}
 
 
 def serialize_store_cart(s:Session, customer:StoreCustomer):
