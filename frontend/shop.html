@@ -1286,8 +1286,8 @@ function aibCatalogEntries(){
  const groups=aibCatalogGroups(),entries=[];
  for(const k of groups){if(AIB_WORLD_CATALOG[k])for(const v of AIB_WORLD_CATALOG[k].split(';')){const p=v.split('|');entries.push({brand:p[0],models:(p[1]||'').split(',').map(x=>x.trim()).filter(Boolean),source:'fallback'})}}
  if(AIB_REMOTE_VEHICLES){for(const m of AIB_REMOTE_VEHICLES.makes||[]){const kinds=m.kinds||[];const group=kinds.includes('car')?'cars':(kinds.some(k=>['truck','van','bus'].includes(k))?'trucks':'');if(!group||!groups.includes(group))continue;const models=(m.models||[]).filter(x=>group==='cars'?x.kind==='car':['truck','van','bus'].includes(x.kind)).map(x=>x.name);entries.push({brand:m.name,slug:m.slug,models,source:'VehiclesDB'})}}
- if(AIB_REMOTE_TRACTORS&&groups.includes('agri'))for(const b of AIB_REMOTE_TRACTORS.brands||[])entries.push({brand:b.name,models:[],source:'TractorData',modelCount:b.models,years:b.years});
- if(AIB_REMOTE_HEAVY&&groups.includes('heavy'))for(const b of AIB_REMOTE_HEAVY.brands||[])entries.push({brand:b.name,models:[],source:'SpecCodex'});
+ if(AIB_REMOTE_TRACTORS&&groups.includes('agri'))for(const b of AIB_REMOTE_TRACTORS.brands||[])entries.push({brand:b.name,slug:b.key,models:[],source:'TractorData',modelCount:b.models,years:b.years});
+ if(AIB_REMOTE_HEAVY&&groups.includes('heavy'))for(const b of AIB_REMOTE_HEAVY.brands||[])entries.push({brand:b.name,slug:String(b.name||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''),models:[],source:'SpecCodex'});
  const merged=new Map();for(const e of entries){const key=e.brand.toLocaleLowerCase();if(!merged.has(key))merged.set(key,{...e,models:[]});const old=merged.get(key);old.models=[...new Set([...old.models,...e.models])];if(e.source==='VehiclesDB'||e.source==='TractorData')old.source=e.source;if(e.slug)old.slug=e.slug;if(e.modelCount)old.modelCount=e.modelCount;if(e.years)old.years=e.years}
  return [...merged.values()];
 }
@@ -1329,11 +1329,10 @@ async function updateAibGenerationOptions(){
  const request=++AIB_GENERATION_REQUEST;
  const setOptions=(names,source)=>{if(request!==AIB_GENERATION_REQUEST)return;const current=gen.value;gen.innerHTML='<option value="">'+(names.length?'كل أجيال '+esc(model):'لا توجد أجيال مسجلة لهذا الطراز')+'</option>'+names.map(n=>'<option value="'+esc(n)+'">'+esc(n)+'</option>').join('');if(names.includes(current))gen.value=current;gen.dataset.source=source||'none'};
  if(!brand||!model){setOptions([],'none');gen.options[0].textContent='اختر الشركة والطراز لعرض الأجيال الفعلية';return}
- if(group&&group!=='cars'){setOptions([],'none');gen.options[0].textContent='الأجيال متاحة لفئة السيارات فقط';return}
  const fallback=aibKnownGenerations(brand,model);
  if(fallback.length)setOptions(fallback,'AIB verified fallback');
  const normalize=value=>String(value||'').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'');
- const selectedEntry=aibCatalogEntries().find(x=>x.brand===brand);
+ const selectedEntry=aibCatalogEntries().find(x=>normalize(x.brand)===normalize(brand));
  const slug=selectedEntry?.slug||brand.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/&/g,'and').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
  if(!slug){if(!fallback.length)setOptions([],'none');return}
  const stillCurrent=()=>request===AIB_GENERATION_REQUEST&&document.getElementById('aibSearchBrand')?.value===brand&&document.getElementById('aibSearchModel')?.value===model;
