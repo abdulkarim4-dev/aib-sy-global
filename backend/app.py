@@ -2216,9 +2216,71 @@ def gemini_store_chat(payload: GeminiChatPayload):
         "أنت مساعد خدمة العملاء لمتجر مجموعة AIB التجارية لبيع السيارات وقطع الغيار والمحركات والشاحنات والمعدات الثقيلة والزراعية. أجب بالعربية الواضحة ما لم يكتب العميل بلغة أخرى. ساعد في فهم أقسام المتجر والبحث عن المنتجات وشرح خطوات الطلب بشكل عام. لا تخترع أسعاراً أو كميات أو توفر منتجات أو مواصفات غير موجودة في السؤال، ولا تدّع أنك ترى المخزون أو الطلبات أو حساب العميل. اطلب من العميل البحث في المتجر أو التواصل مع الشركة عند الحاجة إلى تأكيد السعر أو التوفر. لا تطلب كلمات مرور أو رموز تحقق أو بيانات بطاقات."
     )}
 
+def _normalize_order_search(value: Any) -> str:
+    value = str(value or "").casefold()
+    for old_char, new_char in (("أ","ا"),("إ","ا"),("آ","ا"),("ى","ي"),("ة","ه")):
+        value = value.replace(old_char, new_char)
+    return "".join(ch if ch.isalnum() else " " for ch in value)
+
+def _online_order_search_context(s: Session, message: str) -> list[dict]:
+    normalized = _normalize_order_search(message)
+    order_intent = any(term in normalized for term in ("طلب", "طلبات", "زبون", "زبائن", "عميل", "عملاء", "order", "orders", "customer"))
+    if not order_intent:
+        return []
+    stop_words = {"طلب","طلبات","الطلب","الطلبات","زبون","زبائن","الزبون","الزبائن","عميل","عملاء","العميل","العملاء","ابحث","بحث","اعرض","عرض","تفاصيل","تفصيل","عن","من","في","حالة","طلبات","الشراء","شراء","الكتروني","الالكتروني","الجديد","الجديدة","كل","اخر","احدث","رقم","order","orders","customer","customers","show","find","search","details","the","for"}
+    tokens = [x for x in normalized.split() if len(x) > 1 and x not in stop_words]
+    rows = s.scalars(select(OnlinePurchaseOrder).order_by(OnlinePurchaseOrder.id.desc()).limit(1000)).all()
+    scored = []
+    for order in rows:
+        customer = order.customer_data or {}
+        items = order.items or []
+        searchable = _normalize_order_search(" ".join([
+            str(order.id), str(customer.get("full_name","")), str(customer.get("email","")),
+            str(customer.get("full_phone","")), str(customer.get("shipping_address","")),
+            " ".join(str(x.get(k,"")) for x in items if isinstance(x,dict) for k in ("description","sku","model"))
+        ]))
+        if not tokens:
+            score = 1
+        else:
+            matched = sum(1 for token in tokens if token in searchable)
+            score = matched
+        if score:
+            scored.append((score, order))
+    scored.sort(key=lambda pair: (pair[0], pair[1].id), reverse=True)
+    results = []
+    for _, order in scored[:10]:
+        customer = order.customer_data or {}
+        results.append({
+            "id": order.id,
+            "customer_name": customer.get("full_name",""),
+            "phone": customer.get("full_phone",""),
+            "email": customer.get("email",""),
+            "shipping_address": customer.get("shipping_address",""),
+            "items": [{"name": x.get("description",""), "sku": x.get("sku",""), "model": x.get("model",""), "quantity": x.get("quantity",0), "unit_price": x.get("price",0)} for x in (order.items or []) if isinstance(x,dict)],
+            "total": float(order.total or 0),
+            "currency": order.currency,
+            "status": order.status,
+            "invoice_record_id": order.record_id,
+            "review_note": order.review_note or "",
+            "payment_proof_available": bool(order.payment_proof),
+            "created_at": order.created_at.isoformat() if order.created_at else None
+        })
+    return results
+
 @app.post("/ai/accounting-chat")
-def gemini_accounting_chat(payload: GeminiChatPayload, u: User = Depends(current_user)):
-    return {"reply": _gemini_reply(
-        payload.message, payload.history,
-        "أنت مساعد ذكي داخلي لبرنامج المحاسبة والإدارة في مجموعة AIB التجارية. أجب بالعربية الواضحة، واشرح الإجراءات المحاسبية وتنظيم الفواتير والصناديق والمخزون والتقارير. المستخدم الحالي دوره " + str(u.role) + ". لا تدّع أنك قرأت سجلات قاعدة البيانات أو أرصدة الصناديق أو بيانات العملاء؛ لم تُرسل إليك بيانات هذه السجلات. لا تكشف أو تطلب كلمات المرور أو مفاتيح API أو رموز التحقق. لا تقترح تنفيذ قيود مالية أو حذف بيانات دون مراجعة المستخدم والصلاحيات المعتمدة في التطبيق."
-    )}
+def gemini_accounting_chat(payload: GeminiChatPayload, s: Session = Depends(db), u: User = Depends(current_user)):
+    normalized_message = _normalize_order_search(payload.message)
+    order_intent = any(term in normalized_message for term in ("طلب","طلبات","زبون","زبائن","عميل","عملاء","order","orders","customer"))
+    orders = _online_order_search_context(s, payload.message) if order_intent and u.role == "owner" else []
+    if order_intent and u.role != "owner":
+        return {"reply":"البحث في طلبات الزبائن وتفاصيلهم متاح للمالك فقط حفاظاً على خصوصية بيانات العملاء. يمكنك طلب الصلاحية من المالك.","orders":[]}
+    order_context = json.dumps(orders, ensure_ascii=False)
+    system_prompt = (
+        "أنت مساعد ذكي داخلي لبرنامج المحاسبة والإدارة في مجموعة AIB التجارية. أجب بالعربية الواضحة، واشرح الإجراءات المحاسبية وتنظيم الفواتير والصناديق والمخزون والتقارير. "
+        "يمكنك البحث في طلبات الشراء الإلكتروني عندما يسأل المستخدم عنها. بيانات الطلبات الفعلية المصرح بها لهذا السؤال موجودة في سياق النظام التالي بصيغة JSON: " + order_context + ". "
+        "اعتمد على هذه البيانات فقط، ولا تخترع أي طلب أو معلومة. إذا كانت القائمة فارغة فقل إنه لم يتم العثور على طلب مطابق. اذكر رقم الطلب والاسم والهاتف والمنتجات والكميات والإجمالي والحالة وتاريخ الطلب عند توفرها. "
+        "لا تعرض إثبات الدفع نفسه أو بياناته المشفرة؛ اكتف بذكر هل الإثبات مرفق. المستخدم الحالي دوره " + str(u.role) + ". "
+        "لا تكشف أو تطلب كلمات المرور أو مفاتيح API أو رموز التحقق. لا تنفذ موافقة أو رفضاً أو تعديلاً مالياً؛ اشرح أن هذه الإجراءات تتم من شاشة مراجعة الطلبات وبصلاحيات التطبيق."
+    )
+    reply = _gemini_reply(payload.message, payload.history, system_prompt)
+    return {"reply": reply, "orders": orders}
