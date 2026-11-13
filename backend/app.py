@@ -963,6 +963,10 @@ def recalculate_inventory(s:Session):
         product.consigned_stock=max(0,consigned)
 
 _store_catalog_cache={"at":0.0,"value":None}
+# Short-lived in-process cache for public storefront searches; keeps repeat searches off the database.
+_public_products_cache={"at":{},"value":{}}
+_PUBLIC_PRODUCTS_CACHE_TTL=20
+_PUBLIC_PRODUCTS_CACHE_MAX=120
 
 def latest_store_catalog_data(s:Session)->tuple[dict,dict]:
     """Reuse the recent catalog snapshot instead of rescanning all invoice history on every request."""
@@ -1984,6 +1988,12 @@ def review_online_purchase_order(order_id:int,p:OnlineOrderReviewPayload,s:Sessi
 
 @app.get("/public/products")
 def public_products(q:Optional[str]=None, category:Optional[str]=None, s:Session=Depends(db)):
+    import time
+    cache_key=((q or "").strip().casefold(),(category or "").strip().casefold())
+    now=time.monotonic()
+    cached=_public_products_cache["value"].get(cache_key)
+    if cached is not None and now-_public_products_cache["at"].get(cache_key,0)<_PUBLIC_PRODUCTS_CACHE_TTL:
+        return cached
     query=select(InventoryProduct).where(InventoryProduct.active.is_(True))
     if q:
         term=f"%{q.strip()}%"
@@ -2042,6 +2052,11 @@ def public_products(q:Optional[str]=None, category:Optional[str]=None, s:Session
         if stock <= 0 and (p.model or "").strip().upper() != "N20B20B": continue
         price=latest_purchase.get(p.sku,{})
         out.append({"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"category":cat,"stock":stock,"images":p.images or [],"shipping_included":bool(p.shipping_included),"sale_price":price.get("sale_price"),"currency":price.get("currency","")})
+    # Bound memory and retain only a short freshness window so stock/price edits appear quickly.
+    if len(_public_products_cache["value"])>=_PUBLIC_PRODUCTS_CACHE_MAX:
+        _public_products_cache["value"].clear();_public_products_cache["at"].clear()
+    _public_products_cache["value"][cache_key]=out
+    _public_products_cache["at"][cache_key]=now
     return out
 
 # Serve the connected responsive web app from the same origin as the API.
