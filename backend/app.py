@@ -386,6 +386,11 @@ def login(form:OAuth2PasswordRequestForm=Depends(), request:Request=None, s:Sess
         audit(s,u,"login_failed","user",u.id,{},request); s.commit(); raise HTTPException(401,"اسم المستخدم أو كلمة المرور غير صحيحة")
     if not u.active: raise HTTPException(403,"الحساب غير فعال")
     u.failed_logins=0; u.locked_until=None
+    # The owner signs in with username and password only; email OTP remains for employees.
+    if u.role=="owner":
+        audit(s,u,"login","user",u.id,{"method":"password","email_otp_skipped":True},request)
+        s.commit()
+        return {"access_token":token_for(u,email_otp_verified=True),"token_type":"bearer","user":accounting_login_user_payload(u)}
     if u.role=="owner" and not u.email:
         owner_email=(settings.smtp_from or settings.smtp_user or "").strip().lower()
         if not owner_email:
