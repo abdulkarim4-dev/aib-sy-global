@@ -1101,10 +1101,10 @@ body{background-image:radial-gradient(ellipse at 90% 0,rgba(49,129,178,.10),tran
  .all-products-banner{padding:9px 12px!important}
 }
 </style>
-</head><body><header class="wrap top"><div class="brand"><a class="brand-logo-link" href="/" aria-label="العودة إلى الصفحة الرئيسية"><img src="/aib-logo.png?v=20261113-aib2" alt="AIB"></a><div><b>AIB GROUP</b><small>المتجر الإلكتروني الرسمي</small></div></div><button class="store-account-button" id="storeAccountButton" type="button" onclick="openStoreAuth()" aria-label="حساب العميل">تسجيل الدخول</button><button class="store-logout-button" id="storeLogoutButton" type="button" onclick="logoutStoreCustomer()" hidden>تسجيل الخروج</button><button class="cart-open" type="button" onclick="openCart()" aria-label="فتح سلة التسوق">🛒 <span>سلة التسوق</span><b id="cartCount">0</b></button></header>
-<button class="aib-menu-trigger" type="button" onclick="openAibStoreMenu()" aria-label="فتح قائمة المتجر" aria-controls="aibStoreDrawer" aria-expanded="false">
+</head><body><header class="wrap top"><button class="aib-menu-trigger" type="button" onclick="openAibStoreMenu()" aria-label="فتح قائمة المتجر" aria-controls="aibStoreDrawer" aria-expanded="false">
  <span></span><span></span><span></span>
-</button>
+</button><div class="brand"><a class="brand-logo-link" href="/" aria-label="العودة إلى الصفحة الرئيسية"><img src="/aib-logo.png?v=20261113-aib2" alt="AIB"></a><div><b>AIB GROUP</b><small>المتجر الإلكتروني الرسمي</small></div></div><button class="store-account-button" id="storeAccountButton" type="button" onclick="openStoreAuth()" aria-label="حساب العميل">تسجيل الدخول</button><button class="store-logout-button" id="storeLogoutButton" type="button" onclick="logoutStoreCustomer()" hidden>تسجيل الخروج</button><button class="cart-open" type="button" onclick="openCart()" aria-label="فتح سلة التسوق">🛒 <span>سلة التسوق</span><b id="cartCount">0</b></button></header>
+
 <div id="aibStoreMenuBackdrop" class="aib-store-menu-backdrop" onclick="closeAibStoreMenu()" hidden></div>
 <aside id="aibStoreDrawer" class="aib-store-drawer" aria-label="قائمة متجر AIB" aria-hidden="true">
  <div class="aib-drawer-head">
@@ -1612,7 +1612,8 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape'&&document.ge
 
 /* AIB store side navigation */
 .top{position:relative!important}
-.aib-menu-trigger{position:absolute!important;left:18px!important;top:50%!important;transform:translateY(-50%)!important;z-index:8!important;width:44px!important;height:44px!important;display:flex!important;flex-direction:column!important;justify-content:center!important;align-items:center!important;gap:5px!important;padding:0!important;border:1px solid #dbe4eb!important;border-radius:12px!important;background:linear-gradient(145deg,#fff,#f2f6f9)!important;box-shadow:0 5px 15px rgba(25,48,65,.09)!important;cursor:pointer!important}
+.top{position:relative!important;isolation:isolate!important}
+.aib-menu-trigger{position:absolute!important;left:18px!important;top:50%!important;transform:translateY(-50%)!important;z-index:20!important;width:44px!important;height:44px!important;display:flex!important;flex-direction:column!important;justify-content:center!important;align-items:center!important;gap:5px!important;padding:0!important;border:1px solid #dbe4eb!important;border-radius:12px!important;background:linear-gradient(145deg,#fff,#f2f6f9)!important;box-shadow:0 5px 15px rgba(25,48,65,.09)!important;cursor:pointer!important}
 .aib-menu-trigger span{display:block!important;width:19px!important;height:2px!important;border-radius:4px!important;background:#24516d!important;transition:transform .2s,opacity .2s}
 .aib-menu-trigger:hover{border-color:#6ca5c8!important;box-shadow:0 7px 18px rgba(36,104,146,.16)!important}
 .aib-store-menu-backdrop{position:fixed;inset:0;z-index:1800;background:rgba(10,20,29,.48);backdrop-filter:blur(3px)}
@@ -1651,7 +1652,7 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape'&&document.ge
 .aib-drawer-logout[hidden]{display:none!important}
 .aib-drawer-foot{margin-top:auto;padding:15px 4px 4px;text-align:center;color:#87959e;font-size:9px}
 .aib-drawer-foot span{padding:0 4px;color:#c18a55}
-@media(max-width:600px){.aib-menu-trigger{left:10px!important;width:40px!important;height:40px!important}.aib-store-drawer{padding:16px 13px 12px}.top .brand{margin-left:48px!important}}
+@media(max-width:600px){.aib-menu-trigger{left:10px!important;top:50%!important;width:40px!important;height:40px!important}.aib-store-drawer{padding:16px 13px 12px}.top .brand{margin-left:48px!important}}
 @media(prefers-reduced-motion:reduce){.aib-store-drawer,.aib-menu-trigger span{transition:none!important}}
 
 </style></body></html>
