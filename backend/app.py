@@ -1473,10 +1473,17 @@ def public_stats(s:Session=Depends(db)):
             purchases+=1
     return {"visible":profile_data.get("public_show_stats",True) is not False,"customers":len(customers),"sales":sales,"purchases":purchases,"records":len(rows)}
 
+def is_strong_store_password(value:str)->bool:
+    return len(value)>=8 and any(c.isupper() for c in value) and any(c.islower() for c in value) and any(c.isdigit() for c in value)
+
+def require_strong_store_password(value:str):
+    if not is_strong_store_password(value):
+        raise HTTPException(400,"يجب أن تتكون كلمة المرور من 8 خانات على الأقل، وتتضمن حرفاً كبيراً وحرفاً صغيراً ورقماً")
+
 class StoreRegisterPayload(BaseModel):
     full_name: str = Field(min_length=2, max_length=160)
     email: str = Field(min_length=5, max_length=254)
-    password: str = Field(min_length=10, max_length=256)
+    password: str = Field(min_length=8, max_length=256)
 class StoreLoginPayload(BaseModel):
     email: str = Field(min_length=5, max_length=254)
     password: str = Field(min_length=1, max_length=256)
@@ -1485,7 +1492,7 @@ class StorePasswordResetRequestPayload(BaseModel):
 class StorePasswordResetConfirmPayload(BaseModel):
     email: str = Field(min_length=5, max_length=254)
     code: str = Field(min_length=6, max_length=6)
-    new_password: str = Field(min_length=10, max_length=256)
+    new_password: str = Field(min_length=8, max_length=256)
 
 class StoreProfilePayload(BaseModel):
     full_name: str = Field(min_length=2,max_length=160)
@@ -1496,7 +1503,7 @@ class StoreProfilePayload(BaseModel):
     phone_number: str = Field(default="",max_length=32)
     avatar_data: Optional[str] = Field(default=None,max_length=1400000)
 class StoreChangePasswordPayload(BaseModel):
-    new_password: str = Field(min_length=10,max_length=256)
+    new_password: str = Field(min_length=8,max_length=256)
 class StorePasswordChangeConfirmPayload(BaseModel):
     token: str = Field(min_length=32,max_length=256)
 
@@ -1542,6 +1549,7 @@ def store_latest_prices(s:Session):
 
 @app.post("/store/auth/register")
 def store_register(p:StoreRegisterPayload, request:Request, s:Session=Depends(db)):
+    require_strong_store_password(p.password)
     email=p.email.strip().lower()
     if "@" not in email or "." not in email.rsplit("@",1)[-1]:
         raise HTTPException(400,"يرجى إدخال بريد إلكتروني صحيح")
@@ -1660,6 +1668,7 @@ def request_store_password_reset(p:StorePasswordResetRequestPayload, request:Req
 
 @app.post("/store/auth/password-reset/confirm")
 def confirm_store_password_reset(p:StorePasswordResetConfirmPayload, request:Request, s:Session=Depends(db)):
+    require_strong_store_password(p.new_password)
     email=p.email.strip().lower()
     customer=s.scalar(select(StoreCustomer).where(StoreCustomer.email==email,StoreCustomer.active.is_(True)))
     if not customer:
@@ -1790,6 +1799,7 @@ def update_store_profile(p:StoreProfilePayload, s:Session=Depends(db), customer:
 
 @app.post("/store/auth/change-password")
 def request_store_password_change(p:StoreChangePasswordPayload, request:Request, s:Session=Depends(db), customer:StoreCustomer=Depends(current_store_customer)):
+    require_strong_store_password(p.new_password)
     if password_hash.verify(p.new_password,customer.password_hash):
         raise HTTPException(400,"اختر كلمة مرور جديدة مختلفة عن الحالية")
     now=datetime.now(timezone.utc)
