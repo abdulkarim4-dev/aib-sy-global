@@ -1262,7 +1262,12 @@ async function submitOnlineOrder(){if(!requireStoreLogin())return;const button=d
 function downloadProvisionalInvoice(){const w=window.open('','_blank');if(!w){showCartNotice('اسمح بفتح النوافذ المنبثقة لتحميل الفاتورة','warning');return}w.document.open();w.document.write('<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><title>فاتورة طلب AIB</title><style>body{font-family:Tahoma,Arial;padding:35px;color:#111}.checkout-invoice{position:relative;overflow:hidden}.provisional-watermark{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%) rotate(-35deg);font-size:26px;font-weight:900;color:#a00000;opacity:.2;white-space:nowrap}.checkout-invoice table{width:100%;border-collapse:collapse}.checkout-invoice td,.checkout-invoice th{border:1px solid #aaa;padding:8px;text-align:right}</style>'+window.aibProvisionalInvoice+'</html>');w.document.close();w.focus();setTimeout(()=>w.print(),300)}
 let selected='';let allProductsMode=false;
 function category(c,b,fromHistory=false){
- allProductsMode=false;selected=c||'';
+ allProductsMode=false;searchPageMode=false;selected=c||'';
+ const categorySection=document.getElementById('categorySection');if(categorySection)categorySection.style.removeProperty('display');
+ const categoryHeader=document.getElementById('categoryPageHeader');if(categoryHeader)categoryHeader.style.removeProperty('display');
+ const searchHeading=document.getElementById('searchPageHeading');if(searchHeading)searchHeading.hidden=true;
+ const searchPanel=document.getElementById('searchFiltersPanel');if(searchPanel)searchPanel.hidden=true;
+ const searchToggle=document.querySelector('.search-page-filter-toggle');if(searchToggle){searchToggle.hidden=true;searchToggle.setAttribute('aria-expanded','false')}
  if(!fromHistory){const url=new URL(window.location.href);if(selected)url.searchParams.set('category',selected);else url.searchParams.delete('category');window.history.pushState({category:selected},'',url.pathname+url.search+url.hash)}
  document.querySelectorAll('.cat,.all-products-banner').forEach(x=>x.classList.remove('active'));
  if(b)b.classList.add('active');
@@ -1275,7 +1280,7 @@ function category(c,b,fromHistory=false){
  const heading=document.querySelector('.products-heading h2');
  if(selected){
   const products=document.querySelector('.products-section');if(products)products.hidden=false;
-  if(section)section.hidden=true;
+  if(section){section.hidden=true;section.style.removeProperty('display')}
   if(hero)hero.hidden=true;
   if(header)header.hidden=false;
   if(title)title.textContent=categoryName(selected);
