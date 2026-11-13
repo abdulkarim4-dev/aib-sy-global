@@ -1895,6 +1895,7 @@ def accounting_app():
 def sham_cash_qr():
     return FileResponse(FRONTEND_DIR / "sham_cash_qr.png", media_type="image/png")
 
+@app.get("/aib-logo.png", include_in_schema=False)
 @app.get("/aib-logo.webp", include_in_schema=False)
 def aib_original_logo():
     # Serve the original transparent AIB WebP asset directly from the same
