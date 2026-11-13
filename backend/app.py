@@ -1524,8 +1524,9 @@ class StoreCartPayload(BaseModel):
     items: list[StoreCartItemPayload] = Field(default_factory=list, max_length=100)
 
 def store_customer_token(customer:StoreCustomer):
+    # Customer sessions remain valid until the customer explicitly logs out or the account is disabled.
     now=datetime.now(timezone.utc)
-    return jwt.encode({"sub":str(customer.id),"typ":"store_customer","iat":now,"exp":now+timedelta(days=30)},settings.jwt_secret,algorithm="HS256")
+    return jwt.encode({"sub":str(customer.id),"typ":"store_customer","iat":now},settings.jwt_secret,algorithm="HS256")
 
 def store_product_category(name:str, model:str):
     value=(name+" "+(model or "")).lower()
