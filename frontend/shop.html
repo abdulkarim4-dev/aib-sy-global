@@ -1322,14 +1322,14 @@ const AIB_KNOWN_GENERATIONS={
  'ford':{'Focus':['Mk1','Mk2','Mk3','Mk4'],'Mustang':['Foxbody','SN95','S197','S550','S650'],'Explorer':['UN46','U152','U251','U502','U625']},
  'mazda':{'Mazda3':['BK','BL','BM','BN','BP'],'Mazda6':['GG','GH','GJ','GL'],'CX-5':['KE','KF','KH']}
 };
-function aibKnownGenerations(brand,model){const norm=v=>String(v||'').toLowerCase().replace(/[^a-z0-9]/g,'');const key=Object.keys(AIB_KNOWN_GENERATIONS).find(k=>norm(k)===norm(brand));if(!key)return[];const models=AIB_KNOWN_GENERATIONS[key];const m=Object.keys(models).find(k=>norm(k)===norm(model));return m?models[m]:[]}
+function aibKnownGenerations(brand,model){const norm=v=>String(v||'').toLowerCase().replace(/[^a-z0-9]/g,'');const key=Object.keys(AIB_KNOWN_GENERATIONS).find(k=>norm(k)===norm(brand));if(!key)return[];const models=AIB_KNOWN_GENERATIONS[key];const m=Object.keys(models).find(k=>norm(k)===norm(model)||norm(model).includes(norm(k))||norm(k).includes(norm(model)));return m?models[m]:[]}
 async function updateAibGenerationOptions(){
  const gen=document.getElementById('aibSearchGeneration'),brand=document.getElementById('aibSearchBrand')?.value||'',model=document.getElementById('aibSearchModel')?.value||'',group=document.getElementById('searchGroup')?.value||'';
  if(!gen)return;
  const request=++AIB_GENERATION_REQUEST;
  const setOptions=(names,source)=>{if(request!==AIB_GENERATION_REQUEST)return;const current=gen.value;gen.innerHTML='<option value="">'+(names.length?'كل أجيال '+esc(model):'لا توجد أجيال مسجلة لهذا الطراز')+'</option>'+names.map(n=>'<option value="'+esc(n)+'">'+esc(n)+'</option>').join('');if(names.includes(current))gen.value=current;gen.dataset.source=source||'none'};
  if(!brand||!model){setOptions([],'none');gen.options[0].textContent='اختر الشركة والطراز لعرض الأجيال الفعلية';return}
- if(group!=='cars'){setOptions([],'none');gen.options[0].textContent='الأجيال متاحة لفئة السيارات فقط';return}
+ if(group&&group!=='cars'){setOptions([],'none');gen.options[0].textContent='الأجيال متاحة لفئة السيارات فقط';return}
  const fallback=aibKnownGenerations(brand,model);
  if(fallback.length)setOptions(fallback,'AIB verified fallback');
  const normalize=value=>String(value||'').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'');
