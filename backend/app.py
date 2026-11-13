@@ -2224,39 +2224,58 @@ def _normalize_order_search(value: Any) -> str:
 
 def _online_order_search_context(s: Session, message: str) -> list[dict]:
     normalized = _normalize_order_search(message)
-    order_intent = any(term in normalized for term in ("طلب", "طلبات", "زبون", "زبائن", "عميل", "عملاء", "order", "orders", "customer"))
-    if not order_intent:
-        return []
-    stop_words = {"طلب","طلبات","الطلب","الطلبات","زبون","زبائن","الزبون","الزبائن","عميل","عملاء","العميل","العملاء","ابحث","بحث","اعرض","عرض","تفاصيل","تفصيل","عن","من","في","حالة","طلبات","الشراء","شراء","الكتروني","الالكتروني","الجديد","الجديدة","كل","اخر","احدث","رقم","order","orders","customer","customers","show","find","search","details","the","for"}
+    stop_words = {"طلب","طلبات","الطلب","الطلبات","زبون","زبائن","الزبون","الزبائن","عميل","عملاء","العميل","العملاء","ابحث","بحث","اعرض","عرض","تفاصيل","تفصيل","عن","من","في","حالة","الشراء","شراء","الكتروني","الالكتروني","الجديد","الجديدة","كل","اخر","احدث","رقم","order","orders","customer","customers","show","find","search","details","the","for"}
     tokens = [x for x in normalized.split() if len(x) > 1 and x not in stop_words]
-    rows = s.scalars(select(OnlinePurchaseOrder).order_by(OnlinePurchaseOrder.id.desc()).limit(1000)).all()
+    # Search the complete order history (newest first); do not limit the candidate
+    # set before matching because an older customer order may otherwise be missed.
+    rows = s.scalars(select(OnlinePurchaseOrder).order_by(OnlinePurchaseOrder.id.desc())).all()
     scored = []
     for order in rows:
         customer = order.customer_data or {}
         items = order.items or []
+        item_terms = " ".join(str(x.get(k,"")) for x in items if isinstance(x,dict) for k in ("description","sku","model","product_name","name"))
         searchable = _normalize_order_search(" ".join([
-            str(order.id), str(customer.get("full_name","")), str(customer.get("email","")),
-            str(customer.get("full_phone","")), str(customer.get("shipping_address","")),
-            " ".join(str(x.get(k,"")) for x in items if isinstance(x,dict) for k in ("description","sku","model"))
+            str(order.id), str(customer.get("full_name","")), str(customer.get("first_name","")),
+            str(customer.get("last_name","")), str(customer.get("email","")),
+            str(customer.get("full_phone","")), str(customer.get("phone_number","")),
+            str(customer.get("shipping_address","")), item_terms
         ]))
         if not tokens:
             score = 1
         else:
             matched = sum(1 for token in tokens if token in searchable)
-            score = matched
+            # Require a meaningful match rather than returning unrelated orders.
+            score = matched if matched == len(tokens) else 0
         if score:
             scored.append((score, order))
     scored.sort(key=lambda pair: (pair[0], pair[1].id), reverse=True)
     results = []
     for _, order in scored[:10]:
         customer = order.customer_data or {}
+        item_results = []
+        for line in (order.items or []):
+            if not isinstance(line,dict):
+                continue
+            sku = str(line.get("sku","")).strip().upper()
+            product = s.scalar(select(InventoryProduct).where(InventoryProduct.sku == sku)) if sku else None
+            available = float((product.owned_stock or 0) + (product.consigned_stock or 0)) if product and product.active else 0
+            item_results.append({
+                "name": line.get("description") or line.get("product_name") or line.get("name",""),
+                "sku": sku,
+                "model": line.get("model",""),
+                "quantity": line.get("quantity",0),
+                "unit_price": line.get("price",0),
+                "inventory_found": bool(product and product.active),
+                "inventory_available": available,
+                "inventory_status": ("متوفر" if available >= float(line.get("quantity") or 0) else "المخزون أقل من كمية الطلب") if product and product.active else "المنتج غير موجود حالياً في المخزون"
+            })
         results.append({
             "id": order.id,
             "customer_name": customer.get("full_name",""),
-            "phone": customer.get("full_phone",""),
+            "phone": customer.get("full_phone") or (str(customer.get("phone_country_code","")) + str(customer.get("phone_number",""))),
             "email": customer.get("email",""),
             "shipping_address": customer.get("shipping_address",""),
-            "items": [{"name": x.get("description",""), "sku": x.get("sku",""), "model": x.get("model",""), "quantity": x.get("quantity",0), "unit_price": x.get("price",0)} for x in (order.items or []) if isinstance(x,dict)],
+            "items": item_results,
             "total": float(order.total or 0),
             "currency": order.currency,
             "status": order.status,
