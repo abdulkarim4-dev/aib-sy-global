@@ -1897,8 +1897,17 @@ def sham_cash_qr():
 
 @app.get("/aib-logo.webp", include_in_schema=False)
 def aib_original_logo():
-    logo_data = base64.b64decode((FRONTEND_DIR / "aib-logo.webp.b64").read_text(encoding="ascii").strip())
-    return Response(content=logo_data, media_type="image/webp", headers={"Cache-Control": "public, max-age=86400"})
+    # Serve the original transparent AIB WebP asset directly from the same
+    # frontend directory copied into the production Docker image.
+    logo_path = FRONTEND_DIR / "aib-logo.webp"
+    if not logo_path.is_file():
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="AIB logo asset not found")
+    return FileResponse(
+        logo_path,
+        media_type="image/webp",
+        headers={"Cache-Control": "public, max-age=86400, immutable"},
+    )
 
 @app.get("/logos/{filename}", include_in_schema=False)
 def brand_logo(filename: str):
