@@ -2209,12 +2209,48 @@ def _gemini_reply(message: str, history: list[dict[str, str]], system_prompt: st
         raise HTTPException(502, "لم يُرجع Gemini إجابة نصية. أعد صياغة السؤال.")
     return answer.strip()
 
+def _store_inventory_search(s: Session, message: str) -> list[dict]:
+    normalized = _normalize_order_search(message)
+    stop_words = {"اريد","ابغي","ابحث","بحث","عن","لي","من","في","متجر","المتجر","قسم","المحركات","محركات","محرك","مكينة","كامل","كامله","كاملة","رجاء","لو","سمحت","هل","يوجد","موجود","متوفر","شراء","طلب","السعر","كم","تفاصيل","اريد","engine","full","complete","please","find","search","the","for"}
+    tokens = [x for x in normalized.split() if len(x) > 1 and x not in stop_words]
+    query = select(InventoryProduct).where(InventoryProduct.active.is_(True))
+    # Prefer explicit model/SKU/name identifiers such as N63; when absent, search engine products.
+    if tokens:
+        clauses = []
+        for token in tokens:
+            pattern = f"%{token}%"
+            clauses.extend([InventoryProduct.sku.ilike(pattern), InventoryProduct.name.ilike(pattern), InventoryProduct.model.ilike(pattern)])
+        query = query.where(or_(*clauses))
+    else:
+        query = query.where(or_(InventoryProduct.name.ilike("%محرك%"), InventoryProduct.name.ilike("%engine%"), InventoryProduct.model.ilike("%N63%")))
+    rows = s.scalars(query.order_by(InventoryProduct.sku).limit(40)).all()
+    # For generic "complete engine" requests, do not return unrelated parts.
+    engine_rows = [p for p in rows if any(term in _normalize_order_search((p.name or "") + " " + (p.model or "")) for term in ("محرك","engine","مكينه")) or (p.model or "").upper().startswith(("N","B","M","S"))]
+    if engine_rows:
+        rows = engine_rows
+    _, latest_purchase = latest_store_catalog_data(s)
+    results = []
+    for p in rows[:12]:
+        stock = float(p.owned_stock or 0) + float(p.consigned_stock or 0)
+        pricing = latest_purchase.get(p.sku, {})
+        results.append({"id":p.id,"sku":p.sku,"name":p.name,"model":p.model or "","stock":stock,
+                        "sale_price":pricing.get("sale_price"),"currency":pricing.get("currency",""),
+                        "images":(p.images or [])[:3]})
+    return results
+
 @app.post("/ai/store-chat")
-def gemini_store_chat(payload: GeminiChatPayload):
-    return {"reply": _gemini_reply(
-        payload.message, payload.history,
-        "أنت مساعد خدمة العملاء لمتجر مجموعة AIB التجارية لبيع السيارات وقطع الغيار والمحركات والشاحنات والمعدات الثقيلة والزراعية. أجب بالعربية الواضحة ما لم يكتب العميل بلغة أخرى. ساعد في فهم أقسام المتجر والبحث عن المنتجات وشرح خطوات الطلب بشكل عام. لا تخترع أسعاراً أو كميات أو توفر منتجات أو مواصفات غير موجودة في السؤال، ولا تدّع أنك ترى المخزون أو الطلبات أو حساب العميل. اطلب من العميل البحث في المتجر أو التواصل مع الشركة عند الحاجة إلى تأكيد السعر أو التوفر. لا تطلب كلمات مرور أو رموز تحقق أو بيانات بطاقات."
-    )}
+def gemini_store_chat(payload: GeminiChatPayload, s: Session = Depends(db)):
+    products = _store_inventory_search(s, payload.message)
+    product_context = json.dumps(products, ensure_ascii=False)
+    system_prompt = (
+        "أنت مساعد خدمة العملاء لمتجر مجموعة AIB التجارية. أجب بالعربية الواضحة. "
+        "إذا طلب العميل منتجاً أو محركاً أو قطعة، اعتمد أولاً على نتائج المخزون الفعلية التالية بصيغة JSON: " + product_context + ". "
+        "إذا وجدت منتجات فاذكر الاسم والطراز ورقم الصنف والكمية والسعر فقط إذا كانت متاحة في البيانات، ولا تطلب من العميل البحث يدوياً. "
+        "إذا لم توجد نتائج مطابقة فقل بوضوح إن البحث لم يعثر على منتج مطابق واطلب معلومة واحدة تساعد على تضييق البحث. "
+        "لا تخترع سعراً أو كمية أو مواصفة، ولا تدّع توفر منتج غير موجود في النتائج. لا تكشف بيانات العملاء أو الطلبات. لا تطلب كلمات مرور أو رموز تحقق أو بيانات بطاقات."
+    )
+    reply = _gemini_reply(payload.message, payload.history, system_prompt)
+    return {"reply": reply, "products": products}
 
 def _normalize_order_search(value: Any) -> str:
     value = str(value or "").casefold()
