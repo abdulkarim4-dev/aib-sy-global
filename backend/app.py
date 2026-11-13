@@ -2249,7 +2249,17 @@ def gemini_store_chat(payload: GeminiChatPayload, s: Session = Depends(db)):
         "إذا لم توجد نتائج مطابقة فقل بوضوح إن البحث لم يعثر على منتج مطابق واطلب معلومة واحدة تساعد على تضييق البحث. "
         "لا تخترع سعراً أو كمية أو مواصفة، ولا تدّع توفر منتج غير موجود في النتائج. لا تكشف بيانات العملاء أو الطلبات. لا تطلب كلمات مرور أو رموز تحقق أو بيانات بطاقات."
     )
-    reply = _gemini_reply(payload.message, payload.history, system_prompt)
+    try:
+        reply = _gemini_reply(payload.message, payload.history, system_prompt)
+    except HTTPException as exc:
+        # Inventory search must remain usable even when Google's Gemini quota
+        # or service is temporarily unavailable.
+        if products:
+            reply = "عثرت على نتائج في مخزون مجموعة AIB. أدرجت تفاصيل المحركات والمنتجات المتاحة أدناه. قد يتأخر الرد الذكي مؤقتاً، لكن نتائج المخزون مباشرة."
+        elif exc.status_code in (429, 502, 503, 504):
+            reply = "تعذر الاتصال بمساعد Gemini مؤقتاً، ولم يعثر البحث الحالي على منتج مطابق في المخزون. جرّب رقم الطراز أو اسم المحرك مرة أخرى."
+        else:
+            raise
     return {"reply": reply, "products": products}
 
 def _normalize_order_search(value: Any) -> str:
