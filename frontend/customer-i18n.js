@@ -1,5 +1,48 @@
 (()=>{"use strict";
 const dict={
+ar:{
+"Passenger cars":"السيارات السياحية",
+"Passenger car":"سيارة سياحية",
+"Trucks":"الشاحنات",
+"Heavy equipment":"المعدات الثقيلة",
+"Agricultural equipment":"المعدات الزراعية",
+"Engines":"المحركات",
+"Passenger cars engines":"محركات السيارات السياحية",
+"SKU:":"رمز المنتج:",
+"SKU":"رمز المنتج",
+"USD":"دولار أمريكي",
+"Price includes shipping and delivery within Syria":"السعر يشمل أجور الشحن والتوصيل داخل سوريا",
+"Price includes shipping and delivery":"السعر يشمل أجور الشحن والتوصيل",
+"Buy now":"شراء الآن",
+"WhatsApp":"واتساب",
+"View details":"عرض التفاصيل",
+"Show details":"عرض التفاصيل",
+"Available:":"المتاح:",
+"Available":"متوفر",
+"Out of stock":"غير متوفر",
+"Add to cart":"أضف إلى السلة",
+"Add to Cart":"أضف إلى السلة",
+"View product":"عرض المنتج",
+"Product details":"تفاصيل المنتج",
+"Shipping included":"الشحن مشمول",
+"Shipping and delivery within Syria":"الشحن والتوصيل داخل سوريا",
+"Search":"بحث",
+"Search products":"البحث عن المنتجات",
+"Sort by":"ترتيب حسب",
+"Default":"افتراضي",
+"Loading...":"جارٍ التحميل...",
+"Loading…":"جارٍ التحميل…",
+"Close":"إغلاق",
+"Back":"رجوع",
+"Quantity":"الكمية",
+"Price":"السعر",
+"Model":"الموديل",
+"Generation":"الجيل",
+"Year":"السنة",
+"Fuel":"الوقود",
+"Manufacturer":"الشركة المصنعة"
+},
+
 en:{
 "إعدادات المتجر":"Store settings","لغة عرض المتجر":"Store display language","تلقائي — حسب لغة الهاتف":"Automatic — use phone language","يتم اختيار لغة الهاتف تلقائياً، ويمكنك تثبيت لغة أخرى من هنا.":"The store follows your phone language automatically. You can choose another language here.",
 "لغة المتجر":"Store language","اختر لغة عرض المتجر":"Choose store display language","سيُحفظ اختيارك ويُطبّق على صفحات العرض والمتجر عند زيارتك القادمة.":"Your choice will be saved and used on the presentation and store pages on your next visit.",
@@ -30,7 +73,7 @@ const langs=Object.keys(dict);
 function detect(){const prefs=(navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language||"en"]).map(x=>(x||"").toLowerCase());for(const p of prefs){const base=p.split("-")[0];if(base==="ar")return "ar";if(langs.includes(base))return base;}return "en";}
 const languageKey="aib_customer_language";
 let savedLanguage="";try{savedLanguage=localStorage.getItem(languageKey)||"";}catch(e){}
-const lang=(savedLanguage==="ar"||langs.includes(savedLanguage))?savedLanguage:detect(), map=dict[lang]||dict.en, rtl=lang==="ar";
+const lang=(savedLanguage==="ar"||langs.includes(savedLanguage))?savedLanguage:detect(), map=dict[lang]||{}, rtl=lang==="ar";
 window.setAibCustomerLanguage=function(value){
  if(value==="auto"){try{localStorage.removeItem(languageKey);}catch(e){}location.reload();return;}
  if(value!=="ar"&&!langs.includes(value))return;
@@ -51,7 +94,7 @@ const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let n;
 while((n=walker.nextNode())){if(n.nodeValue&&n.nodeValue.trim())n.nodeValue=translateString(n.nodeValue);}
 const attrs=["placeholder","title","aria-label","alt"];root.querySelectorAll?.("*").forEach(el=>{for(const a of attrs){const v=el.getAttribute(a);if(v){const t=translateString(v);if(t!==v)el.setAttribute(a,t);}}if(el.tagName==="INPUT"||el.tagName==="BUTTON"){if(el.value){const t=translateString(el.value);if(t!==el.value)el.value=t;}}});
 }
-if(lang!=="ar"){const title=translateString(document.title);document.title=title;apply(document.body);}
+{const title=translateString(document.title);document.title=title;apply(document.body);}
 const observer=new MutationObserver(records=>{for(const rec of records){if(rec.type==="characterData"){const t=translateString(rec.target.nodeValue);if(t!==rec.target.nodeValue)rec.target.nodeValue=t;}else rec.addedNodes.forEach(n=>{if(n.nodeType===Node.TEXT_NODE){const t=translateString(n.nodeValue);if(t!==n.nodeValue)n.nodeValue=t;}else if(n.nodeType===Node.ELEMENT_NODE)apply(n);});}});
 observer.observe(document.documentElement,{subtree:true,childList:true,characterData:true});
 })();
