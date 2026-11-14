@@ -912,6 +912,17 @@ def prepare_record_inventory(s:Session, section:str, raw_data:dict, allow_legacy
     for raw in items:
         if not isinstance(raw,dict): continue
         item=dict(raw)
+        # Normalize dedicated vehicle fields before the empty-line guard.
+        # This ensures a vehicle purchase creates an inventory product even
+        # when the generic description/model inputs were left blank.
+        vehicle_make=str(item.get("vehicle_make") or "").strip()
+        vehicle_model=str(item.get("vehicle_model") or "").strip()
+        vehicle_type=str(item.get("vehicle_type") or "").strip()
+        if vehicle_make or vehicle_model:
+            if not str(item.get("description") or "").strip():
+                item["description"]=" ".join(x for x in (vehicle_make,vehicle_model) if x).strip() or vehicle_type or "مركبة كاملة"
+            if not str(item.get("model") or "").strip():
+                item["model"]=vehicle_model
         name=str(item.get("description") or item.get("model") or "").strip()
         model=str(item.get("model") or "").strip()
         sku=str(item.get("sku") or "").strip().upper()
@@ -1084,7 +1095,14 @@ def create_record(p:RecordCreate, request:Request, s:Session=Depends(db), u:User
     prepared_data=prepare_record_inventory(s,p.section,p.data)
     consume_operation_verification(s,u,"invoice_create",p.verification_token)
     r=Record(section=p.section,invoice_no=invoice_no,currency=p.currency,data=prepared_data,created_by=u.id)
-    s.add(r); s.flush(); recalculate_inventory(s); audit(s,u,"record_created","record",r.id,{"section":r.section,"invoice_no":r.invoice_no},request); s.commit(); return {"id":r.id,"invoice_no":r.invoice_no,"created_at":r.created_at}
+    s.add(r); s.flush(); recalculate_inventory(s); audit(s,u,"record_created","record",r.id,{"section":r.section,"invoice_no":r.invoice_no},request); s.commit()
+    # Invalidate shop catalog caches immediately after a stock-changing record.
+    if p.section in {"purchase","carPurchase","deposit"}:
+        _store_catalog_cache["value"]=None
+        _store_catalog_cache["at"]=0
+        _public_products_cache["value"].clear()
+        _public_products_cache["at"].clear()
+    return {"id":r.id,"invoice_no":r.invoice_no,"created_at":r.created_at}
 @app.get("/records")
 def list_records(section:Optional[str]=None, s:Session=Depends(db), u:User=Depends(require_permission("invoices","view"))):
     q=select(Record).where(Record.deleted==False)
