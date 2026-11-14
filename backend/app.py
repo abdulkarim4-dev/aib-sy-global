@@ -998,7 +998,7 @@ def latest_store_catalog_data(s:Session)->tuple[dict,dict]:
                 family=str(item.get("store_family") or "").strip()
                 category=str(item.get("store_category") or "").strip()
                 if category in allowed.get(family,set()):
-                    latest_categories[sku]={"store_family":family,"store_category":category}
+                    latest_categories[sku]={"store_family":family,"store_category":category,"vehicle_details":{k:item.get(k) for k in ("vehicle_type","vehicle_make","vehicle_model","vehicle_generation","vehicle_year","vehicle_odometer","vehicle_fuel","vehicle_color","chassis") if item.get(k) not in (None,"")}}
     result=(latest_categories,latest_prices)
     _store_catalog_cache["value"]=result
     _store_catalog_cache["at"]=now
@@ -2156,7 +2156,7 @@ def public_products(q:Optional[str]=None, category:Optional[str]=None, s:Session
         # Keep the N20 engine visible as an out-of-stock catalog item; do not expose other zero-stock items.
         if stock <= 0 and (p.model or "").strip().upper() != "N20B20B": continue
         price=latest_purchase.get(p.sku,{})
-        out.append({"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"category":cat,"stock":stock,"images":p.images or [],"shipping_included":bool(p.shipping_included),"sale_price":price.get("sale_price"),"currency":price.get("currency","")})
+        out.append({"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"category":cat,"stock":stock,"images":p.images or [],"shipping_included":bool(p.shipping_included),"vehicle_details":store_categories.get(p.sku,{}).get("vehicle_details",{}),"sale_price":price.get("sale_price"),"currency":price.get("currency","")})
     # Bound memory and retain only a short freshness window so stock/price edits appear quickly.
     if len(_public_products_cache["value"])>=_PUBLIC_PRODUCTS_CACHE_MAX:
         _public_products_cache["value"].clear();_public_products_cache["at"].clear()
