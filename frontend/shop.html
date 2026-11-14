@@ -2085,3 +2085,60 @@ input.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventD
 </body></html>
 
 <style id="aib-hide-vehicle-identity-fields-fix">.catalog-tools .aib-vehicle-search label[hidden]{display:none!important;}</style>
+
+<style id="aib-professional-floating-buttons">
+/* Buttons only: premium vertical AIB control stack */
+html body .aib-gemini-dock{
+ position:fixed!important;right:max(18px,env(safe-area-inset-right))!important;
+ bottom:max(18px,env(safe-area-inset-bottom))!important;left:auto!important;top:auto!important;
+ z-index:2147483000!important;display:flex!important;flex-direction:column!important;
+ align-items:center!important;gap:10px!important;width:auto!important;height:auto!important;
+ padding:0!important;margin:0!important;border:0!important;border-radius:0!important;
+ background:transparent!important;box-shadow:none!important;backdrop-filter:none!important;
+ -webkit-backdrop-filter:none!important;transform:none!important
+}
+html body #aibGeminiStoreFab{
+ width:174px!important;min-width:174px!important;min-height:48px!important;
+ padding:11px 14px!important;border:1px solid rgba(174,211,232,.48)!important;
+ border-radius:15px!important;background:linear-gradient(135deg,#173b54 0%,#205f7e 70%,#24718a 100%)!important;
+ color:#fff!important;font:800 13px/1.4 Tahoma,Arial,sans-serif!important;
+ letter-spacing:0!important;text-shadow:0 1px 2px rgba(0,0,0,.22)!important;
+ box-shadow:0 7px 19px rgba(13,35,51,.25),inset 0 1px 0 rgba(255,255,255,.17)!important;
+ transition:transform .18s ease,box-shadow .18s ease,filter .18s ease!important
+}
+html body #aibGeminiStoreFab:hover{
+ transform:translateY(-2px)!important;filter:brightness(1.08)!important;
+ box-shadow:0 10px 24px rgba(13,35,51,.30),inset 0 1px 0 rgba(255,255,255,.2)!important
+}
+html body .aib-gemini-social{
+ display:flex!important;flex-direction:column!important;align-items:center!important;
+ justify-content:flex-start!important;gap:9px!important;width:auto!important;padding:0!important
+}
+html body .aib-gemini-social a{
+ width:46px!important;height:46px!important;flex:0 0 46px!important;box-sizing:border-box!important;
+ display:grid!important;place-items:center!important;border:1px solid rgba(182,199,212,.30)!important;
+ border-radius:14px!important;background:linear-gradient(145deg,rgba(34,48,60,.96),rgba(17,29,40,.96))!important;
+ color:#e9f0f5!important;text-decoration:none!important;
+ box-shadow:0 5px 14px rgba(9,20,30,.22),inset 0 1px 0 rgba(255,255,255,.10)!important;
+ transition:transform .18s ease,border-color .18s ease,background .18s ease!important;
+ backdrop-filter:none!important;-webkit-backdrop-filter:none!important
+}
+html body .aib-gemini-social a svg{display:block!important;width:19px!important;height:19px!important}
+html body .aib-gemini-social a:hover{
+ transform:translateY(-2px)!important;border-color:rgba(224,237,246,.65)!important;
+ background:linear-gradient(145deg,#30485a,#1b3041)!important
+}
+html body .aib-gemini-social .wa{color:#57dda0!important}
+html body .aib-gemini-social .fb{color:#8dbdff!important}
+html body .aib-gemini-social .ig{color:#f5a0c4!important}
+html body .aib-gemini-social .call{color:#b8dcf3!important}
+@media(max-width:520px){
+ html body .aib-gemini-dock{right:12px!important;bottom:max(12px,env(safe-area-inset-bottom))!important;gap:8px!important}
+ html body #aibGeminiStoreFab{width:158px!important;min-width:158px!important;min-height:44px!important;padding:9px 11px!important;font-size:12px!important}
+ html body .aib-gemini-social{gap:8px!important}
+ html body .aib-gemini-social a{width:42px!important;height:42px!important;flex-basis:42px!important;border-radius:13px!important}
+}
+@media(prefers-reduced-motion:reduce){
+ html body #aibGeminiStoreFab,html body .aib-gemini-social a{transition:none!important}
+}
+</style>
