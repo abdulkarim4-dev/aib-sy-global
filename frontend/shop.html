@@ -2172,46 +2172,49 @@ header.top>.aib-menu-trigger{
 </style>
 
 <style id="aib-category-images-final">
-/* Final category image layer: one reliable rule set after every older theme block. */
+/* Category photography: selected external images mapped to the exact category keys. */
 .category-zone .cats .cat{
-  position:relative!important;isolation:isolate!important;overflow:hidden!important;
-  min-height:126px!important;padding:14px!important;
-  display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:flex-end!important;
-  gap:7px!important;border:1px solid #aab8c3!important;border-radius:13px!important;
-  background-color:#263744!important;background-size:cover!important;background-position:center!important;background-repeat:no-repeat!important;
-  color:#fff!important;text-shadow:0 2px 7px #000!important;
+ position:relative!important;isolation:isolate!important;overflow:hidden!important;
+ min-height:126px!important;padding:14px!important;display:flex!important;flex-direction:column!important;
+ align-items:center!important;justify-content:flex-end!important;gap:7px!important;
+ border:1px solid #aab8c3!important;border-radius:13px!important;
+ background-color:#263744!important;background-size:cover!important;background-position:center!important;
+ background-repeat:no-repeat!important;color:#fff!important;text-shadow:0 2px 7px #000!important;
 }
 .category-zone .cats .cat::before{content:none!important;display:none!important}
-.category-zone .cats .cat::after{
-  content:""!important;position:absolute!important;inset:0!important;z-index:0!important;display:block!important;
-  background:linear-gradient(0deg,rgba(5,13,20,.88),rgba(5,13,20,.08) 85%)!important;pointer-events:none!important
-}
+.category-zone .cats .cat::after{content:""!important;position:absolute!important;inset:0!important;z-index:0!important;
+ display:block!important;background:linear-gradient(0deg,rgba(5,13,20,.88),rgba(5,13,20,.06) 85%)!important;pointer-events:none!important}
 .category-zone .cats .cat .cat-icon,.category-zone .cats .cat>span:not(.cat-icon){position:relative!important;z-index:1!important}
 .category-zone .cats .cat .cat-icon{display:none!important}
 .category-zone .cats .cat>span:not(.cat-icon){color:#fff!important;font-size:12px!important;font-weight:900!important;line-height:1.6!important;text-shadow:0 2px 8px #000!important}
-.category-zone .cats .cat:hover,.category-zone .cats .cat.active{transform:translateY(-3px)!important;border-color:#e87936!important;box-shadow:0 12px 24px #0004!important}
+/* Passenger cars and their parts */
 .category-zone .cats .cat[onclick="category('cars',this)"]{background-image:url('https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=1000&q=85')!important}
-.category-zone .cats .cat[onclick="category('car_parts',this)"]{background-image:url('https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&w=1000&q=85')!important}
+.category-zone .cats .cat[onclick="category('car_parts',this)"]{background-image:url('https://fljoffroad.com/cdn/shop/collections/pieces_detachees_de_moteur_FLJ_Offroad.png?width=1000')!important}
 .category-zone .cats .cat[onclick="category('car_engines',this)"]{background-image:url('https://images.unsplash.com/photo-1552656967-7a0991a13906?auto=format&fit=crop&w=1000&q=85')!important}
-.category-zone .cats .cat[onclick="category('car_engine_parts',this)"]{background-image:url('https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=1000&q=85')!important}
+.category-zone .cats .cat[onclick="category('car_engine_parts',this)"]{background-image:url('https://www.deere.co.in/assets/images/region-1/parts-and-service/engine-parts/parts-engineparts-maintenancesupport-1298x768.jpg')!important}
+/* Trucks */
 .category-zone .cats .cat[onclick="category('trucks',this)"]{background-image:url('https://images.unsplash.com/photo-1519003722824-194d4455a60c?auto=format&fit=crop&w=1000&q=85')!important}
 .category-zone .cats .cat[onclick="category('truck_parts',this)"]{background-image:url('https://images.unsplash.com/photo-1487754180451-c456f719a1fc?auto=format&fit=crop&w=1000&q=85')!important}
 .category-zone .cats .cat[onclick="category('truck_engines',this)"]{background-image:url('https://images.unsplash.com/photo-1581092334651-ddf26d9a09d0?auto=format&fit=crop&w=1000&q=85')!important}
-.category-zone .cats .cat[onclick="category('truck_engine_parts',this)"]{background-image:url('https://images.unsplash.com/photo-1581092918056-0c4c3acd3781?auto=format&fit=crop&w=1000&q=85')!important}
+.category-zone .cats .cat[onclick="category('truck_engine_parts',this)"]{background-image:url('https://image.madeinchina.com/202f0j00uBdcypoMfEze/Sinotruk-HOWO-Weichai-Engine-Truck-Parts-Generator-Foton-FAW-Shaanxi-Automobile-Dongfeng-Auto-Parts-Diesel-Generator-Spare-Parts-Supplier.webp')!important}
+/* Heavy machinery */
 .category-zone .cats .cat[onclick="category('heavy',this)"]{background-image:url('https://images.unsplash.com/photo-1580901368919-7738efb0f87e?auto=format&fit=crop&w=1000&q=85')!important}
 .category-zone .cats .cat[onclick="category('heavy_parts',this)"]{background-image:url('https://images.unsplash.com/photo-1579412690850-bd41cd0af397?auto=format&fit=crop&w=1000&q=85')!important}
 .category-zone .cats .cat[onclick="category('heavy_engines',this)"]{background-image:url('https://images.unsplash.com/photo-1530267981375-f0de937f5f13?auto=format&fit=crop&w=1000&q=85')!important}
-.category-zone .cats .cat[onclick="category('heavy_engine_parts',this)"]{background-image:url('https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=1000&q=85')!important}
+.category-zone .cats .cat[onclick="category('heavy_engine_parts',this)"]{background-image:url('https://la.develon-ce.com/emerging/img/parts-service/genuine-parts/m_engine-parts_list4_img.jpg')!important}
+/* Agricultural machinery */
 .category-zone .cats .cat[onclick="category('agri',this)"]{background-image:url('https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&w=1000&q=85')!important}
-.category-zone .cats .cat[onclick="category('agri_parts',this)"]{background-image:url('https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&w=1000&q=85')!important}
-.category-zone .cats .cat[onclick="category('agri_engines',this)"]{background-image:url('https://images.unsplash.com/photo-1581092918056-0c4c3acd3781?auto=format&fit=crop&w=1000&q=85')!important}
-.category-zone .cats .cat[onclick="category('agri_engine_parts',this)"]{background-image:url('https://images.unsplash.com/photo-1487754180451-c456f719a1fc?auto=format&fit=crop&w=1000&q=85')!important}
+.category-zone .cats .cat[onclick="category('agri_parts',this)"]{background-image:url('https://roltech-czesci.pl/assets/images/czesci-lubliniec.jpg')!important}
+.category-zone .cats .cat[onclick="category('agri_engines',this)"]{background-image:url('https://www.deere.co.in/assets/images/region-1/parts-and-service/engine-parts/parts-engineparts-maintenancesupport-1298x768.jpg')!important}
+.category-zone .cats .cat[onclick="category('agri_engine_parts',this)"]{background-image:url('https://roltech-czesci.pl/assets/images/czesci-lubliniec.jpg')!important}
+/* Generators, pumps, compressors and road equipment */
 #specialCategorySection .cats .cat[onclick="category('generators',this)"]{background-image:url('https://images.unsplash.com/photo-1516937941344-00b4e0337589?auto=format&fit=crop&w=1000&q=85')!important}
 #specialCategorySection .cats .cat[onclick="category('hydraulic_compressors',this)"]{background-image:url('https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=1000&q=85')!important}
-#specialCategorySection .cats .cat[onclick="category('water_pumps',this)"]{background-image:url('https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?auto=format&fit=crop&w=1000&q=85')!important}
+#specialCategorySection .cats .cat[onclick="category('water_pumps',this)"]{background-image:url('https://www.enginegensetparts.com/uploads/11172/engines-water-pump-manufacturers8bd3e.jpg')!important}
 #specialCategorySection .cats .cat[onclick="category('road_equipment',this)"]{background-image:url('https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=1000&q=85')!important}
-#specialCategorySection .cats .cat[onclick="category('special_parts',this)"]{background-image:url('https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&w=1000&q=85')!important}
-#specialCategorySection .cats .cat[onclick="category('special_engines',this)"]{background-image:url('https://images.unsplash.com/photo-1552656967-7a0991a13906?auto=format&fit=crop&w=1000&q=85')!important}
+#specialCategorySection .cats .cat[onclick="category('special_parts',this)"]{background-image:url('https://la.develon-ce.com/emerging/img/parts-service/genuine-parts/m_engine-parts_list4_img.jpg')!important}
+#specialCategorySection .cats .cat[onclick="category('special_engines',this)"]{background-image:url('https://eqzolu.com/assets/images/product/construction/generator4.jpg')!important}
+.category-zone .cats .cat:hover,.category-zone .cats .cat.active{transform:translateY(-3px)!important;border-color:#e87936!important;box-shadow:0 12px 24px #0004!important}
 @media(max-width:650px){.category-zone .cats .cat{min-height:112px!important;padding:10px!important}.category-zone .cats .cat>span:not(.cat-icon){font-size:11px!important}}
 </style>
 <button id="aibGeminiDockReveal" class="aib-gemini-edge-reveal" type="button" aria-label="إظهار مساعد AIB وأزرار التواصل" title="إظهار المساعد والتواصل">‹</button>
