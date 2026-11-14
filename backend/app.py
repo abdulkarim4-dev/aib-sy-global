@@ -900,8 +900,8 @@ def prepare_record_inventory(s:Session, section:str, raw_data:dict, allow_legacy
             for key,value in legacy_map.items():
                 if value not in (None,"") and first.get(key) in (None,""):
                     first[key]=value
-            first.setdefault("store_family","car")
-            first.setdefault("store_category","cars")
+            if not first.get("store_family"): first["store_family"]="car"
+            if not first.get("store_category"): first["store_category"]="cars"
             if not str(first.get("description") or "").strip():
                 first["description"]=" ".join(str(data.get(k) or "").strip() for k in ("car_make","car_model")).strip() or "سيارة كاملة"
             if not str(first.get("model") or "").strip():
