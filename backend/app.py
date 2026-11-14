@@ -2053,12 +2053,13 @@ def create_online_order(p:OnlineOrderPayload,s:Session=Depends(db),customer:Stor
         lines.append({"product_id":product.id,"sku":product.sku,"description":product.name,"model":product.model or "","quantity":qty,"price":unit,"store_family":catalog.get("store_family",""),"store_category":catalog.get("store_category",""),"vehicle_details":catalog.get("vehicle_details",{})})
     if not lines: raise HTTPException(400,"السلة فارغة")
     if p.contract_identity and not has_full_vehicle: raise HTTPException(400,"بيانات العقد متاحة فقط عند شراء مركبة كاملة")
+    if has_full_vehicle and not p.contract_identity: raise HTTPException(400,"لا يمكن إرسال طلب شراء مركبة كاملة دون معلومات عقد البيع وهوية العميل")
     contract_identity=None
     if p.contract_identity:
         allowed_identity=("first_name","last_name","father_name","mother_name","national_no","birth_place_date","id_type","id_no","id_issuer","registry","residence","address")
         contract_identity={k:str(p.contract_identity.get(k) or "").strip()[:500] for k in allowed_identity}
-        if not contract_identity["first_name"] or not contract_identity["last_name"] or contract_identity["id_type"] not in {"هوية شخصية","جواز سفر"} or not contract_identity["id_no"]:
-            raise HTTPException(400,"بيانات هوية العميل غير مكتملة لإضافتها إلى العقد")
+        if any(not contract_identity[k] for k in allowed_identity) or contract_identity["id_type"] not in {"هوية شخصية","جواز سفر"}:
+            raise HTTPException(400,"يجب إكمال جميع بيانات هوية العميل والعقد قبل إرسال طلب الشراء")
     previous_profile={"full_name":customer.full_name,"shipping_address":customer.shipping_address,"phone_country_code":customer.phone_country_code,"phone_number":customer.phone_number}
     customer.first_name=p.first_name.strip();customer.last_name=p.last_name.strip();customer.full_name=(customer.first_name+" "+customer.last_name).strip()
     customer.shipping_address=p.shipping_address.strip();customer.phone_country_code=p.phone_country_code;customer.phone_number=p.phone_number.strip()
