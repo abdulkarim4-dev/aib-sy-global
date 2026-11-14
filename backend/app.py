@@ -1002,6 +1002,26 @@ _public_products_cache={"at":{},"value":{}}
 _PUBLIC_PRODUCTS_CACHE_TTL=20
 _PUBLIC_PRODUCTS_CACHE_MAX=120
 
+def record_item_landed_unit_cost(record:Record,item:dict)->float:
+    """Allocate invoice-level extra costs across item lines by line value, then return landed unit cost."""
+    data=record.data if isinstance(record.data,dict) else {}
+    costs=data.get("extra_costs") if isinstance(data.get("extra_costs"),dict) else {}
+    extra_keys={
+        "loading":("loading_cost","loading"),
+        "packaging":("packaging_cost","packaging"),
+        "local_transport":("local_transport_cost","local_transport"),
+        "shipping":("shipping_cost","shipping"),
+        "customs":("customs_cost","customs"),
+        "clearance":("clearance_cost","clearance"),
+    }
+    extra_total=sum(max(0.0,float(data.get(field,costs.get(key,0)) or 0)) for field,key in extra_keys.values())
+    items=[x for x in data.get("items",[]) if isinstance(x,dict)] if isinstance(data.get("items"),list) else []
+    subtotal=sum(max(0.0,float(x.get("price") or 0))*max(0.0,float(x.get("quantity") or 0)) for x in items)
+    unit_price=max(0.0,float(item.get("price") or 0))
+    if subtotal<=0 or unit_price<=0 or extra_total<=0:
+        return unit_price
+    return unit_price+(extra_total*unit_price/subtotal)
+
 def latest_store_catalog_data(s:Session)->tuple[dict,dict]:
     """Reuse the recent catalog snapshot instead of rescanning all invoice history on every request."""
     import time
@@ -1022,7 +1042,7 @@ def latest_store_catalog_data(s:Session)->tuple[dict,dict]:
             sku=str(item.get("sku") or "").strip().upper()
             if not sku: continue
             if record.section in {"purchase","carPurchase"} and sku not in latest_prices:
-                price=float(item.get("price") or 0)
+                price=record_item_landed_unit_cost(record,item)
                 if price>0:
                     latest_prices[sku]={"purchase_price":round(price,2),"sale_price":round(price*1.35,2),"currency":record.currency or "USD"}
             if sku not in latest_categories:
@@ -1596,12 +1616,12 @@ def store_product_category(name:str, model:str):
 
 def store_latest_prices(s:Session):
     prices={}
-    records=s.scalars(select(Record).where(Record.section=="purchase",Record.deleted.is_(False)).order_by(Record.created_at.desc(),Record.id.desc())).all()
+    records=s.scalars(select(Record).where(Record.section.in_(["purchase","carPurchase"]),Record.deleted.is_(False)).order_by(Record.created_at.desc(),Record.id.desc())).all()
     for record in records:
         for item in (record.data or {}).get("items",[]):
             if not isinstance(item,dict): continue
             sku=str(item.get("sku") or "").strip().upper()
-            price=float(item.get("price") or 0)
+            price=record_item_landed_unit_cost(record,item)
             if sku and price>0 and sku not in prices:
                 prices[sku]={"sale_price":round(price*1.35,2),"currency":record.currency or "USD"}
     return prices
