@@ -2308,4 +2308,14 @@ async function loadCustomerOrders(){const list=document.getElementById('customer
 }
 .category-zone .cats .cat[onclick="category('truck_parts',this)"]::before{content:none!important;background:none!important;}
 </style>
+
+<style id="aib-truck-parts-image-final-fix">
+/* إصلاح ظهور صورة بطاقة قطع غيار الشاحنات */
+html body .category-zone .cats button.cat[onclick*="truck_parts"]{
+ background:linear-gradient(0deg,rgba(5,12,18,.70),rgba(5,12,18,.04)),url("https://s.alicdn.com/@sc04/kf/H3562247ef2ab486eba1343d809731ed0X/Truck-Body-Parts-Headlight-Grille-Bumper-Corner-Panel-Fog-Lamp-Door-Accessories-for-hino-500-Wide-Narrow-Dyna.png") center center / cover no-repeat!important;
+ background-color:#202a32!important;
+}
+html body .category-zone .cats button.cat[onclick*="truck_parts"]::before{display:none!important;content:none!important;}
+html body .category-zone .cats button.cat[onclick*="truck_parts"] .cat-icon{background:transparent!important;}
+</style>
 </body></html>
