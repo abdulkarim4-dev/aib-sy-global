@@ -617,7 +617,7 @@ window.aibUpdateInvoiceItem=function(el){
  x[k]=el.value;
  if(k==='store_family'){x.store_category='';x.vehicle_make='';x.vehicle_model='';window.renderItemRows();return}
  if(k==='store_category'){x.vehicle_make='';x.vehicle_model='';window.renderItemRows();return}
- if(k==='vehicle_make'){x.vehicle_model='';window.renderItemRows();return}
+ if(k==='vehicle_make'){x.vehicle_model='';x.vehicle_generation='';x._generationOptions=[];window.renderItemRows();return}\n if(k==='vehicle_model'){x.vehicle_generation='';x._generationOptions=[];window.renderItemRows();window.aibPurchaseGenerationOptions(i);return}
  if(k==='sku'){
   const p=(window.inventoryProducts||[]).find(p=>p.sku===String(el.value||'').trim().toUpperCase());
   if(p){x.description=p.name;x.model=p.model||'';x.store_family=p.store_family||x.store_family;x.store_category=p.store_category||x.store_category;const vd=p.vehicle_details||{};for(const [source,target] of [['vehicle_type','vehicle_type'],['vehicle_make','vehicle_make'],['vehicle_model','vehicle_model'],['vehicle_generation','vehicle_generation'],['vehicle_year','vehicle_year'],['vehicle_odometer','vehicle_odometer'],['vehicle_fuel','vehicle_fuel'],['vehicle_color','vehicle_color'],['chassis','chassis']])if(vd[source]!==undefined)x[target]=vd[source];window.renderItemRows();return}
