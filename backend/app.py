@@ -1595,6 +1595,7 @@ class OnlineOrderPayload(BaseModel):
     phone_number: str = Field(min_length=5,max_length=32)
     payment_proof: str = Field(min_length=40,max_length=7000000)
     proof_type: str = Field(min_length=3,max_length=80)
+    contract_identity: Optional[dict[str,str]] = None
     items: list[StoreCartItemPayload] = Field(min_length=1,max_length=100)
 
 class StoreCartPayload(BaseModel):
@@ -1993,10 +1994,13 @@ def serialize_store_cart(s:Session, customer:StoreCustomer):
         product=s.get(InventoryProduct,int(item.get("product_id") or 0))
         if not product or not product.active: continue
         price=prices.get(product.sku,{})
+        store_categories=latest_inventory_store_categories(s)
+        explicit=store_categories.get(product.sku,{})
         out.append({"id":product.id,"sku":product.sku,"name":product.name,"model":product.model or "",
             "qty":int(item.get("quantity") or 1),"stock":float(product.owned_stock or 0)+float(product.consigned_stock or 0),
             "price":price.get("sale_price"),"currency":price.get("currency",""),
-            "images":product.images or [],"category":store_product_category(product.name,product.model or "")})
+            "images":product.images or [],"category":store_product_category(product.name,product.model or ""),
+            "store_family":explicit.get("store_family",""),"store_category":explicit.get("store_category",""),"vehicle_details":explicit.get("vehicle_details",{})})
     return out
 
 @app.get("/store/cart")
@@ -2033,7 +2037,7 @@ def create_online_order(p:OnlineOrderPayload,s:Session=Depends(db),customer:Stor
     except HTTPException: raise
     except Exception: raise HTTPException(400,"ملف إثبات الدفع غير صالح")
     if not raw or len(raw)>5*1024*1024: raise HTTPException(413,"الحد الأقصى لإثبات الدفع 5 ميغابايت")
-    prices=store_latest_prices(s);lines=[];currency=None;total=0;seen=set()
+    prices=store_latest_prices(s);store_categories=latest_inventory_store_categories(s);lines=[];currency=None;total=0;seen=set();has_full_vehicle=False
     for entry in p.items:
         if entry.product_id in seen: continue
         seen.add(entry.product_id);product=s.get(InventoryProduct,entry.product_id)
@@ -2044,12 +2048,21 @@ def create_online_order(p:OnlineOrderPayload,s:Session=Depends(db),customer:Stor
         if not price or float(price.get("sale_price") or 0)<=0: raise HTTPException(409,"سعر أحد المنتجات غير محدد")
         if currency and currency!=price["currency"]: raise HTTPException(409,"لا يمكن جمع عملات مختلفة في طلب واحد")
         currency=price["currency"];unit=float(price["sale_price"]);total+=unit*qty
-        lines.append({"product_id":product.id,"sku":product.sku,"description":product.name,"model":product.model or "","quantity":qty,"price":unit})
+        catalog=store_categories.get(product.sku,{})
+        if catalog.get("store_category") in {"cars","trucks","heavy","agri"}: has_full_vehicle=True
+        lines.append({"product_id":product.id,"sku":product.sku,"description":product.name,"model":product.model or "","quantity":qty,"price":unit,"store_family":catalog.get("store_family",""),"store_category":catalog.get("store_category",""),"vehicle_details":catalog.get("vehicle_details",{})})
     if not lines: raise HTTPException(400,"السلة فارغة")
+    if p.contract_identity and not has_full_vehicle: raise HTTPException(400,"بيانات العقد متاحة فقط عند شراء مركبة كاملة")
+    contract_identity=None
+    if p.contract_identity:
+        allowed_identity=("first_name","last_name","father_name","mother_name","national_no","birth_place_date","id_type","id_no","id_issuer","registry","residence","address")
+        contract_identity={k:str(p.contract_identity.get(k) or "").strip()[:500] for k in allowed_identity}
+        if not contract_identity["first_name"] or not contract_identity["last_name"] or contract_identity["id_type"] not in {"هوية شخصية","جواز سفر"} or not contract_identity["id_no"]:
+            raise HTTPException(400,"بيانات هوية العميل غير مكتملة لإضافتها إلى العقد")
     previous_profile={"full_name":customer.full_name,"shipping_address":customer.shipping_address,"phone_country_code":customer.phone_country_code,"phone_number":customer.phone_number}
     customer.first_name=p.first_name.strip();customer.last_name=p.last_name.strip();customer.full_name=(customer.first_name+" "+customer.last_name).strip()
     customer.shipping_address=p.shipping_address.strip();customer.phone_country_code=p.phone_country_code;customer.phone_number=p.phone_number.strip()
-    data={"first_name":customer.first_name,"last_name":customer.last_name,"full_name":customer.full_name,"email":customer.email,"shipping_address":customer.shipping_address,"phone_country_code":customer.phone_country_code,"phone_number":customer.phone_number,"full_phone":customer.phone_country_code+customer.phone_number}
+    data={"first_name":customer.first_name,"last_name":customer.last_name,"full_name":customer.full_name,"email":customer.email,"shipping_address":customer.shipping_address,"phone_country_code":customer.phone_country_code,"phone_number":customer.phone_number,"full_phone":customer.phone_country_code+customer.phone_number,"include_contract_identity":bool(contract_identity),"contract_identity":contract_identity}
     order=OnlinePurchaseOrder(customer_id=customer.id,customer_data=data,items=lines,total=round(total,2),currency=currency or "USD",payment_proof=p.payment_proof,proof_type=p.proof_type,status="pending")
     s.add(order);s.commit();s.refresh(order)
     if any(previous_profile[k]!=(customer.full_name if k=="full_name" else customer.shipping_address if k=="shipping_address" else customer.phone_country_code if k=="phone_country_code" else customer.phone_number) for k in previous_profile):
@@ -2064,7 +2077,7 @@ def create_online_order(p:OnlineOrderPayload,s:Session=Depends(db),customer:Stor
     if admin_email:
         admin_body=(f"وصل طلب شراء جديد من {customer.full_name}\\nالبريد: {customer.email}\\nالهاتف: {data['full_phone']}\\n"
             f"الإجمالي: {float(order.total):.2f} {order.currency}\\nالمنتجات:\\n{item_lines}\\nيرجى مراجعة الطلب وإثبات الدفع من لوحة المحاسبة.")
-        admin_html=aib_email_html(f"طلب شراء إلكتروني جديد #{order.id}","وصل طلب جديد من متجر AIB ويحتاج إلى مراجعة إثبات الدفع.",[("رقم الطلب",f"#{order.id}"),("العميل",html.escape(customer.full_name)),("البريد",html.escape(customer.email)),("الهاتف",html.escape(data["full_phone"])),("العنوان",html.escape(data["shipping_address"])),("الإجمالي",f"{float(order.total):.2f} {html.escape(order.currency)}")],accent="#168447",note="يرجى فتح بوابة المحاسبة لمراجعة الطلب والتحقق من إثبات الدفع.")
+        admin_html=aib_email_html(f"طلب شراء إلكتروني جديد #{order.id}","وصل طلب جديد من متجر AIB ويحتاج إلى مراجعة إثبات الدفع.",[("رقم الطلب",f"#{order.id}"),("العميل",html.escape(customer.full_name)),("البريد",html.escape(customer.email)),("الهاتف",html.escape(data["full_phone"])),("العنوان",html.escape(data["shipping_address"])),("بيانات العقد",html.escape((contract_identity or {}).get("first_name","") + " " + (contract_identity or {}).get("last_name","")) if contract_identity else "غير مضافة"),("الإجمالي",f"{float(order.total):.2f} {html.escape(order.currency)}")],accent="#168447",note="يرجى فتح بوابة المحاسبة لمراجعة الطلب والتحقق من إثبات الدفع.")
         send_notification_email(admin_email,f"طلب شراء إلكتروني جديد #{order.id} – AIB",admin_body,admin_html)
     return {"ok":True,"order_id":order.id,"customer":data,"items":lines,"total":float(order.total),"currency":order.currency,"status":order.status}
 
@@ -2114,6 +2127,9 @@ def review_online_purchase_order(order_id:int,p:OnlineOrderReviewPayload,s:Sessi
         from_consigned=qty-from_owned
         allocated_items.append({"sku":x["sku"],"description":x["description"],"model":x.get("model",""),"quantity":qty,"price":x["price"],"owned_quantity":from_owned,"consigned_quantity":from_consigned})
     data={"customer":order.customer_data["full_name"],"customer_phone":order.customer_data["full_phone"],"customer_address":order.customer_data["shipping_address"],"amount":float(order.total),"items":allocated_items,"notes":"طلب إلكتروني – تم التحقق من إثبات الدفع واعتماده"}
+    identity=(order.customer_data or {}).get("contract_identity") or {}
+    if identity:
+        data.update({"include_buyer_identity":True,"buyer_first_name":identity.get("first_name",""),"buyer_last_name":identity.get("last_name",""),"buyer_father_name":identity.get("father_name",""),"buyer_mother_name":identity.get("mother_name",""),"buyer_national_no":identity.get("national_no",""),"buyer_birth_place_date":identity.get("birth_place_date",""),"buyer_id_type":identity.get("id_type",""),"buyer_id_no":identity.get("id_no",""),"buyer_id_issuer":identity.get("id_issuer",""),"buyer_registry":identity.get("registry",""),"buyer_residence":identity.get("residence",""),"buyer_address":identity.get("address","")})
     prepared=prepare_record_inventory(s,"directSale",data)
     s.execute(text("SELECT pg_advisory_xact_lock(hashtext(:key))"),{"key":"aib-invoice:directSale"})
     serial=int(s.scalar(select(func.count(Record.id)).where(Record.section=="directSale")) or 0)+1
