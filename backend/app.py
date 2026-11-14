@@ -1853,12 +1853,12 @@ def confirm_store_phone(p:StorePhoneConfirmPayload,s:Session=Depends(db),custome
         raise HTTPException(429,"تم تجاوز محاولات التحقق. اطلب رمزاً جديداً")
     if not secrets.compare_digest(item["hash"],hashlib.sha256(p.code.encode()).hexdigest()):
         raise HTTPException(400,"رمز التحقق غير صحيح")
-    customer.phone_country_code=item["phone"][:4] if False else (customer.phone_country_code or "")
+    customer.phone_country_code=""
     customer.phone_number=item["phone"]
     customer.phone_verified_at=datetime.now(timezone.utc)
     s.commit()
     _store_phone_codes.pop(customer.id,None)
-    return {"ok":True,"message":"تم التحقق من رقم الهاتف بنجاح"}
+    return {"ok":True,"phone_number":item["phone"],"message":"تم التحقق من رقم الهاتف بنجاح"}
 
 @app.put("/store/auth/profile")
 def update_store_profile(p:StoreProfilePayload, s:Session=Depends(db), customer:StoreCustomer=Depends(current_store_customer)):
