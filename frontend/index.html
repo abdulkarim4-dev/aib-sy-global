@@ -568,7 +568,8 @@ window.aibPurchaseGenerationOptions=async function(index){
  const norm=v=>String(v||'').toLowerCase().replace(/[^a-z0-9]/g,'');
  const all={...AIB_KNOWN_GENERATIONS,...AIB_ADDITIONAL_GENERATIONS,...AIB_GLOBAL_GENERATION_EXPANSIONS};
  const key=Object.keys(all).find(k=>norm(k)===norm(row.vehicle_make));
- const modelNorm=v=>String(v||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim().split(/\s+/).sort().join(' ');\n const modelKey=key?(Object.keys(all[key]).find(k=>norm(k)===norm(row.vehicle_model))||Object.keys(all[key]).find(k=>modelNorm(k)===modelNorm(row.vehicle_model))):null;
+ const modelNorm=v=>String(v||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim().split(/\s+/).sort().join(' ');
+ const modelKey=key?(Object.keys(all[key]).find(k=>norm(k)===norm(row.vehicle_model))||Object.keys(all[key]).find(k=>modelNorm(k)===modelNorm(row.vehicle_model))):null;
  let names=modelKey?all[key][modelKey]:[];
  const brand=row.vehicle_make||'',model=row.vehicle_model||'';
  if(brand&&model){
