@@ -1506,7 +1506,7 @@ class StoreProfilePayload(BaseModel):
     shipping_address: str = Field(default="",max_length=1000)
     phone_country_code: str = Field(default="+963",min_length=2,max_length=8)
     phone_number: str = Field(default="",max_length=32)
-    avatar_data: Optional[str] = Field(default=None,max_length=1400000)
+    avatar_data: Optional[str] = Field(default=None,max_length=5600000)
 class StoreChangePasswordPayload(BaseModel):
     new_password: str = Field(min_length=8,max_length=256)
 class StorePasswordChangeConfirmPayload(BaseModel):
