@@ -1210,6 +1210,33 @@ html body .aib-gemini-form button:disabled{opacity:.55!important}
  html body #aibGeminiStoreFab,html body .aib-gemini-social a{transition:transform .18s ease,box-shadow .18s ease!important}
  html body #aibGeminiStoreFab:active,html body .aib-gemini-social a:active{transform:scale(.97)!important}
 }
+/* AIB contact controls: one elegant vertical transparent stack */
+html body .aib-gemini-dock{display:flex!important;flex-direction:column!important;align-items:flex-end!important;gap:9px!important}
+html body .aib-gemini-social{display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:flex-start!important;gap:9px!important;width:auto!important}
+html body .aib-gemini-social a{
+ width:43px!important;height:43px!important;flex:0 0 43px!important;border:1px solid rgba(206,224,238,.42)!important;
+ border-radius:14px!important;background:rgba(15,31,45,.34)!important;color:#fff!important;
+ box-shadow:0 5px 16px rgba(0,0,0,.20),inset 0 1px 0 rgba(255,255,255,.12)!important;
+ backdrop-filter:blur(12px)!important;-webkit-backdrop-filter:blur(12px)!important
+}
+html body .aib-gemini-social .wa{color:#64e6a2!important}
+html body .aib-gemini-social .fb{color:#8fc2ff!important}
+html body .aib-gemini-social .ig{color:#ff9fc7!important}
+html body .aib-gemini-social .call{color:#b9e4ff!important}
+html body #aibGeminiStoreFab{
+ min-width:0!important;min-height:47px!important;padding:10px 15px!important;border:1px solid rgba(205,226,242,.48)!important;
+ border-radius:15px!important;background:rgba(16,48,70,.48)!important;color:#fff!important;
+ box-shadow:0 7px 20px rgba(0,0,0,.23),inset 0 1px 0 rgba(255,255,255,.14)!important;
+ backdrop-filter:blur(14px) saturate(135%)!important;-webkit-backdrop-filter:blur(14px) saturate(135%)!important
+}
+html body .aib-gemini-panel{bottom:255px!important}
+@media(max-width:520px){
+ html body .aib-gemini-dock{gap:8px!important}
+ html body .aib-gemini-social{gap:8px!important}
+ html body .aib-gemini-social a{width:40px!important;height:40px!important;flex-basis:40px!important}
+ html body #aibGeminiStoreFab{min-height:45px!important;padding:9px 13px!important;font-size:13px!important}
+ html body .aib-gemini-panel{bottom:245px!important}
+}
 
 </style>
 </head><body><header class="wrap top"><button class="aib-menu-trigger" type="button" onclick="openAibStoreMenu()" aria-label="فتح قائمة المتجر" aria-controls="aibStoreDrawer" aria-expanded="false">
