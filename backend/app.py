@@ -888,7 +888,27 @@ def prepare_record_inventory(s:Session, section:str, raw_data:dict, allow_legacy
     data=dict(raw_data or {})
     items=data.get("items") if isinstance(data.get("items"),list) else []
     prepared=[]
-    stock_sections={"purchase","directSale","deposit","consignSale"}
+    stock_sections={"purchase","carPurchase","directSale","deposit","consignSale"}
+    # Legacy vehicle-purchase invoices keep vehicle data in the record header;
+    # normalize it into a stock item so the vehicle enters inventory and the shop.
+    if section=="carPurchase":
+        if not items:
+            items=[{"quantity":1,"price":float(data.get("amount") or data.get("price") or 0)}]
+        first=next((x for x in items if isinstance(x,dict)),None)
+        if first is not None:
+            legacy_map={"vehicle_type":"سيارة كاملة","vehicle_make":data.get("car_make"),"vehicle_model":data.get("car_model"),"vehicle_year":data.get("car_year"),"vehicle_odometer":data.get("car_odometer"),"vehicle_color":data.get("car_color"),"chassis":data.get("car_vin")}
+            for key,value in legacy_map.items():
+                if value not in (None,"") and first.get(key) in (None,""):
+                    first[key]=value
+            first.setdefault("store_family","car")
+            first.setdefault("store_category","cars")
+            if not str(first.get("description") or "").strip():
+                first["description"]=" ".join(str(data.get(k) or "").strip() for k in ("car_make","car_model")).strip() or "سيارة كاملة"
+            if not str(first.get("model") or "").strip():
+                first["model"]=str(data.get("car_model") or "").strip()
+            if not first.get("quantity"): first["quantity"]=1
+            if not first.get("price") and data.get("amount"): first["price"]=float(data.get("amount") or 0)
+        data["items"]=items
     for raw in items:
         if not isinstance(raw,dict): continue
         item=dict(raw)
@@ -936,7 +956,7 @@ def prepare_record_inventory(s:Session, section:str, raw_data:dict, allow_legacy
 def recalculate_inventory(s:Session):
     totals={p.id:{"owned":0.0,"consigned":0.0} for p in s.scalars(select(InventoryProduct)).all()}
     for record in s.scalars(select(Record).where(Record.deleted.is_(False))).all():
-        if record.section not in {"purchase","directSale","deposit","consignSale"}: continue
+        if record.section not in {"purchase","carPurchase","directSale","deposit","consignSale"}: continue
         items=record.data.get("items") if isinstance(record.data,dict) else []
         for item in items if isinstance(items,list) else []:
             if not isinstance(item,dict) or not item.get("sku"): continue
@@ -954,7 +974,7 @@ def recalculate_inventory(s:Session):
                 totals[product.id]["owned"]-=owned_qty
                 totals[product.id]["consigned"]-=consigned_qty
             else:
-                bucket="owned" if record.section in {"purchase","directSale"} else "consigned"
+                bucket="owned" if record.section in {"purchase","carPurchase","directSale"} else "consigned"
                 sign=-1 if record.section in {"directSale","consignSale"} else 1
                 totals[product.id][bucket]+=sign*qty
     for product in s.scalars(select(InventoryProduct)).all():
@@ -983,14 +1003,14 @@ def latest_store_catalog_data(s:Session)->tuple[dict,dict]:
     allowed={"car":{"cars","car_parts","car_engines","car_engine_parts"},"truck":{"trucks","truck_parts","truck_engines","truck_engine_parts"},"heavy":{"heavy","heavy_parts","heavy_engines","heavy_engine_parts"},"agri":{"agri","agri_parts","agri_engines","agri_engine_parts"},"special":{"generators","hydraulic_compressors","water_pumps","road_equipment","special_parts","special_engines"}}
     rows=s.scalars(select(Record).where(
         Record.deleted.is_(False),
-        Record.section.in_(["purchase","deposit"])
+        Record.section.in_(["purchase","carPurchase","deposit"])
     ).order_by(Record.created_at.desc(),Record.id.desc())).all()
     for record in rows:
         for item in (record.data or {}).get("items",[]):
             if not isinstance(item,dict): continue
             sku=str(item.get("sku") or "").strip().upper()
             if not sku: continue
-            if record.section=="purchase" and sku not in latest_prices:
+            if record.section in {"purchase","carPurchase"} and sku not in latest_prices:
                 price=float(item.get("price") or 0)
                 if price>0:
                     latest_prices[sku]={"purchase_price":round(price,2),"sale_price":round(price*1.35,2),"currency":record.currency or "USD"}
