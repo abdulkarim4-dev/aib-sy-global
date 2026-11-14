@@ -516,10 +516,57 @@ const AIB_ADDITIONAL_GENERATIONS={
  'western star':{'47X':['47X (2021–الآن)'],'49X':['49X (2020–الآن)']}
 };
 
+const AIB_GLOBAL_GENERATION_EXPANSIONS={
+'bmw':{'2 Series':['F22','F23','F44','G42'],'4 Series':['F32','F33','F36','G22','G23','G26'],'8 Series':['E31','G14','G15','G16'],'X1':['E84','F48','U11'],'X2':['F39','U10'],'X4':['F26','G02'],'X7':['G07'],'Z4':['E85','E86','E89','G29']},
+'mercedes-benz':{'CLA':['C117','X117','C118','X118'],'CLS':['C219','C218','C257'],'GLA':['X156','H247'],'GLB':['X247'],'GLK':['X204'],'GLS':['X166','X167'],'G-Class':['W460','W461','W463','W465'],'Sprinter':['W901-W905','W906','W907-W910'],'Vito':['W638','W639','W447']},
+'volkswagen':{'Polo':['86','86C','6N','9N','6R','AW'],'Jetta':['A1','A2','A3','A4','A5','A6','A7'],'T-Roc':['A1'],'T-Cross':['C1'],'Touareg':['7L','7P','CR'],'Arteon':['3H'],'Amarok':['2H','NF'],'Caddy':['Typ 14','2K','SA']},
+'audi':{'A1':['8X','GB'],'A5':['8T','F5'],'A7':['4G','4K'],'A8':['D2','D3','D4','D5'],'Q2':['GA'],'Q3':['8U','F3'],'Q7':['4L','4M'],'Q8':['4M8'],'TT':['8N','8J','8S']},
+'toyota':{'Prius':['XW10','XW20','XW30','XW50','XW60'],'Hilux':['N10','N20','N30','N40','N50','N60','N70','AN10','AN20','AN30','AN120','AN130'],'Fortuner':['AN50','AN60','AN150','AN160'],'Prado':['J70','J90','J120','J150','J250'],'Avalon':['XX10','XX20','XX30','XX40','XX50'],'Highlander':['XU20','XU40','XU50','XU70'],'Supra':['A40','A60','A70','A80','A90'],'Yaris Cross':['XP210']},
+'lexus':{'IS':['XE10','XE20','XE30'],'ES':['V20','V30','V40','V60','V70','XZ10'],'GS':['S140','S160','S190','L10'],'LS':['XF10','XF20','XF30','XF40','XF50'],'RX':['XU10','XU30','AL10','AL20','AL30'],'NX':['AZ10','AZ20'],'LX':['J80','J100','J200','J300'],'GX':['J120','J150','J250']},
+'honda':{'HR-V':['GH','RU','RV'],'Jazz':['GD','GE','GK','GR'],'Fit':['GD','GE','GK','GR'],'Pilot':['YF1','YF2','YF3','YF4','YF5'],'Odyssey':['RA','RB','RC','RL'],'City':['SX8','GD8','GM2','GM6','GN'],'Ridgeline':['YK1','YK2']},
+'nissan':{'Qashqai':['J10','J11','J12'],'Juke':['F15','F16'],'Murano':['Z50','Z51','Z52'],'Navara':['D21','D22','D40','D23'],'Pathfinder':['R50','R51','R52','R53'],'Maxima':['A32','A33','A34','A35','A36'],'Sentra':['B13','B14','B15','B16','B17','B18'],'Armada':['TA60','Y62']},
+'kia':{'Rio':['DC','JB','UB','YB','FB'],'Optima':['MG','TF','JF'],'K5':['DL3'],'Picanto':['SA','TA','JA'],'Soul':['AM','PS','SK3'],'Stinger':['CK'],'Telluride':['ON'],'Seltos':['SP2'],'Carnival':['VQ','YP','KA4']},
+'hyundai':{'i10':['PA','IA','AC3'],'i20':['PB','GB','BC3'],'i30':['FD','GD','PD'],'i40':['VF'],'Creta':['GS','SU2'],'Palisade':['LX2'],'Venue':['QX'],'Ioniq 5':['NE'],'Ioniq 6':['CE']},
+'ford':{'Fiesta':['Mk1','Mk2','Mk3','Mk4','Mk5','Mk6','Mk7'],'Mondeo':['Mk1','Mk2','Mk3','Mk4','Mk5'],'Kuga':['C394','C520','CX482'],'Ranger':['PJ','PK','PX','T6','P703'],'F-150':['Gen 6','Gen 7','Gen 8','Gen 9','Gen 10','Gen 11','Gen 12','Gen 13','Gen 14'],'Transit':['VE6','VJ','V184','V347','V363']},
+'chevrolet':{'Malibu':['V-body','N-body','Epsilon','Epsilon II','E2XX'],'Cruze':['J300','J400'],'Captiva':['C100','C140'],'Trailblazer':['GMT360','RG','RG2'],'Tahoe':['GMT400','GMT800','GMT900','K2UC','T1UC'],'Silverado':['GMT400','GMT800','GMT900','K2XX','T1XX'],'Camaro':['Gen 1','Gen 2','Gen 3','Gen 4','Gen 5','Gen 6']},
+'jeep':{'Wrangler':['YJ','TJ','JK','JL'],'Grand Cherokee':['ZJ','WJ','WK','WK2','WL'],'Cherokee':['XJ','KJ','KK','KL'],'Compass':['MK','MP'],'Renegade':['BU'],'Gladiator':['JT']},
+'land rover':{'Range Rover':['L405','L460'],'Range Rover Sport':['L320','L494','L461'],'Range Rover Evoque':['L538','L551'],'Discovery':['Series I','Series II','LR3/LR4','L462'],'Defender':['L316','L663'],'Freelander':['L314','L359']},
+'volvo':{'S60':['P24','P3','SPA'],'S80':['P2','P3'],'S90':['SPA'],'V40':['P1'],'V60':['P3','SPA'],'V90':['SPA'],'XC40':['CMA'],'XC60':['Y20','SPA'],'XC90':['P2','SPA']},
+'subaru':{'Impreza':['GC','GD','GE','GP','GK'],'Forester':['SF','SG','SH','SJ','SK'],'Outback':['BG','BH','BP','BR','BS','BT'],'Legacy':['BC','BD','BE','BL','BM','BN','BW'],'XV/Crosstrek':['GP','GT']},
+'mitsubishi':{'Lancer':['Cedia','CS','CY'],'Outlander':['CU','CW','GF','GG','GN'],'Pajero':['L040','V20','V60','V80'],'L200/Triton':['K00','K60','KA/KB','KL','KJ'],'ASX':['GA','GN']},
+'mazda':{'CX-3':['DK'],'CX-30':['DM'],'CX-9':['TB','TC'],'MX-5':['NA','NB','NC','ND'],'RX-8':['SE3P']},
+'porsche':{'911':['930','964','993','996','997','991','992'],'Boxster':['986','987','981','982'],'Cayman':['987C','981C','982C'],'Cayenne':['955','957','958','9YA'],'Macan':['95B'],'Panamera':['970','971','976'],'Taycan':['J1']},
+'renault':{'Clio':['X57','X65','X85','X98','BJA'],'Megane':['X64','X84','X95','XFB'],'Duster':['HS','HM'],'Koleos':['HY','HZG'],'Captur':['J87','JB']},
+'peugeot':{'208':['A9','P21'],'308':['T7','T9','P5'],'3008':['T84','P84'],'5008':['T87','P87'],'508':['W2','R8'],'Partner':['M49','B9','K9']},
+'citroen':{'C3':['A51','B618','CC21'],'C4':['B7','B71','C41'],'C5':['X7','R'],'Berlingo':['M49','B9','K9']},
+'skoda':{'Octavia':['1U','1Z','5E','NX'],'Superb':['3U','3T','3V'],'Fabia':['6Y','5J','NJ','PJ'],'Kodiaq':['NS'],'Karoq':['NU']},
+'seat':{'Ibiza':['6K','6L','6J','6F'],'Leon':['1M','1P','5F','KL'],'Ateca':['KH'],'Arona':['KJ']},
+'fiat':{'500':['312','332'],'Panda':['141','169','319'],'Tipo':['356'],'Ducato':['280','290','X250','X290']},
+'tesla':{'Model S':['Pre-facelift','Refresh 2021'],'Model 3':['Pre-refresh','Highland'],'Model X':['First generation'],'Model Y':['Pre-refresh','Juniper']},
+'byd':{'Atto 3':['Yuan Plus platform'],'Dolphin':['EA1'],'Seal':['e-Platform 3.0'],'Han':['First generation'],'Tang':['First generation'],'Song Plus':['First generation']},
+'geely':{'Coolray':['SX11'],'Monjaro':['KX11'],'Emgrand':['EC7','SS11'],'Tugella':['FY11']},
+'chery':{'Tiggo 4':['T17'],'Tiggo 7':['T1E'],'Tiggo 8':['T18'],'Arrizo 5':['M1'],'Arrizo 6':['M1E']},
+'haval':{'H6':['Gen 1','Gen 2','Gen 3'],'Jolion':['First generation'],'H9':['Gen 1','Gen 2']},
+'mg':{'MG 3':['Gen 1','Gen 2','Gen 3'],'MG 5':['Gen 1','Gen 2'],'MG 6':['Gen 1','Gen 2'],'ZS':['Gen 1','Gen 2'],'HS':['Gen 1','Gen 2']},
+'great wall':{'Poer':['P71'],'Wingle 5':['First generation'],'Wingle 7':['First generation']},
+'volvo trucks':{'FH':['FH12 (1993–2005)','FH (2002–2012)','FH (2012–2020)','FH (2020–2024)','FH Aero (2024–الآن)'],'FM':['FM (1998–2005)','FM (2005–2013)','FM (2013–2020)','FM (2020–الآن)'],'FMX':['FMX (2010–2013)','FMX (2013–2020)','FMX (2020–الآن)']},
+'scania':{'P-Series':['P-Series 4 (1995–2004)','P-Series PRT (2004–2016)','P-Series NTG (2016–الآن)'],'G-Series':['G-Series PRT (2004–2016)','G-Series NTG (2016–الآن)'],'R-Series':['R-Series 4 (2004–2010)','R-Series Streamline (2013–2016)','R-Series NTG (2016–الآن)'],'S-Series':['S-Series NTG (2016–الآن)']},
+'man':{'TGX':['TGX first generation (2007–2020)','TGX second generation (2020–الآن)'],'TGS':['TGS first generation (2007–2020)','TGS second generation (2020–الآن)'],'TGM':['TGM first generation (2005–2013)','TGM second generation (2013–الآن)'],'TGL':['TGL first generation (2005–2013)','TGL second generation (2013–الآن)']},
+'daf':{'XF':['XF 95 (1997–2006)','XF 105 (2005–2013)','New XF Euro 6 (2013–2017)','New Generation XF (2021–الآن)'],'XG':['XG (2021–الآن)'],'CF':['CF (1992–2001)','CF (2001–2013)','CF Euro 6 (2013–2021)','New Generation XD/CF (2022–الآن)'],'LF':['LF (2001–2006)','LF (2006–2013)','LF Euro 6 (2013–2021)','New Generation XB (2023–الآن)']},
+'iveco':{'S-Way':['Stralis (2002–2012)','Stralis Hi-Way (2012–2019)','S-Way (2019–الآن)'],'T-Way':['Trakker (1993–2019)','T-Way (2021–الآن)'],'Eurocargo':['Gen 1 (1991–2002)','Gen 2 (2002–2008)','Gen 3 (2008–2015)','Gen 4 (2015–الآن)']},
+'isuzu':{'D-Max':['RA','RT','RG'],'N-Series':['Generations 1–8'],'F-Series':['Generations 1–3'],'Giga':['Generations 1–2']},
+'hino':{'300':['Dutro generations 1–3'],'500':['Ranger generations 1–4'],'700':['Profia generations 1–4']},
+'mitsubishi fuso':{'Canter':['Canter generations 1–8'],'Fighter':['Fighter generations 1–3'],'Super Great':['Super Great generations 1–4']},
+'sinotruk':{'HOWO':['HOWO','HOWO A7','HOWO T5G','HOWO TX'],'Sitrak C7H':['C7H']},
+'shacman':{'X3000':['X3000'],'F3000':['F3000'],'H3000':['H3000']},
+'dongfeng':{'KL':['KL'],'KX':['KX'],'KC':['KC']},
+'foton':{'Auman':['ETX','EST','Galaxy'],'Aumark':['Aumark','Aumark S']},
+'jac':{'N-Series':['Generations 1–2'],'K-Series':['Generations 1–2']}
+};
 window.aibPurchaseGenerationOptions=async function(index){
  const row=(window.draftItems||[])[index];if(!row)return;
  const norm=v=>String(v||'').toLowerCase().replace(/[^a-z0-9]/g,'');
- const all={...AIB_KNOWN_GENERATIONS,...AIB_ADDITIONAL_GENERATIONS};
+ const all={...AIB_KNOWN_GENERATIONS,...AIB_ADDITIONAL_GENERATIONS,...AIB_GLOBAL_GENERATION_EXPANSIONS};
  const key=Object.keys(all).find(k=>norm(k)===norm(row.vehicle_make));
  const modelKey=key?Object.keys(all[key]).find(k=>norm(k)===norm(row.vehicle_model)):null;
  let names=modelKey?all[key][modelKey]:[];
@@ -534,7 +581,7 @@ window.aibPurchaseGenerationOptions=async function(index){
     const make=(data.makes||[]).find(x=>normalize(x.name)===normalize(brand))||((data.makes||[]).length===1?(data.makes||[])[0]:null);
     const vehicle=(make?.models||[]).find(x=>normalize(x.name)===normalize(model));
     const external=(vehicle?.generations||[]).map(x=>x.name).filter(Boolean);
-    if(external.length)names=[...new Set(external)];
+    if(external.length)names=[...new Set([...names,...external])];
    }
   }catch(e){console.warn('AIB purchase generation lookup failed:',e)}
  }
