@@ -1628,6 +1628,16 @@ body.customer-orders-page-open{overflow:hidden}
  <button type="button" class="aib-drawer-item" onclick="closeAibStoreMenu();openStoreAuth()"><span class="aib-drawer-icon">♙</span><span><b id="aibDrawerAccountAction">تسجيل الدخول / إنشاء حساب</b><small>بياناتك وإعدادات حساب المشترك</small></span><i>‹</i></button>
  <button type="button" class="aib-drawer-item" onclick="closeAibStoreMenu();openCustomerOrders()"><span class="aib-drawer-icon">▤</span><span><b>سجل طلباتي وحالة الطلب</b><small>تابع قبول طلباتك وشحنها وتسليمها</small></span><i>‹</i></button>
  <button type="button" class="aib-drawer-item" onclick="closeAibStoreMenu();openCart()"><span class="aib-drawer-icon">🛒</span><span><b>سلة التسوق</b><small>المنتجات التي اخترتها</small></span><em id="aibDrawerCartCount">0</em></button>
+ <div class="aib-drawer-section-label">إعدادات المتجر</div>
+ <div class="aib-drawer-language">
+  <label for="aibCustomerLanguage"><strong>لغة عرض المتجر</strong>
+   <select id="aibCustomerLanguage" onchange="setAibCustomerLanguage(this.value)">
+    <option value="auto">تلقائي — حسب لغة الهاتف</option>
+    <option value="ar">العربية</option><option value="en">English</option><option value="tr">Türkçe</option><option value="de">Deutsch</option><option value="fr">Français</option><option value="ru">Русский</option>
+   </select>
+  </label>
+  <small>يتم اختيار لغة الهاتف تلقائياً، ويمكنك تثبيت لغة أخرى من هنا.</small>
+ </div>
  <button type="button" class="aib-drawer-item" onclick="closeAibStoreMenu();window.scrollTo({top:0,behavior:'smooth'})"><span class="aib-drawer-icon">⌂</span><span><b>العودة إلى المتجر</b><small>تصفح الأقسام والمنتجات</small></span><i>‹</i></button>
  <div class="aib-drawer-section-label">المساعدة والدعم</div>
  <a class="aib-drawer-item aib-drawer-support" href="https://wa.me/963997439627?text=%D9%85%D8%B1%D8%AD%D8%A8%D8%A7%D9%8B%D8%8C%20%D8%A3%D8%B1%D8%BA%D8%A8%20%D8%A8%D8%A7%D9%84%D8%AA%D9%88%D8%A7%D8%B5%D9%84%20%D9%85%D8%B9%20%D9%81%D8%B1%D9%8A%D9%82%20%D8%AF%D8%B9%D9%85%20AIB" target="_blank" rel="noopener"><span class="aib-drawer-icon">◉</span><span><b>الدعم السريع عبر واتساب</b><small>تواصل مباشرة مع فريق AIB</small></span><i>↗</i></a>
@@ -1686,20 +1696,6 @@ body.customer-orders-page-open{overflow:hidden}
 <label>عنوان السكن / الشحن<textarea id="aibProfileAddress" rows="3" maxlength="1000"></textarea></label>
 <label>رقم الهاتف</label><div class="aib-settings-two"><select id="aibProfileDial"><option value="">بدون رمز دولة (أدخل الرقم الدولي)</option><option value="+963">سوريا +963</option><option value="+43">النمسا +43</option><option value="+49">ألمانيا +49</option><option value="+90">تركيا +90</option><option value="+41">سويسرا +41</option><option value="+971">الإمارات +971</option><option value="+966">السعودية +966</option><option value="+1">أمريكا +1</option><option value="+44">بريطانيا +44</option></select><input id="aibProfilePhone" type="tel" maxlength="32" placeholder="رقم الهاتف"></div>
 <button class="cart-checkout" type="submit">حفظ بيانات الحساب</button></form>
-<div class="aib-settings-divider"></div>
-<div class="aib-settings-form aib-language-setting">
-<strong>لغة المتجر</strong>
-<label for="aibCustomerLanguage">اختر لغة عرض المتجر
-<select id="aibCustomerLanguage" onchange="setAibCustomerLanguage(this.value)">
-<option value="ar">العربية</option>
-<option value="en">English</option>
-<option value="tr">Türkçe</option>
-<option value="de">Deutsch</option>
-<option value="fr">Français</option>
-<option value="ru">Русский</option>
-</select></label>
-<small>سيُحفظ اختيارك ويُطبّق على صفحات العرض والمتجر عند زيارتك القادمة.</small>
-</div>
 <div class="aib-settings-divider"></div>
 <form class="aib-settings-form" onsubmit="changeAibStorePassword(event)"><strong>تغيير كلمة المرور</strong>
 <label>كلمة المرور الجديدة<input id="aibNewPassword" type="password" required minlength="8" maxlength="256" autocomplete="new-password" placeholder="8 خانات على الأقل"></label>
@@ -2657,6 +2653,11 @@ html body .category-zone .cats button.cat[onclick="category('generators',this)"]
 #specialCategorySection .cats button.cat[onclick*="water_pumps"] .cat-icon{
  background:transparent!important;
 }
+
+.aib-drawer-language{margin:8px 0 14px;padding:13px;border:1px solid #dfe5eb;border-radius:12px;background:#fff;color:#202a33}
+.aib-drawer-language label{display:grid;gap:9px;font-size:13px;color:#263746}
+.aib-drawer-language select{width:100%;min-width:0;padding:11px;border:1px solid #cfd8e1;border-radius:9px;background:#f8fafc;color:#202a33;font:inherit}
+.aib-drawer-language small{display:block;margin-top:8px;color:#667582;font-size:11px;line-height:1.7}
 </style>
 
 <script src="/customer-i18n.js?v=20261115" defer></script></body></html>
