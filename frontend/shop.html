@@ -1375,6 +1375,7 @@ body.customer-orders-page-open{overflow:hidden}
 .aib-google-link p{font-size:11px}
 .aib-google-link button{border-radius:10px;font-size:12px}
 .aib-photo-remove{font-size:11px}
+.aib-language-setting{border:1px solid #3d6179!important;background:linear-gradient(135deg,#1b3445,#172630)!important}.aib-language-setting select{width:100%;cursor:pointer}.aib-language-setting small{color:#aebdca;font-size:11px;line-height:1.8}
 @media(max-width:520px){#aibSettingsContent{padding:12px;gap:13px}.aib-settings-form{padding:12px}.aib-settings-two{grid-template-columns:1fr}.aib-profile-photo{padding:16px 10px}}
 
 /* Mobile account modal: anchor content at the top so profile photo is reachable by scrolling */
@@ -1509,6 +1510,20 @@ body.customer-orders-page-open{overflow:hidden}
 <label>عنوان السكن / الشحن<textarea id="aibProfileAddress" rows="3" maxlength="1000"></textarea></label>
 <label>رقم الهاتف</label><div class="aib-settings-two"><select id="aibProfileDial"><option value="">بدون رمز دولة (أدخل الرقم الدولي)</option><option value="+963">سوريا +963</option><option value="+43">النمسا +43</option><option value="+49">ألمانيا +49</option><option value="+90">تركيا +90</option><option value="+41">سويسرا +41</option><option value="+971">الإمارات +971</option><option value="+966">السعودية +966</option><option value="+1">أمريكا +1</option><option value="+44">بريطانيا +44</option></select><input id="aibProfilePhone" type="tel" maxlength="32" placeholder="رقم الهاتف"></div>
 <button class="cart-checkout" type="submit">حفظ بيانات الحساب</button></form>
+<div class="aib-settings-divider"></div>
+<div class="aib-settings-form aib-language-setting">
+<strong>لغة المتجر</strong>
+<label for="aibCustomerLanguage">اختر لغة عرض المتجر
+<select id="aibCustomerLanguage" onchange="setAibCustomerLanguage(this.value)">
+<option value="ar">العربية</option>
+<option value="en">English</option>
+<option value="tr">Türkçe</option>
+<option value="de">Deutsch</option>
+<option value="fr">Français</option>
+<option value="ru">Русский</option>
+</select></label>
+<small>سيُحفظ اختيارك ويُطبّق على صفحات العرض والمتجر عند زيارتك القادمة.</small>
+</div>
 <div class="aib-settings-divider"></div>
 <form class="aib-settings-form" onsubmit="changeAibStorePassword(event)"><strong>تغيير كلمة المرور</strong>
 <label>كلمة المرور الجديدة<input id="aibNewPassword" type="password" required minlength="8" maxlength="256" autocomplete="new-password" placeholder="8 خانات على الأقل"></label>
