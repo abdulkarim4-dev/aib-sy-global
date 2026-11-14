@@ -1447,7 +1447,13 @@ def update_record(record_id:int, p:RecordUpdate, request:Request, s:Session=Depe
     ensure_total_covers_payments(s,r.id,p.data)
     r.data=prepare_record_inventory(s,r.section,p.data,allow_legacy=True); r.invoice_no=p.invoice_no; r.currency=p.currency; r.updated_at=datetime.now(timezone.utc)
     recalculate_inventory(s)
-    audit(s,u,"record_updated","record",r.id,{"section":r.section,"invoice_no":r.invoice_no},request); s.commit(); return {"ok":True}
+    audit(s,u,"record_updated","record",r.id,{"section":r.section,"invoice_no":r.invoice_no},request); s.commit()
+    if r.section in {"purchase","carPurchase","deposit"}:
+        _store_catalog_cache["value"]=None
+        _store_catalog_cache["at"]=0
+        _public_products_cache["value"].clear()
+        _public_products_cache["at"].clear()
+    return {"ok":True}
 
 def sale_cash_moves_for_record(s:Session, record:Record):
     if record.section not in {"directSale","consignSale","carSale","purchase","carPurchase"}:
