@@ -17,7 +17,7 @@ ru:{
 }
 };
 const langs=Object.keys(dict);
-function detect(){const prefs=(navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language||"en"]).map(x=>(x||"").toLowerCase());for(const p of prefs){const base=p.split("-")[0];if(langs.includes(base))return base;}return "en";}
+function detect(){const prefs=(navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language||"en"]).map(x=>(x||"").toLowerCase());for(const p of prefs){const base=p.split("-")[0];if(base==="ar")return "ar";if(langs.includes(base))return base;}return "en";}
 const lang=detect(), map=dict[lang]||dict.en, rtl=lang==="ar";
 document.documentElement.lang=lang;document.documentElement.dir=rtl?"rtl":"ltr";
 document.documentElement.setAttribute("data-aib-customer-language",lang);
