@@ -563,7 +563,8 @@ const AIB_GLOBAL_GENERATION_EXPANSIONS={
 'foton':{'Auman':['ETX','EST','Galaxy'],'Aumark':['Aumark','Aumark S']},
 'jac':{'N-Series':['Generations 1–2'],'K-Series':['Generations 1–2']}
 };
-function aibIsHistoricalPlaceholderModel(value){const v=String(value||'').trim().toLowerCase();return /^(?:sedan|saloon|hatchback|coupe|convertible|cabriolet|wagon|estate|station wagon|suv|sport utility vehicle|pickup|pick up|van|minivan|mpv|كروس اوفر|كروس أوفر|سيدان|هاتشباك|كوبيه|مكشوفة|ستيشن|بيك اب|بيك أب|فان|ميني فان)\\s*[-_/() ]*\\d{4}$/i.test(v)||/^\\d{4}\\s*[-_/() ]*(?:sedan|saloon|hatchback|coupe|convertible|wagon|estate|suv|pickup|van|mpv|سيدان|هاتشباك|كوبيه|بيك اب|فان)$/i.test(v)}\nwindow.aibPurchaseGenerationOptions=async function(index){
+function aibIsHistoricalPlaceholderModel(value){const v=String(value||'').trim().toLowerCase();return /^(?:sedan|saloon|hatchback|coupe|convertible|cabriolet|wagon|estate|station wagon|suv|sport utility vehicle|pickup|pick up|van|minivan|mpv|كروس اوفر|كروس أوفر|سيدان|هاتشباك|كوبيه|مكشوفة|ستيشن|بيك اب|بيك أب|فان|ميني فان)\s*[-_/() ]*\d{4}$/i.test(v)||/^\d{4}\s*[-_/() ]*(?:sedan|saloon|hatchback|coupe|convertible|wagon|estate|suv|pickup|van|mpv|سيدان|هاتشباك|كوبيه|بيك اب|فان)$/i.test(v)}
+window.aibPurchaseGenerationOptions=async function(index){
  const row=(window.draftItems||[])[index];if(!row)return;
  const norm=v=>String(v||'').toLowerCase().replace(/[^a-z0-9]/g,'');
  const all={};for(const source of [AIB_KNOWN_GENERATIONS,AIB_ADDITIONAL_GENERATIONS,AIB_GLOBAL_GENERATION_EXPANSIONS])for(const [brand,models] of Object.entries(source))all[brand]={...(all[brand]||{}),...models};
