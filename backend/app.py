@@ -2249,6 +2249,15 @@ def public_products(q:Optional[str]=None, category:Optional[str]=None, s:Session
 from pathlib import Path
 from fastapi.responses import FileResponse, Response
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
+
+@app.get("/customer-i18n.js", include_in_schema=False)
+def customer_i18n_script():
+    return FileResponse(
+        FRONTEND_DIR / "customer-i18n.js",
+        media_type="application/javascript",
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0", "Pragma": "no-cache"},
+    )
+
 @app.get("/", include_in_schema=False)
 def home():
     return FileResponse(FRONTEND_DIR / "store.html")
