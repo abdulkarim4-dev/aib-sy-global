@@ -1716,7 +1716,7 @@ let aibPendingAvatar=null;
 function toggleAibAccountSettings(){const box=document.getElementById('aibSettingsContent');if(!box)return;box.hidden=!box.hidden;if(!box.hidden){loadAibStoreProfile();checkAibGoogleConfig()}}
 function loadAibStoreProfile(){if(!storeCustomer)return;const c=storeCustomer;const set=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v||''};set('aibProfileFullName',c.full_name);set('aibProfileFirstName',c.first_name);set('aibProfileLastName',c.last_name);set('aibProfileEmail',c.email);set('aibProfileAddress',c.shipping_address);set('aibProfileDial',c.phone_country_code||'+963');set('aibProfilePhone',c.phone_number);aibPendingAvatar=c.avatar_data||null;renderAibProfilePhoto()}
 function renderAibProfilePhoto(){const img=document.getElementById('aibProfilePreview'),ph=document.getElementById('aibProfilePlaceholder');if(!img||!ph)return;if(aibPendingAvatar){img.src=aibPendingAvatar;img.hidden=false;ph.hidden=true}else{img.removeAttribute('src');img.hidden=true;ph.hidden=false}}
-function previewAibProfilePhoto(input){const f=input.files&&input.files[0];if(!f)return;if(!['image/jpeg','image/png','image/webp'].includes(f.type)){showCartNotice('اختر صورة JPG أو PNG أو WEBP','warning');input.value='';return}if(f.size>900*1024){showCartNotice('حجم الصورة يجب ألا يتجاوز 900 كيلوبايت','warning');input.value='';return}const r=new FileReader();r.onload=()=>{aibPendingAvatar=r.result;renderAibProfilePhoto()};r.readAsDataURL(f)}
+function previewAibProfilePhoto(input){const f=input.files&&input.files[0];if(!f)return;if(!['image/jpeg','image/png','image/webp'].includes(f.type)){showCartNotice('اختر صورة JPG أو PNG أو WEBP','warning');input.value='';return}if(f.size>4*1024*1024){showCartNotice('حجم الصورة يجب ألا يتجاوز 4 ميغابايت','warning');input.value='';return}const r=new FileReader();r.onload=()=>{aibPendingAvatar=r.result;renderAibProfilePhoto()};r.readAsDataURL(f)}
 function removeAibProfilePhoto(){aibPendingAvatar='';const f=document.getElementById('aibProfileFile');if(f)f.value='';renderAibProfilePhoto()}
 async function saveAibStoreProfile(e){e.preventDefault();const body={full_name:document.getElementById('aibProfileFullName').value.trim(),first_name:document.getElementById('aibProfileFirstName').value.trim(),last_name:document.getElementById('aibProfileLastName').value.trim(),shipping_address:document.getElementById('aibProfileAddress').value.trim(),phone_country_code:document.getElementById('aibProfileDial').value,phone_number:document.getElementById('aibProfilePhone').value.trim(),avatar_data:aibPendingAvatar};const btn=e.submitter;if(btn){btn.disabled=true;btn.textContent='جارٍ الحفظ…'}try{const d=await storeApi('/store/auth/profile',{method:'PUT',body:JSON.stringify(body)});storeCustomer=d.customer;updateStoreAccountButton();updateAibDrawerAccount();document.getElementById('storeLoggedName').textContent=storeCustomer.full_name+' · '+storeCustomer.email;loadAibStoreProfile();showCartNotice(d.message||'تم حفظ بيانات الحساب')}catch(err){showCartNotice(err.message,'warning')}finally{if(btn){btn.disabled=false;btn.textContent='حفظ بيانات الحساب'}}}
 async function changeAibStorePassword(e){e.preventDefault();const new_password=document.getElementById('aibNewPassword').value,confirm=document.getElementById('aibConfirmPassword').value;if(new_password!==confirm){showCartNotice('تأكيد كلمة المرور الجديدة غير مطابق','warning');return}if(!isStrongStorePassword(new_password)){showStorePasswordRulesError();return}const btn=e.submitter;if(btn){btn.disabled=true;btn.textContent='جارٍ إرسال رابط التأكيد…'}try{const d=await storeApi('/store/auth/change-password',{method:'POST',body:JSON.stringify({new_password})});e.target.reset();showCartNotice(d.message||'تم إرسال رابط التأكيد إلى بريدك الإلكتروني')}catch(err){showCartNotice(err.message,'warning')}finally{if(btn){btn.disabled=false;btn.textContent='إرسال رابط التأكيد إلى البريد'}}}
@@ -2135,4 +2135,30 @@ async function loadCustomerOrders(){const list=document.getElementById('customer
 .customer-orders-page-view .customer-orders-empty{min-height:45vh;display:flex;flex-direction:column;align-items:center;justify-content:center}
 body.customer-orders-page-open{overflow:hidden}
 @media(max-width:600px){.customer-orders-page-view .customer-orders-page{padding:14px}.customer-orders-page-view .cart-head{margin:-14px -14px 18px;padding:16px 14px}.customer-orders-page-view .cart-head h2{font-size:19px}}
+
+/* Refined customer account settings */
+.aib-account-settings{margin:14px 0;border:1px solid #40596c;border-radius:18px;background:linear-gradient(145deg,#1c2c38,#121e28);box-shadow:0 14px 34px #0003;overflow:hidden}
+.aib-settings-toggle{position:relative;padding:17px 18px;background:linear-gradient(105deg,#263b4a,#1b2a36);font-size:14px;letter-spacing:.1px}
+.aib-settings-toggle:after{content:'⌄';position:absolute;left:18px;top:50%;transform:translateY(-50%);color:#8dc8eb;font-size:20px}
+.aib-settings-toggle span{font-size:11px;line-height:1.7}
+#aibSettingsContent{padding:18px;gap:17px}
+.aib-profile-photo{position:relative;gap:11px;padding:20px 14px;background:radial-gradient(circle at 50% 0%,#35526766,transparent 68%),#14222d;border:1px solid #40596c;border-radius:15px}
+#aibProfilePreview,#aibProfilePlaceholder{width:104px;height:104px;border:3px solid #80bde2;box-shadow:0 0 0 5px #80bde21c,0 8px 24px #0005}
+.aib-profile-photo label{padding:10px 17px;border:1px solid #5684a2;border-radius:10px;background:#203b4e;color:#d7efff;font-size:12px}
+.aib-profile-photo label:hover{background:#2b5068}
+.aib-profile-photo:after{content:'JPG أو PNG أو WEBP · الحد الأقصى 4 ميغابايت';color:#91a8b8;font:10px Tahoma}
+#aibProfileFile{max-width:100%;font-size:11px}
+.aib-settings-form{gap:12px;padding:15px;border:1px solid #344b5d;border-radius:14px;background:#172630}
+.aib-settings-form>strong{font-size:14px;padding-bottom:3px}
+.aib-settings-form label{gap:7px;font-size:12px}
+.aib-settings-form input,.aib-settings-form textarea,.aib-settings-form select{padding:12px 13px;border-radius:10px;border-color:#496174;background:#101c26;font-size:13px;transition:border-color .18s,box-shadow .18s}
+.aib-settings-form input:focus,.aib-settings-form textarea:focus,.aib-settings-form select:focus{outline:none;border-color:#77bce7;box-shadow:0 0 0 3px #77bce722}
+.aib-settings-two{gap:10px}
+.aib-settings-divider{height:1px;background:linear-gradient(90deg,transparent,#496174,transparent);margin:2px 0}
+.aib-google-link{padding:16px;border:1px solid #3c5669;border-radius:14px;background:linear-gradient(130deg,#1b303e,#15232d);gap:9px}
+.aib-google-link strong{font-size:14px}
+.aib-google-link p{font-size:11px}
+.aib-google-link button{border-radius:10px;font-size:12px}
+.aib-photo-remove{font-size:11px}
+@media(max-width:520px){#aibSettingsContent{padding:12px;gap:13px}.aib-settings-form{padding:12px}.aib-settings-two{grid-template-columns:1fr}.aib-profile-photo{padding:16px 10px}}
 </style>
