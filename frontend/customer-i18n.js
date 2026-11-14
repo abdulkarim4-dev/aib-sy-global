@@ -26,8 +26,16 @@ function detect(){const prefs=(navigator.languages&&navigator.languages.length?n
 const languageKey="aib_customer_language";
 let savedLanguage="";try{savedLanguage=localStorage.getItem(languageKey)||"";}catch(e){}
 const lang=(savedLanguage==="ar"||langs.includes(savedLanguage))?savedLanguage:detect(), map=dict[lang]||dict.en, rtl=lang==="ar";
-window.setAibCustomerLanguage=function(value){if(value!=="ar"&&!langs.includes(value))return;try{localStorage.setItem(languageKey,value);}catch(e){}location.reload();};
-window.addEventListener("DOMContentLoaded",()=>{const picker=document.getElementById("aibCustomerLanguage");if(picker)picker.value=lang;});
+window.setAibCustomerLanguage=function(value){
+ if(value==="auto"){try{localStorage.removeItem(languageKey);}catch(e){}location.reload();return;}
+ if(value!=="ar"&&!langs.includes(value))return;
+ try{localStorage.setItem(languageKey,value);}catch(e){}
+ location.reload();
+};
+window.addEventListener("DOMContentLoaded",()=>{
+ const picker=document.getElementById("aibCustomerLanguage");
+ if(picker)picker.value=(savedLanguage==="ar"||langs.includes(savedLanguage))?savedLanguage:"auto";
+});
 document.documentElement.lang=lang;document.documentElement.dir=rtl?"rtl":"ltr";
 document.documentElement.setAttribute("data-aib-customer-language",lang);
 try{document.documentElement.style.setProperty("--aib-language",lang)}catch(e){}
