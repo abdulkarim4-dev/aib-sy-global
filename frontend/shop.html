@@ -1324,6 +1324,97 @@ html body .aib-gemini-edge-reveal:hover{background:rgba(43,77,99,.96)!important}
 }
 </style>
 
+<style id="aib-hide-vehicle-identity-fields-fix">.catalog-tools .aib-vehicle-search label[hidden]{display:none!important;}
+/* Customer order history */
+.customer-orders-modal{display:none;position:fixed;inset:0;z-index:1350;background:#05090edb;backdrop-filter:blur(8px);padding:14px;overflow:auto;align-items:center;justify-content:center}
+.customer-orders-modal.open{display:flex}
+.customer-orders-panel{width:min(720px,100%);max-height:calc(100dvh - 28px);overflow:auto;border:1px solid #46637a;border-radius:18px;background:linear-gradient(145deg,#202c37,#111a22);box-shadow:0 25px 80px #000b;padding:18px;color:#f4f8fb}
+.customer-order-card{margin-top:12px;padding:14px;border:1px solid #3a5367;border-radius:13px;background:linear-gradient(145deg,#1a2935,#121d26)}
+.customer-order-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding-bottom:10px;border-bottom:1px solid #344958}
+.customer-order-status{display:inline-flex;align-items:center;gap:7px;padding:7px 11px;border-radius:20px;background:#263b4b;border:1px solid #49677e;color:#dceefa;font-size:11px;font-weight:800}
+.customer-order-status.pending{background:#3a3021;border-color:#927044;color:#f6d49b}.customer-order-status.approved{background:#183b30;border-color:#347b5d;color:#a9edc9}.customer-order-status.rejected{background:#402525;border-color:#8e4d4d;color:#ffc2bd}.customer-order-status.shipping{background:#1d3550;border-color:#477ca8;color:#b9ddff}.customer-order-status.delivered{background:#1d3c37;border-color:#3c8a73;color:#b7f0df}
+.customer-order-items{margin:10px 0;padding:0 18px;color:#c4d2dc;font-size:12px;line-height:2}
+.customer-order-meta{display:flex;gap:12px;flex-wrap:wrap;color:#aebdca;font-size:11px}
+.customer-orders-empty{text-align:center;padding:34px 14px;color:#b6c5d0;line-height:2}
+.customer-orders-refresh{padding:8px 12px;border:1px solid #47677f;border-radius:9px;background:#1b3447;color:#eaf5fc;font:700 11px Tahoma;cursor:pointer}
+@media(max-width:560px){.customer-orders-panel{padding:12px}.customer-order-card{padding:11px}}
+
+/* Present order history as a dedicated full-page view, not a floating card */
+.customer-orders-modal.customer-orders-page-view{position:fixed;inset:0;z-index:2400;display:none;align-items:stretch;justify-content:stretch;padding:0;overflow-y:auto;background:#101820;backdrop-filter:none}
+.customer-orders-modal.customer-orders-page-view.open{display:flex}
+.customer-orders-page-view .customer-orders-page{width:100%;max-width:none;min-height:100dvh;max-height:none;height:auto;overflow:visible;border:0;border-radius:0;padding:clamp(16px,3vw,34px);background:linear-gradient(180deg,#1a2834 0%,#101820 240px);box-shadow:none}
+.customer-orders-page-view .cart-head{position:sticky;top:0;z-index:2;margin:calc(clamp(16px,3vw,34px) * -1);margin-bottom:22px;padding:clamp(16px,3vw,34px);background:#172530f5;border-bottom:1px solid #3a5265;backdrop-filter:blur(12px)}
+.customer-orders-page-view #customerOrdersList{width:min(100%,1050px);margin:0 auto}
+.customer-orders-page-view .customer-order-card{padding:18px;margin:0 0 14px;border-radius:14px}
+.customer-orders-page-view .customer-orders-empty{min-height:45vh;display:flex;flex-direction:column;align-items:center;justify-content:center}
+body.customer-orders-page-open{overflow:hidden}
+@media(max-width:600px){.customer-orders-page-view .customer-orders-page{padding:14px}.customer-orders-page-view .cart-head{margin:-14px -14px 18px;padding:16px 14px}.customer-orders-page-view .cart-head h2{font-size:19px}}
+
+/* Refined customer account settings */
+.aib-account-settings{margin:14px 0;border:1px solid #40596c;border-radius:18px;background:linear-gradient(145deg,#1c2c38,#121e28);box-shadow:0 14px 34px #0003;overflow:hidden}
+.aib-settings-toggle{position:relative;padding:17px 18px;background:linear-gradient(105deg,#263b4a,#1b2a36);font-size:14px;letter-spacing:.1px}
+.aib-settings-toggle:after{content:'⌄';position:absolute;left:18px;top:50%;transform:translateY(-50%);color:#8dc8eb;font-size:20px}
+.aib-settings-toggle span{font-size:11px;line-height:1.7}
+#aibSettingsContent{padding:18px;gap:17px}
+.aib-profile-photo{position:relative;gap:11px;padding:20px 14px;background:radial-gradient(circle at 50% 0%,#35526766,transparent 68%),#14222d;border:1px solid #40596c;border-radius:15px}
+#aibProfilePreview,#aibProfilePlaceholder{width:104px;height:104px;border:3px solid #80bde2;box-shadow:0 0 0 5px #80bde21c,0 8px 24px #0005}
+.aib-profile-photo label{padding:10px 17px;border:1px solid #5684a2;border-radius:10px;background:#203b4e;color:#d7efff;font-size:12px}
+.aib-profile-photo label:hover{background:#2b5068}
+.aib-profile-photo:after{content:'JPG أو PNG أو WEBP · الحد الأقصى 4 ميغابايت';color:#91a8b8;font:10px Tahoma}
+#aibProfileFile{max-width:100%;font-size:11px}
+.aib-settings-form{gap:12px;padding:15px;border:1px solid #344b5d;border-radius:14px;background:#172630}
+.aib-settings-form>strong{font-size:14px;padding-bottom:3px}
+.aib-settings-form label{gap:7px;font-size:12px}
+.aib-settings-form input,.aib-settings-form textarea,.aib-settings-form select{padding:12px 13px;border-radius:10px;border-color:#496174;background:#101c26;font-size:13px;transition:border-color .18s,box-shadow .18s}
+.aib-settings-form input:focus,.aib-settings-form textarea:focus,.aib-settings-form select:focus{outline:none;border-color:#77bce7;box-shadow:0 0 0 3px #77bce722}
+.aib-settings-two{gap:10px}
+.aib-settings-divider{height:1px;background:linear-gradient(90deg,transparent,#496174,transparent);margin:2px 0}
+.aib-phone-verification{display:grid;gap:9px;padding:12px;border:1px solid #3c5669;border-radius:12px;background:#13232e}.aib-phone-verification .aib-settings-two{align-items:center}.aib-phone-verification small{color:#aebdca;font-size:11px;line-height:1.7}.aib-phone-verification button:disabled{opacity:.6;cursor:wait}
+.aib-google-link{padding:16px;border:1px solid #3c5669;border-radius:14px;background:linear-gradient(130deg,#1b303e,#15232d);gap:9px}
+.aib-google-link strong{font-size:14px}
+.aib-google-link p{font-size:11px}
+.aib-google-link button{border-radius:10px;font-size:12px}
+.aib-photo-remove{font-size:11px}
+@media(max-width:520px){#aibSettingsContent{padding:12px;gap:13px}.aib-settings-form{padding:12px}.aib-settings-two{grid-template-columns:1fr}.aib-profile-photo{padding:16px 10px}}
+
+/* Mobile account modal: anchor content at the top so profile photo is reachable by scrolling */
+@media(max-width:560px){
+ .store-auth-modal{align-items:flex-start!important;justify-content:center!important;padding:10px 10px calc(18px + env(safe-area-inset-bottom))!important;overflow-x:hidden!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch}
+ .store-auth-panel{width:100%!important;max-width:460px!important;max-height:none!important;height:auto!important;min-height:0!important;overflow:visible!important;flex:0 0 auto!important;margin:0 auto!important}
+ .store-logged-panel{min-height:0;overflow:visible}
+ .aib-account-settings{scroll-margin-top:12px}
+ #aibSettingsContent{min-height:0;overflow:visible}
+ .aib-profile-photo{display:grid!important;visibility:visible!important;position:relative;scroll-margin-top:14px}
+ #aibProfilePreview:not([hidden]),#aibProfilePlaceholder:not([hidden]){display:grid!important;visibility:visible!important}
+ #aibProfileFile{display:block!important;visibility:visible!important;width:100%;min-height:34px}
+}
+
+/* AIB category photo refresh - correctly embedded in the document stylesheet */
+.category-zone .cat::before{background-size:cover!important;background-position:center!important;background-repeat:no-repeat!important;opacity:.68!important;filter:saturate(.9) contrast(1.08)!important}
+.category-zone .cat[onclick="category('cars',this)"]::before{background-image:linear-gradient(0deg,rgba(5,12,18,.78),rgba(5,12,18,.12)),url('https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=1100&q=85')!important}
+.category-zone .cat[onclick="category('car_parts',this)"]::before{background-image:linear-gradient(0deg,rgba(5,12,18,.78),rgba(5,12,18,.12)),url('https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&w=1100&q=85')!important}
+.category-zone .cat[onclick="category('car_engines',this)"]::before{background-image:linear-gradient(0deg,rgba(5,12,18,.78),rgba(5,12,18,.12)),url('https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=1100&q=85')!important}
+.category-zone .cat[onclick="category('car_engine_parts',this)"]::before{background-image:linear-gradient(0deg,rgba(5,12,18,.78),rgba(5,12,18,.12)),url('https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?auto=format&fit=crop&w=1100&q=85')!important}
+.category-zone .cat[onclick="category('trucks',this)"]::before{background-image:linear-gradient(0deg,rgba(5,12,18,.78),rgba(5,12,18,.12)),url('https://images.unsplash.com/photo-1519003722824-194d4455a60c?auto=format&fit=crop&w=1100&q=85')!important}
+.category-zone .cat[onclick="category('truck_parts',this)"]::before{background-image:linear-gradient(0deg,rgba(5,12,18,.78),rgba(5,12,18,.12)),url('https://images.unsplash.com/photo-1487754180451-c456f719a1fc?auto=format&fit=crop&w=1100&q=85')!important}
+.category-zone .cat[onclick="category('truck_engines',this)"]::before{background-image:linear-gradient(0deg,rgba(5,12,18,.78),rgba(5,12,18,.12)),url('https://images.unsplash.com/photo-1581092334651-ddf26d9a09d0?auto=format&fit=crop&w=1100&q=85')!important}
+.category-zone .cat[onclick="category('truck_engine_parts',this)"]::before{background-image:linear-gradient(0deg,rgba(5,12,18,.78),rgba(5,12,18,.12)),url('https://images.unsplash.com/photo-1581092918056-0c4c3acd3781?auto=format&fit=crop&w=1100&q=85')!important}
+.category-zone .cat[onclick="category('heavy',this)"]::before{background-image:linear-gradient(0deg,rgba(5,12,18,.78),rgba(5,12,18,.12)),url('https://images.unsplash.com/photo-1580901368919-7738efb0f87e?auto=format&fit=crop&w=1100&q=85')!important}
+.category-zone .cat[onclick="category('heavy_parts',this)"]::before{background-image:linear-gradient(0deg,rgba(5,12,18,.78),rgba(5,12,18,.12)),url('https://images.unsplash.com/photo-1579412690850-bd41cd0af397?auto=format&fit=crop&w=1100&q=85')!important}
+.category-zone .cat[onclick="category('heavy_engines',this)"]::before{background-image:linear-gradient(0deg,rgba(5,12,18,.78),rgba(5,12,18,.12)),url('https://images.unsplash.com/photo-1530267981375-f0de937f5f13?auto=format&fit=crop&w=1100&q=85')!important}
+.category-zone .cat[onclick="category('heavy_engine_parts',this)"]::before{background-image:linear-gradient(0deg,rgba(5,12,18,.78),rgba(5,12,18,.12)),url('https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=1100&q=85')!important}
+.category-zone .cat[onclick="category('agri',this)"]::before{background-image:linear-gradient(0deg,rgba(5,12,18,.78),rgba(5,12,18,.12)),url('https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&w=1100&q=85')!important}
+.category-zone .cat[onclick="category('agri_parts',this)"]::before{background-image:linear-gradient(0deg,rgba(5,12,18,.78),rgba(5,12,18,.12)),url('https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&w=1100&q=85')!important}
+.category-zone .cat[onclick="category('agri_engines',this)"]::before{background-image:linear-gradient(0deg,rgba(5,12,18,.78),rgba(5,12,18,.12)),url('https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=1100&q=85')!important}
+.category-zone .cat[onclick="category('agri_engine_parts',this)"]::before{background-image:linear-gradient(0deg,rgba(5,12,18,.78),rgba(5,12,18,.12)),url('https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?auto=format&fit=crop&w=1100&q=85')!important}
+#specialCategorySection .cat[onclick="category('generators',this)"]{background-image:linear-gradient(0deg,rgba(5,12,18,.78),rgba(5,12,18,.12)),url('https://images.unsplash.com/photo-1516937941344-00b4e0337589?auto=format&fit=crop&w=1100&q=85')!important}
+#specialCategorySection .cat[onclick="category('hydraulic_compressors',this)"]{background-image:linear-gradient(0deg,rgba(5,12,18,.78),rgba(5,12,18,.12)),url('https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=1100&q=85')!important}
+#specialCategorySection .cat[onclick="category('water_pumps',this)"]{background-image:linear-gradient(0deg,rgba(5,12,18,.78),rgba(5,12,18,.12)),url('https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?auto=format&fit=crop&w=1100&q=85')!important}
+#specialCategorySection .cat[onclick="category('road_equipment',this)"]{background-image:linear-gradient(0deg,rgba(5,12,18,.78),rgba(5,12,18,.12)),url('https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=1100&q=85')!important}
+#specialCategorySection .cat[onclick="category('special_parts',this)"]{background-image:linear-gradient(0deg,rgba(5,12,18,.78),rgba(5,12,18,.12)),url('https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&w=1100&q=85')!important}
+#specialCategorySection .cat[onclick="category('special_engines',this)"]{background-image:linear-gradient(0deg,rgba(5,12,18,.78),rgba(5,12,18,.12)),url('https://images.unsplash.com/photo-1581092918056-0c4c3acd3781?auto=format&fit=crop&w=1100&q=85')!important}
+
+</style>
 </head><body><header class="wrap top"><button class="aib-menu-trigger" type="button" onclick="openAibStoreMenu()" aria-label="فتح قائمة المتجر" aria-controls="aibStoreDrawer" aria-expanded="false">
  <span></span><span></span><span></span>
 </button><div class="brand"><a class="brand-logo-link" href="/shop" aria-label="العودة إلى الصفحة الرئيسية للمتجر"><img src="/aib-logo.png?v=20261113-aib2" alt="AIB" width="145" height="58" decoding="async" fetchpriority="high"></a><div><b>AIB GROUP</b><small>المتجر الإلكتروني الرسمي</small></div></div><button class="store-account-button" id="storeAccountButton" type="button" onclick="openStoreAuth()" aria-label="حساب العميل">جارٍ التحقق من الحساب…</button><button class="cart-open" type="button" onclick="openCart()" aria-label="فتح سلة التسوق">🛒 <span>سلة التسوق</span><b id="cartCount">0</b></button></header>
@@ -2114,71 +2205,7 @@ async function loadCustomerOrders(){const list=document.getElementById('customer
 </script>
 </body></html>
 
-<style id="aib-hide-vehicle-identity-fields-fix">.catalog-tools .aib-vehicle-search label[hidden]{display:none!important;}
-/* Customer order history */
-.customer-orders-modal{display:none;position:fixed;inset:0;z-index:1350;background:#05090edb;backdrop-filter:blur(8px);padding:14px;overflow:auto;align-items:center;justify-content:center}
-.customer-orders-modal.open{display:flex}
-.customer-orders-panel{width:min(720px,100%);max-height:calc(100dvh - 28px);overflow:auto;border:1px solid #46637a;border-radius:18px;background:linear-gradient(145deg,#202c37,#111a22);box-shadow:0 25px 80px #000b;padding:18px;color:#f4f8fb}
-.customer-order-card{margin-top:12px;padding:14px;border:1px solid #3a5367;border-radius:13px;background:linear-gradient(145deg,#1a2935,#121d26)}
-.customer-order-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding-bottom:10px;border-bottom:1px solid #344958}
-.customer-order-status{display:inline-flex;align-items:center;gap:7px;padding:7px 11px;border-radius:20px;background:#263b4b;border:1px solid #49677e;color:#dceefa;font-size:11px;font-weight:800}
-.customer-order-status.pending{background:#3a3021;border-color:#927044;color:#f6d49b}.customer-order-status.approved{background:#183b30;border-color:#347b5d;color:#a9edc9}.customer-order-status.rejected{background:#402525;border-color:#8e4d4d;color:#ffc2bd}.customer-order-status.shipping{background:#1d3550;border-color:#477ca8;color:#b9ddff}.customer-order-status.delivered{background:#1d3c37;border-color:#3c8a73;color:#b7f0df}
-.customer-order-items{margin:10px 0;padding:0 18px;color:#c4d2dc;font-size:12px;line-height:2}
-.customer-order-meta{display:flex;gap:12px;flex-wrap:wrap;color:#aebdca;font-size:11px}
-.customer-orders-empty{text-align:center;padding:34px 14px;color:#b6c5d0;line-height:2}
-.customer-orders-refresh{padding:8px 12px;border:1px solid #47677f;border-radius:9px;background:#1b3447;color:#eaf5fc;font:700 11px Tahoma;cursor:pointer}
-@media(max-width:560px){.customer-orders-panel{padding:12px}.customer-order-card{padding:11px}}
 
-/* Present order history as a dedicated full-page view, not a floating card */
-.customer-orders-modal.customer-orders-page-view{position:fixed;inset:0;z-index:2400;display:none;align-items:stretch;justify-content:stretch;padding:0;overflow-y:auto;background:#101820;backdrop-filter:none}
-.customer-orders-modal.customer-orders-page-view.open{display:flex}
-.customer-orders-page-view .customer-orders-page{width:100%;max-width:none;min-height:100dvh;max-height:none;height:auto;overflow:visible;border:0;border-radius:0;padding:clamp(16px,3vw,34px);background:linear-gradient(180deg,#1a2834 0%,#101820 240px);box-shadow:none}
-.customer-orders-page-view .cart-head{position:sticky;top:0;z-index:2;margin:calc(clamp(16px,3vw,34px) * -1);margin-bottom:22px;padding:clamp(16px,3vw,34px);background:#172530f5;border-bottom:1px solid #3a5265;backdrop-filter:blur(12px)}
-.customer-orders-page-view #customerOrdersList{width:min(100%,1050px);margin:0 auto}
-.customer-orders-page-view .customer-order-card{padding:18px;margin:0 0 14px;border-radius:14px}
-.customer-orders-page-view .customer-orders-empty{min-height:45vh;display:flex;flex-direction:column;align-items:center;justify-content:center}
-body.customer-orders-page-open{overflow:hidden}
-@media(max-width:600px){.customer-orders-page-view .customer-orders-page{padding:14px}.customer-orders-page-view .cart-head{margin:-14px -14px 18px;padding:16px 14px}.customer-orders-page-view .cart-head h2{font-size:19px}}
-
-/* Refined customer account settings */
-.aib-account-settings{margin:14px 0;border:1px solid #40596c;border-radius:18px;background:linear-gradient(145deg,#1c2c38,#121e28);box-shadow:0 14px 34px #0003;overflow:hidden}
-.aib-settings-toggle{position:relative;padding:17px 18px;background:linear-gradient(105deg,#263b4a,#1b2a36);font-size:14px;letter-spacing:.1px}
-.aib-settings-toggle:after{content:'⌄';position:absolute;left:18px;top:50%;transform:translateY(-50%);color:#8dc8eb;font-size:20px}
-.aib-settings-toggle span{font-size:11px;line-height:1.7}
-#aibSettingsContent{padding:18px;gap:17px}
-.aib-profile-photo{position:relative;gap:11px;padding:20px 14px;background:radial-gradient(circle at 50% 0%,#35526766,transparent 68%),#14222d;border:1px solid #40596c;border-radius:15px}
-#aibProfilePreview,#aibProfilePlaceholder{width:104px;height:104px;border:3px solid #80bde2;box-shadow:0 0 0 5px #80bde21c,0 8px 24px #0005}
-.aib-profile-photo label{padding:10px 17px;border:1px solid #5684a2;border-radius:10px;background:#203b4e;color:#d7efff;font-size:12px}
-.aib-profile-photo label:hover{background:#2b5068}
-.aib-profile-photo:after{content:'JPG أو PNG أو WEBP · الحد الأقصى 4 ميغابايت';color:#91a8b8;font:10px Tahoma}
-#aibProfileFile{max-width:100%;font-size:11px}
-.aib-settings-form{gap:12px;padding:15px;border:1px solid #344b5d;border-radius:14px;background:#172630}
-.aib-settings-form>strong{font-size:14px;padding-bottom:3px}
-.aib-settings-form label{gap:7px;font-size:12px}
-.aib-settings-form input,.aib-settings-form textarea,.aib-settings-form select{padding:12px 13px;border-radius:10px;border-color:#496174;background:#101c26;font-size:13px;transition:border-color .18s,box-shadow .18s}
-.aib-settings-form input:focus,.aib-settings-form textarea:focus,.aib-settings-form select:focus{outline:none;border-color:#77bce7;box-shadow:0 0 0 3px #77bce722}
-.aib-settings-two{gap:10px}
-.aib-settings-divider{height:1px;background:linear-gradient(90deg,transparent,#496174,transparent);margin:2px 0}
-.aib-phone-verification{display:grid;gap:9px;padding:12px;border:1px solid #3c5669;border-radius:12px;background:#13232e}.aib-phone-verification .aib-settings-two{align-items:center}.aib-phone-verification small{color:#aebdca;font-size:11px;line-height:1.7}.aib-phone-verification button:disabled{opacity:.6;cursor:wait}
-.aib-google-link{padding:16px;border:1px solid #3c5669;border-radius:14px;background:linear-gradient(130deg,#1b303e,#15232d);gap:9px}
-.aib-google-link strong{font-size:14px}
-.aib-google-link p{font-size:11px}
-.aib-google-link button{border-radius:10px;font-size:12px}
-.aib-photo-remove{font-size:11px}
-@media(max-width:520px){#aibSettingsContent{padding:12px;gap:13px}.aib-settings-form{padding:12px}.aib-settings-two{grid-template-columns:1fr}.aib-profile-photo{padding:16px 10px}}
-
-/* Mobile account modal: anchor content at the top so profile photo is reachable by scrolling */
-@media(max-width:560px){
- .store-auth-modal{align-items:flex-start!important;justify-content:center!important;padding:10px 10px calc(18px + env(safe-area-inset-bottom))!important;overflow-x:hidden!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch}
- .store-auth-panel{width:100%!important;max-width:460px!important;max-height:none!important;height:auto!important;min-height:0!important;overflow:visible!important;flex:0 0 auto!important;margin:0 auto!important}
- .store-logged-panel{min-height:0;overflow:visible}
- .aib-account-settings{scroll-margin-top:12px}
- #aibSettingsContent{min-height:0;overflow:visible}
- .aib-profile-photo{display:grid!important;visibility:visible!important;position:relative;scroll-margin-top:14px}
- #aibProfilePreview:not([hidden]),#aibProfilePlaceholder:not([hidden]){display:grid!important;visibility:visible!important}
- #aibProfileFile{display:block!important;visibility:visible!important;width:100%;min-height:34px}
-}
-</style>
 
 
 /* AIB category photo refresh - category-matched Unsplash photography */
