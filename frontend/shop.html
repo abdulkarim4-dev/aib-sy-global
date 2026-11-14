@@ -2227,6 +2227,45 @@ header.top>.aib-menu-trigger{
 .category-zone .cats .cat:hover,.category-zone .cats .cat.active{transform:translateY(-3px)!important;border-color:#e87936!important;box-shadow:0 12px 24px #0004!important}
 @media(max-width:650px){.category-zone .cats .cat{min-height:112px!important;padding:10px!important}.category-zone .cats .cat>span:not(.cat-icon){font-size:11px!important}}
 </style>
+
+<style id="aib-category-images-hard-fix">
+/* Force real photo backgrounds on the category buttons themselves. */
+.category-zone .cats button.cat{
+  background-color:#263744!important;
+  background-repeat:no-repeat!important;
+  background-position:center!important;
+  background-size:cover!important;
+  background-clip:border-box!important;
+}
+.category-zone .cats button.cat::before{content:none!important;display:none!important}
+.category-zone .cats button.cat::after{
+  content:""!important;position:absolute!important;inset:0!important;z-index:0!important;
+  background:linear-gradient(0deg,rgba(5,13,20,.68),rgba(5,13,20,.02) 82%)!important;
+  pointer-events:none!important;display:block!important
+}
+.category-zone .cats button.cat[onclick="category('cars',this)"]{background:linear-gradient(0deg,rgba(5,13,20,.48),rgba(5,13,20,.02)),url('https://cdm-grow-engine.lovable.app/assets/automotive-showroom-operations-1O9n3MGX.jpg') center/cover no-repeat!important}
+.category-zone .cats button.cat[onclick="category('car_parts',this)"]{background:linear-gradient(0deg,rgba(5,13,20,.48),rgba(5,13,20,.02)),url('https://frankfurt.apollo.olxcdn.com/v1/files/uh87aio2unnd-KZ/image%3Bs%3D1000x667') center/cover no-repeat!important}
+.category-zone .cats button.cat[onclick="category('car_engines',this)"]{background:linear-gradient(0deg,rgba(5,13,20,.48),rgba(5,13,20,.02)),url('https://images.unsplash.com/photo-1552656967-7a0991a13906?auto=format&fit=crop&w=1200&q=85') center/cover no-repeat!important}
+.category-zone .cats button.cat[onclick="category('car_engine_parts',this)"]{background:linear-gradient(0deg,rgba(5,13,20,.48),rgba(5,13,20,.02)),url('https://media.fridayparts.com/media/catalog/category/1-Engine-Spare-Parts.png') center/cover no-repeat!important}
+.category-zone .cats button.cat[onclick="category('trucks',this)"]{background:linear-gradient(0deg,rgba(5,13,20,.48),rgba(5,13,20,.02)),url('https://static.wixstatic.com/media/e22d5d_57fd7069689346178f60e6f512443ddf~mv2.jpg/v1/fill/w_1450%2Ch_925%2Cq_90%2Cenc_avif%2Cquality_auto/e22d5d_57fd7069689346178f60e6f512443ddf~mv2.jpg') center/cover no-repeat!important}
+.category-zone .cats button.cat[onclick="category('truck_parts',this)"]{background:linear-gradient(0deg,rgba(5,13,20,.48),rgba(5,13,20,.02)),url('https://image.made-in-china.com/2f0j00vFEboDkICpci/OEM-1103678-Car-Parts-Electronic-Distributor-Ignition-for-Suzuki-Auto-Spare-Parts-Ignition-Distributor-Module.webp') center/cover no-repeat!important}
+.category-zone .cats button.cat[onclick="category('truck_engines',this)"]{background:linear-gradient(0deg,rgba(5,13,20,.48),rgba(5,13,20,.02)),url('https://www.manchina.com.cn/upload/images/2018/02/06/7701e88654794521be3f4fc71ba2a8c5.jpg') center/cover no-repeat!important}
+.category-zone .cats button.cat[onclick="category('truck_engine_parts',this)"]{background:linear-gradient(0deg,rgba(5,13,20,.48),rgba(5,13,20,.02)),url('https://media.fridayparts.com/media/catalog/category/1-Engine-Spare-Parts.png') center/cover no-repeat!important}
+.category-zone .cats button.cat[onclick="category('heavy',this)"]{background:linear-gradient(0deg,rgba(5,13,20,.48),rgba(5,13,20,.02)),url('https://images.unsplash.com/photo-1580901368919-7738efb0f87e?auto=format&fit=crop&w=1200&q=85') center/cover no-repeat!important}
+.category-zone .cats button.cat[onclick="category('heavy_parts',this)"]{background:linear-gradient(0deg,rgba(5,13,20,.48),rgba(5,13,20,.02)),url('https://image.made-in-china.com/2f0j00VQfvTGaFJwco/Excavator-Bucket-Tooth-and-Adapter-Jcb-Standard-Teeth-and-Side-Cutter.webp') center/cover no-repeat!important}
+.category-zone .cats button.cat[onclick="category('heavy_engines',this)"]{background:linear-gradient(0deg,rgba(5,13,20,.48),rgba(5,13,20,.02)),url('https://www.partesymaquinas.com/diesel-gas-engines.webp') center/cover no-repeat!important}
+.category-zone .cats button.cat[onclick="category('heavy_engine_parts',this)"]{background:linear-gradient(0deg,rgba(5,13,20,.48),rgba(5,13,20,.02)),url('https://image.made-in-china.com/202f0j00hbHcKFuqryoE/Excavator-Hydraulic-Pump-320c-320b-320d-320d2-Main-Pump-for-Piston-Pump-339-0512-397-3680-272-6955-173-3381-2726955-1733381.webp') center/cover no-repeat!important}
+.category-zone .cats button.cat[onclick="category('agri',this)"]{background:linear-gradient(0deg,rgba(5,13,20,.48),rgba(5,13,20,.02)),url('https://images.unsplash.com/photo-1500937386664-56d1dfef3854?auto=format&fit=crop&w=1200&q=85') center/cover no-repeat!important}
+.category-zone .cats button.cat[onclick="category('agri_parts',this)"]{background:linear-gradient(0deg,rgba(5,13,20,.48),rgba(5,13,20,.02)),url('https://cpimg.tistatic.com/03037826/b/4/Agricultural-Tractor-Spare-Parts.jpg') center/cover no-repeat!important}
+.category-zone .cats button.cat[onclick="category('agri_engines',this)"]{background:linear-gradient(0deg,rgba(5,13,20,.48),rgba(5,13,20,.02)),url('https://image.made-in-china.com/365f3j00BbATskJaAtqD/Quanchai-Agricultural-Equipment-4c6-4D2-4G1-4m1-4m6-Diesel-Engine.webp') center/cover no-repeat!important}
+.category-zone .cats button.cat[onclick="category('agri_engine_parts',this)"]{background:linear-gradient(0deg,rgba(5,13,20,.48),rgba(5,13,20,.02)),url('https://5.imimg.com/data5/IZ/HH/ST/SELLER-89033123/escort-farmtrac-genuine-tractor-parts-1000x1000.jpg') center/cover no-repeat!important}
+#specialCategorySection .cats button.cat[onclick="category('generators',this)"]{background:linear-gradient(0deg,rgba(5,13,20,.48),rgba(5,13,20,.02)),url('https://gecolsa.com/archivosestaticos/2024/11/C15-550-GC-caterpillar-grupo-electrogeno.png') center/cover no-repeat!important}
+#specialCategorySection .cats button.cat[onclick="category('hydraulic_compressors',this)"]{background:linear-gradient(0deg,rgba(5,13,20,.48),rgba(5,13,20,.02)),url('https://www.fennex.co.nz/media/commerce_products/24/Hydraulic-Piston-Air-Compressors_1600x1600a.webp') center/cover no-repeat!important}
+#specialCategorySection .cats button.cat[onclick="category('water_pumps',this)"]{background:linear-gradient(0deg,rgba(5,13,20,.48),rgba(5,13,20,.02)),url('https://www.cer.com.ar/web/image/product.template/18600/image_1024/%5BB.BC.1.2515.M%5D%20BOMBA%20CENTRIFUGA%20MOTORARG%20MODELO%20BC%2025%20150%20-%201%2C5%20HP%20-%20ELEVA%2032%20MTS%20-%20220V?unique=c61b148') center/cover no-repeat!important}
+#specialCategorySection .cats button.cat[onclick="category('road_equipment',this)"]{background:linear-gradient(0deg,rgba(5,13,20,.48),rgba(5,13,20,.02)),url('https://www.michurinsk.ru/images/articles/46803_d8cc51e1dd437bcb49f9eb885f7f93981725535157.jpeg') center/cover no-repeat!important}
+#specialCategorySection .cats button.cat[onclick="category('special_parts',this)"]{background:linear-gradient(0deg,rgba(5,13,20,.48),rgba(5,13,20,.02)),url('https://image.made-in-china.com/2f0j00VQfvTGaFJwco/Excavator-Bucket-Tooth-and-Adapter-Jcb-Standard-Teeth-and-Side-Cutter.webp') center/cover no-repeat!important}
+#specialCategorySection .cats button.cat[onclick="category('special_engines',this)"]{background:linear-gradient(0deg,rgba(5,13,20,.48),rgba(5,13,20,.02)),url('https://www.partesymaquinas.com/diesel-gas-engines.webp') center/cover no-repeat!important}
+</style>
 <button id="aibGeminiDockReveal" class="aib-gemini-edge-reveal" type="button" aria-label="إظهار مساعد AIB وأزرار التواصل" title="إظهار المساعد والتواصل">‹</button>
 <div class="aib-gemini-dock" aria-label="مساعد AIB وطرق التواصل">
  <button id="aibGeminiDockHide" class="aib-gemini-dock-hide" type="button" aria-label="إخفاء المساعد وأزرار التواصل" title="إخفاء">×</button>
