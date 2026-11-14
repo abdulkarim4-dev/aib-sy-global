@@ -2390,4 +2390,19 @@ html body .category-zone .cats button.cat[onclick="category('generators',this)"]
 }
 </style>
 
+
+<style id="aib-generators-category-image-priority-fix">
+/* صورة Caterpillar C15: تجاوز قواعد #specialCategorySection الأقدم */
+#specialCategorySection .cats button.cat[onclick*="generators"]{
+  background:linear-gradient(0deg,rgba(5,12,18,.64),rgba(5,12,18,.02)),url("https://www.tractors.com.sg/images/product/Engine/Electric_Power_Generation/smallgenset/Cat_Genset_C15.jpg") center 48% / cover no-repeat!important;
+  background-color:#17242b!important;
+}
+#specialCategorySection .cats button.cat[onclick*="generators"]::before{
+  display:none!important;content:none!important;background:none!important;
+}
+#specialCategorySection .cats button.cat[onclick*="generators"] .cat-icon{
+  background:transparent!important;
+}
+</style>
+
 </body></html>
