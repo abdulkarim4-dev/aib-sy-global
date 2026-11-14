@@ -803,6 +803,73 @@ body.modal-open{overflow:hidden}
 
 /* Keep category and category-page panels completely out of search results, even when component CSS sets display. */
 #categorySection[hidden],#categoryPageHeader[hidden]{display:none!important}
+
+/* AIB floating assistant — refined premium control rail */
+html body .aib-gemini-dock{
+ position:fixed!important;right:max(20px,env(safe-area-inset-right))!important;bottom:max(20px,env(safe-area-inset-bottom))!important;
+ display:flex!important;flex-direction:column!important;align-items:center!important;gap:11px!important;
+ width:auto!important;max-width:calc(100vw - 28px)!important;padding:12px!important;
+ border:1px solid rgba(184,207,224,.20)!important;border-radius:23px!important;
+ background:linear-gradient(155deg,rgba(12,25,37,.72),rgba(20,39,54,.54))!important;
+ box-shadow:0 16px 42px rgba(3,13,23,.30),inset 0 1px 0 rgba(255,255,255,.10)!important;
+ backdrop-filter:blur(18px) saturate(145%)!important;-webkit-backdrop-filter:blur(18px) saturate(145%)!important;
+}
+html body #aibGeminiStoreFab{
+ min-width:0!important;width:100%!important;min-height:46px!important;padding:11px 15px!important;
+ border:1px solid rgba(116,184,220,.45)!important;border-radius:14px!important;
+ background:linear-gradient(115deg,#174767,#176b91)!important;color:#fff!important;
+ font:800 13px/1.5 Tahoma,Arial,sans-serif!important;letter-spacing:0!important;text-shadow:none!important;
+ box-shadow:0 5px 15px rgba(0,0,0,.20),inset 0 1px 0 rgba(255,255,255,.15)!important;
+}
+html body #aibGeminiStoreFab:hover{filter:brightness(1.12)!important;transform:translateY(-1px)!important}
+html body .aib-gemini-social{
+ display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:center!important;
+ gap:9px!important;width:auto!important;padding:0 2px!important
+}
+html body .aib-gemini-social a{
+ width:38px!important;height:38px!important;flex:0 0 38px!important;box-sizing:border-box!important;
+ display:grid!important;place-items:center!important;border:1px solid rgba(191,214,231,.25)!important;
+ border-radius:12px!important;background:rgba(255,255,255,.055)!important;
+ box-shadow:inset 0 1px 0 rgba(255,255,255,.08)!important;backdrop-filter:none!important;
+}
+html body .aib-gemini-social a svg{width:17px!important;height:17px!important}
+html body .aib-gemini-social a:hover{background:rgba(255,255,255,.13)!important;transform:translateY(-2px)!important}
+html body .aib-gemini-panel{
+ position:fixed!important;right:max(20px,env(safe-area-inset-right))!important;
+ bottom:178px!important;left:auto!important;top:auto!important;
+ width:min(410px,calc(100vw - 32px))!important;height:min(570px,calc(100dvh - 215px))!important;
+ min-height:340px!important;max-height:calc(100dvh - 100px)!important;
+ overflow:hidden!important;border:1px solid #d8e1e9!important;border-radius:20px!important;
+ background:#f6f8fa!important;box-shadow:0 22px 65px rgba(5,18,30,.32)!important;
+}
+html body .aib-gemini-head{
+ min-height:68px!important;padding:13px 16px!important;
+ background:linear-gradient(115deg,#122f45,#1b5879)!important;border-bottom:3px solid #e77d3d!important
+}
+html body .aib-gemini-head strong{font-size:15px!important;letter-spacing:.1px!important}
+html body .aib-gemini-head small{font-size:11px!important;opacity:.88!important}
+html body .aib-gemini-close{
+ width:34px!important;height:34px!important;flex-basis:34px!important;border-radius:10px!important;
+ border:1px solid rgba(255,255,255,.35)!important;background:rgba(255,255,255,.12)!important;
+ box-shadow:none!important;font-size:23px!important
+}
+html body .aib-gemini-messages{padding:15px!important;gap:11px!important;background:#f3f6f8!important}
+html body .aib-gemini-msg{font-size:13px!important;line-height:1.85!important;border-radius:14px!important;padding:11px 13px!important}
+html body .aib-gemini-msg.bot{background:#fff!important;border:1px solid #e0e6eb!important;color:#263746!important}
+html body .aib-gemini-msg.user{background:#e4f1f8!important;border:1px solid #c7deec!important;color:#174461!important}
+html body .aib-gemini-note{padding:8px 14px!important;background:#fff!important;color:#71808b!important;font-size:10px!important;border-top:1px solid #e5eaee!important}
+html body .aib-gemini-form{padding:11px!important;gap:8px!important;background:#fff!important;border-top:1px solid #e3e9ee!important}
+html body .aib-gemini-form textarea{min-height:46px!important;border:1px solid #d2dce4!important;border-radius:12px!important;background:#f8fafb!important;color:#203342!important;font:13px/1.6 Tahoma,Arial,sans-serif!important}
+html body .aib-gemini-form button{min-width:66px!important;border-radius:11px!important;background:#17658c!important;font:700 12px Tahoma!important}
+@media(max-width:520px){
+ html body .aib-gemini-dock{right:12px!important;bottom:max(12px,env(safe-area-inset-bottom))!important;gap:9px!important;padding:9px!important;border-radius:19px!important}
+ html body #aibGeminiStoreFab{min-height:42px!important;padding:9px 12px!important;font-size:12px!important}
+ html body .aib-gemini-social{gap:7px!important}
+ html body .aib-gemini-social a{width:35px!important;height:35px!important;flex-basis:35px!important;border-radius:11px!important}
+ html body .aib-gemini-panel{right:10px!important;bottom:164px!important;width:calc(100vw - 20px)!important;height:min(560px,calc(100dvh - 190px))!important;min-height:300px!important}
+}
+@media(prefers-reduced-motion:reduce){html body .aib-gemini-social a,html body #aibGeminiStoreFab{transition:none!important}}
+
 </style><style id="aib-unified-white-theme">
 /* AIB unified premium white theme — shared visual layer */
 :root{
