@@ -2320,12 +2320,13 @@ html body .category-zone .cats button.cat[onclick*="truck_parts"] .cat-icon{back
 </style>
 
 <style id="aib-agri-large-luxury-tractor-image">
-/* صورة جرار زراعي ضخم وفخم لبطاقة المعدات الزراعية */
-html body .category-zone .cats button.cat[onclick*="category('agri',"]{
- background:linear-gradient(0deg,rgba(5,12,18,.62),rgba(5,12,18,.02)),url("https://www.deere.dk/assets/images/region-2/products/tractors/large/9r-series/9rx-true-power-2.jpg") center center / cover no-repeat!important;
+/* صورة رسمية موثوقة لجرار John Deere 9RX 830 الضخم */
+html body .category-zone .cats button.cat[onclick="category('agri',this)"]{
+ background-image:linear-gradient(0deg,rgba(5,12,18,.58),rgba(5,12,18,.02)),url("https://johndeere.widen.net/content/fgsdxcwc5m/webp/47SF12L110_830_front_20240104_large_45a1dc497f4ced0b2ad6b37bb238dd38558246d2.webp?crop=true&h=900&keep=c&retina=false&w=1200")!important;
+ background-size:cover!important;background-position:center 48%!important;background-repeat:no-repeat!important;
  background-color:#26352b!important;
 }
-html body .category-zone .cats button.cat[onclick*="category('agri',"]::before{display:none!important;content:none!important;}
-html body .category-zone .cats button.cat[onclick*="category('agri',"] .cat-icon{background:transparent!important;}
+html body .category-zone .cats button.cat[onclick="category('agri',this)"]::before{display:none!important;content:none!important;background:none!important;}
+html body .category-zone .cats button.cat[onclick="category('agri',this)"] .cat-icon{background:transparent!important;}
 </style>
 </body></html>
