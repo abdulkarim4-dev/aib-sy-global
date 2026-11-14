@@ -1239,6 +1239,57 @@ html body .aib-gemini-panel{bottom:255px!important}
 }
 
 </style>
+
+<style id="aib-contact-row-refinement">
+/* أزرار التواصل أسفل مساعد Gemini في صف واحد */
+html body .aib-gemini-dock{
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:flex-end!important;
+  gap:8px!important;
+}
+html body .aib-gemini-social{
+  display:flex!important;
+  flex-direction:row!important;
+  flex-wrap:nowrap!important;
+  align-items:center!important;
+  justify-content:flex-end!important;
+  gap:8px!important;
+  width:auto!important;
+}
+html body .aib-gemini-social a{
+  width:38px!important;
+  height:38px!important;
+  flex:0 0 38px!important;
+  display:grid!important;
+  place-items:center!important;
+  border-radius:12px!important;
+  background:rgba(24,39,52,.58)!important;
+  border:1px solid rgba(205,220,232,.28)!important;
+  box-shadow:0 3px 10px rgba(0,0,0,.13)!important;
+  backdrop-filter:blur(8px)!important;
+  -webkit-backdrop-filter:blur(8px)!important;
+  transition:background .18s ease,border-color .18s ease,transform .18s ease!important;
+}
+html body .aib-gemini-social a svg{width:17px!important;height:17px!important}
+html body .aib-gemini-social a:hover{
+  background:rgba(48,69,86,.78)!important;
+  border-color:rgba(220,233,243,.55)!important;
+  transform:translateY(-2px)!important;
+}
+html body .aib-gemini-social .wa{color:#83d9a7!important}
+html body .aib-gemini-social .fb{color:#9fc7f4!important}
+html body .aib-gemini-social .ig{color:#e9a9c2!important}
+html body .aib-gemini-social .call{color:#b8d8ed!important}
+html body .aib-gemini-panel{bottom:108px!important}
+@media(max-width:520px){
+  html body .aib-gemini-dock{gap:7px!important}
+  html body .aib-gemini-social{gap:7px!important}
+  html body .aib-gemini-social a{width:36px!important;height:36px!important;flex-basis:36px!important;border-radius:11px!important}
+  html body .aib-gemini-panel{bottom:101px!important}
+}
+</style>
+
 </head><body><header class="wrap top"><button class="aib-menu-trigger" type="button" onclick="openAibStoreMenu()" aria-label="فتح قائمة المتجر" aria-controls="aibStoreDrawer" aria-expanded="false">
  <span></span><span></span><span></span>
 </button><div class="brand"><a class="brand-logo-link" href="/shop" aria-label="العودة إلى الصفحة الرئيسية للمتجر"><img src="/aib-logo.png?v=20261113-aib2" alt="AIB" width="145" height="58" decoding="async" fetchpriority="high"></a><div><b>AIB GROUP</b><small>المتجر الإلكتروني الرسمي</small></div></div><button class="store-account-button" id="storeAccountButton" type="button" onclick="openStoreAuth()" aria-label="حساب العميل">جارٍ التحقق من الحساب…</button><button class="store-logout-button" id="storeLogoutButton" type="button" onclick="logoutStoreCustomer()" hidden>تسجيل الخروج</button><button class="cart-open" type="button" onclick="openCart()" aria-label="فتح سلة التسوق">🛒 <span>سلة التسوق</span><b id="cartCount">0</b></button></header>
