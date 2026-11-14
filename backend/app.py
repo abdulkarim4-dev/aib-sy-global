@@ -1930,6 +1930,12 @@ def create_online_order(p:OnlineOrderPayload,s:Session=Depends(db),customer:Stor
         send_notification_email(admin_email,f"طلب شراء إلكتروني جديد #{order.id} – AIB",admin_body,admin_html)
     return {"ok":True,"order_id":order.id,"customer":data,"items":lines,"total":float(order.total),"currency":order.currency,"status":order.status}
 
+
+@app.get("/store/orders")
+def list_customer_online_orders(s:Session=Depends(db),customer:StoreCustomer=Depends(current_store_customer)):
+    rows=s.scalars(select(OnlinePurchaseOrder).where(OnlinePurchaseOrder.customer_id==customer.id).order_by(OnlinePurchaseOrder.created_at.desc(),OnlinePurchaseOrder.id.desc()).limit(100)).all()
+    return [{"id":o.id,"items":o.items,"total":float(o.total),"currency":o.currency,"status":o.status,"review_note":o.review_note,"record_id":o.record_id,"created_at":o.created_at,"invoice_no":(s.get(Record,o.record_id).invoice_no if o.record_id and s.get(Record,o.record_id) else None)} for o in rows]
+
 @app.get("/online-purchase-orders/count")
 def count_online_purchase_orders(s:Session=Depends(db),u:User=Depends(manager)):
     pending=int(s.scalar(select(func.count(OnlinePurchaseOrder.id)).where(OnlinePurchaseOrder.status=="pending")) or 0)
@@ -1986,6 +1992,30 @@ def review_online_purchase_order(order_id:int,p:OnlineOrderReviewPayload,s:Sessi
     approval_html=aib_email_html("تم اعتماد طلبك بنجاح",f"مرحباً {(order.customer_data or {}).get('full_name','')}، تمت مراجعة إثبات الدفع واعتماد طلبك. شكراً لثقتك بمجموعة AIB.",[("رقم الطلب",f"#{order.id}"),("رقم الفاتورة",html.escape(record.invoice_no)),("الإجمالي",f"{float(order.total):.2f} {html.escape(order.currency)}"),("الحالة","تم اعتماد الطلب")],accent="#168447",note="احتفظ برقم الفاتورة لمتابعة طلبك. سيقوم فريقنا بالتواصل معك بشأن التسليم.")
     send_notification_email(customer_email,f"تم اعتماد طلب الشراء #{order.id} - مجموعة AIB",approval_body,approval_html)
     return {"ok":True,"status":"approved","record_id":record.id,"invoice_no":record.invoice_no,"customer":order.customer_data}
+
+
+class OnlineOrderStatusPayload(BaseModel):
+    status: str
+    note: str = ""
+
+@app.put("/online-purchase-orders/{order_id}/status")
+def update_online_purchase_order_status(order_id:int,p:OnlineOrderStatusPayload,s:Session=Depends(db),u:User=Depends(manager)):
+    if p.status not in {"shipping","delivered"}:
+        raise HTTPException(400,"الحالة المطلوبة غير مدعومة")
+    order=s.get(OnlinePurchaseOrder,order_id)
+    if not order: raise HTTPException(404,"الطلب غير موجود")
+    if order.status not in {"approved","shipping"}:
+        raise HTTPException(409,"يجب اعتماد الطلب أولاً قبل تحديث حالة الشحن")
+    if p.status=="delivered" and order.status!="shipping":
+        raise HTTPException(409,"يجب تحويل الطلب إلى حالة الشحن أولاً")
+    order.status=p.status
+    if p.note.strip(): order.review_note=p.note.strip()
+    s.commit()
+    customer_email=(order.customer_data or {}).get("email")
+    status_label="طلبك في الشحن" if p.status=="shipping" else "تم تسليم طلبك"
+    status_html=aib_email_html(status_label,f"مرحباً {(order.customer_data or {}).get('full_name','')}، تم تحديث حالة طلبك لدى مجموعة AIB.",[("رقم الطلب",f"#{order.id}"),("الحالة","في الشحن" if p.status=="shipping" else "تم التسليم")],accent="#2476b9")
+    send_notification_email(customer_email,f"تحديث حالة الطلب #{order.id} - مجموعة AIB",status_label,status_html)
+    return {"ok":True,"status":order.status}
 
 @app.get("/public/products")
 def public_products(q:Optional[str]=None, category:Optional[str]=None, s:Session=Depends(db)):
