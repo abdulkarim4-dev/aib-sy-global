@@ -91,6 +91,7 @@ class StoreCustomer(Base):
     last_name: Mapped[str]=mapped_column(String(80),default="")
     shipping_address: Mapped[str]=mapped_column(Text,default="")
     phone_country_code: Mapped[str]=mapped_column(String(8),default="+963")
+    phone_verified_at: Mapped[Optional[datetime]]=mapped_column(DateTime(timezone=True),nullable=True)
     phone_number: Mapped[str]=mapped_column(String(32),default="")
     avatar_data: Mapped[Optional[str]]=mapped_column(Text,nullable=True)
     google_sub: Mapped[Optional[str]]=mapped_column(String(255),nullable=True,unique=True,index=True)
@@ -323,6 +324,7 @@ def startup():
         conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS phone_country_code VARCHAR(8) NOT NULL DEFAULT '+963'"))
         conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS phone_number VARCHAR(32) NOT NULL DEFAULT ''"))
         conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS avatar_data TEXT"))
+        conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS phone_verified_at TIMESTAMP WITH TIME ZONE"))
         conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS google_sub VARCHAR(255)"))
         conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_store_customers_google_sub ON store_customers (google_sub) WHERE google_sub IS NOT NULL"))
 
@@ -1504,9 +1506,15 @@ class StoreProfilePayload(BaseModel):
     first_name: str = Field(default="",max_length=80)
     last_name: str = Field(default="",max_length=80)
     shipping_address: str = Field(default="",max_length=1000)
-    phone_country_code: str = Field(default="+963",min_length=2,max_length=8)
+    phone_country_code: str = Field(default="",max_length=8)
     phone_number: str = Field(default="",max_length=32)
     avatar_data: Optional[str] = Field(default=None,max_length=5600000)
+class StorePhoneCodePayload(BaseModel):
+    phone_country_code: str = Field(default="",max_length=8)
+    phone_number: str = Field(min_length=5,max_length=32)
+class StorePhoneConfirmPayload(BaseModel):
+    code: str = Field(min_length=6,max_length=6)
+
 class StoreChangePasswordPayload(BaseModel):
     new_password: str = Field(min_length=8,max_length=256)
 class StorePasswordChangeConfirmPayload(BaseModel):
@@ -1788,7 +1796,69 @@ def store_google_callback(request:Request, code:str="", state:str="", error:str=
 
 @app.get("/store/auth/me")
 def store_me(customer:StoreCustomer=Depends(current_store_customer)):
-    return {"id":customer.id,"email":customer.email,"full_name":customer.full_name,"first_name":customer.first_name or "","last_name":customer.last_name or "","shipping_address":customer.shipping_address or "","phone_country_code":customer.phone_country_code or "+963","phone_number":customer.phone_number or "","avatar_data":customer.avatar_data}
+    return {"id":customer.id,"email":customer.email,"full_name":customer.full_name,"first_name":customer.first_name or "","last_name":customer.last_name or "","shipping_address":customer.shipping_address or "","phone_country_code":customer.phone_country_code or "+963","phone_number":customer.phone_number or "","phone_verified":bool(customer.phone_verified_at),"avatar_data":customer.avatar_data}
+
+_store_phone_codes = {}
+def _store_phone_e164(country_code: str, phone_number: str) -> str:
+    raw = "".join(ch for ch in str(phone_number or "").strip() if ch.isdigit() or ch == "+")
+    if raw.startswith("+"):
+        number = "+" + "".join(ch for ch in raw[1:] if ch.isdigit())
+    elif country_code:
+        number = country_code.strip() + "".join(ch for ch in raw if ch.isdigit())
+    else:
+        raise HTTPException(400,"رمز الدولة اختياري، لكن عند تركه فارغاً أدخل الرقم بصيغته الدولية مع + ورمز الدولة")
+    if not number.startswith("+") or not 8 <= len(number) <= 16:
+        raise HTTPException(400,"رقم الهاتف غير صحيح. استخدم الصيغة الدولية")
+    return number
+
+@app.post("/store/auth/phone/send-code")
+def send_store_phone_code(p:StorePhoneCodePayload, customer:StoreCustomer=Depends(current_store_customer)):
+    sid=os.getenv("TWILIO_ACCOUNT_SID","").strip()
+    token=os.getenv("TWILIO_AUTH_TOKEN","").strip()
+    sender=os.getenv("TWILIO_PHONE_NUMBER","").strip()
+    if not (sid and token and sender):
+        raise HTTPException(503,"خدمة الرسائل النصية غير مهيأة بعد. أضف TWILIO_ACCOUNT_SID وTWILIO_AUTH_TOKEN وTWILIO_PHONE_NUMBER في Render")
+    phone=_store_phone_e164(p.phone_country_code,p.phone_number)
+    now=datetime.now(timezone.utc)
+    previous=_store_phone_codes.get(customer.id)
+    if previous and (now-previous["sent_at"]).total_seconds()<60:
+        raise HTTPException(429,"انتظر دقيقة قبل طلب رمز جديد")
+    code=f"{secrets.randbelow(1000000):06d}"
+    body=urlencode({"To":phone,"From":sender,"Body":f"رمز التحقق لمجموعة AIB هو: {code}. صالح لمدة 5 دقائق."}).encode()
+    req=UrlRequest(f"https://api.twilio.com/2010-04-01/Accounts/{sid}/Messages.json",data=body,headers={"Authorization":"Basic "+base64.b64encode(f"{sid}:{token}".encode()).decode(),"Content-Type":"application/x-www-form-urlencoded"},method="POST")
+    try:
+        with urlopen(req,timeout=15) as response:
+            result=json.loads(response.read().decode())
+            if result.get("status") in ("failed","undelivered"):
+                raise HTTPException(502,"تعذر تسليم رسالة التحقق إلى هذا الرقم")
+    except HTTPError as exc:
+        detail="تعذر إرسال رسالة التحقق. تحقق من إعدادات مزود الرسائل ودعم الدولة."
+        try: detail=json.loads(exc.read().decode()).get("message") or detail
+        except Exception: pass
+        raise HTTPException(502,detail)
+    except (URLError,TimeoutError):
+        raise HTTPException(504,"انتهت مهلة إرسال رسالة التحقق. حاول مجدداً")
+    _store_phone_codes[customer.id]={"hash":hashlib.sha256(code.encode()).hexdigest(),"sent_at":now,"expires_at":now+timedelta(minutes=5),"phone":phone,"attempts":0}
+    return {"ok":True,"message":"تم إرسال رمز التحقق برسالة SMS، صالح لمدة 5 دقائق"}
+
+@app.post("/store/auth/phone/confirm")
+def confirm_store_phone(p:StorePhoneConfirmPayload,s:Session=Depends(db),customer:StoreCustomer=Depends(current_store_customer)):
+    item=_store_phone_codes.get(customer.id)
+    if not item or datetime.now(timezone.utc)>item["expires_at"]:
+        _store_phone_codes.pop(customer.id,None)
+        raise HTTPException(400,"انتهت صلاحية الرمز. اطلب رمزاً جديداً")
+    item["attempts"]+=1
+    if item["attempts"]>5:
+        _store_phone_codes.pop(customer.id,None)
+        raise HTTPException(429,"تم تجاوز محاولات التحقق. اطلب رمزاً جديداً")
+    if not secrets.compare_digest(item["hash"],hashlib.sha256(p.code.encode()).hexdigest()):
+        raise HTTPException(400,"رمز التحقق غير صحيح")
+    customer.phone_country_code=item["phone"][:4] if False else (customer.phone_country_code or "")
+    customer.phone_number=item["phone"]
+    customer.phone_verified_at=datetime.now(timezone.utc)
+    s.commit()
+    _store_phone_codes.pop(customer.id,None)
+    return {"ok":True,"message":"تم التحقق من رقم الهاتف بنجاح"}
 
 @app.put("/store/auth/profile")
 def update_store_profile(p:StoreProfilePayload, s:Session=Depends(db), customer:StoreCustomer=Depends(current_store_customer)):
@@ -1798,11 +1868,15 @@ def update_store_profile(p:StoreProfilePayload, s:Session=Depends(db), customer:
     customer.first_name=p.first_name.strip()
     customer.last_name=p.last_name.strip()
     customer.shipping_address=p.shipping_address.strip()
-    customer.phone_country_code=p.phone_country_code.strip()
-    customer.phone_number=p.phone_number.strip()
+    new_phone_country_code=p.phone_country_code.strip()
+    new_phone_number=p.phone_number.strip()
+    if new_phone_number != customer.phone_number or new_phone_country_code != customer.phone_country_code:
+        customer.phone_verified_at=None
+    customer.phone_country_code=new_phone_country_code
+    customer.phone_number=new_phone_number
     if p.avatar_data is not None: customer.avatar_data=p.avatar_data or None
     s.commit()
-    return {"ok":True,"message":"تم حفظ بيانات حسابك","customer":{"id":customer.id,"email":customer.email,"full_name":customer.full_name,"first_name":customer.first_name,"last_name":customer.last_name,"shipping_address":customer.shipping_address,"phone_country_code":customer.phone_country_code,"phone_number":customer.phone_number,"avatar_data":customer.avatar_data}}
+    return {"ok":True,"message":"تم حفظ بيانات حسابك","customer":{"id":customer.id,"email":customer.email,"full_name":customer.full_name,"first_name":customer.first_name,"last_name":customer.last_name,"shipping_address":customer.shipping_address,"phone_country_code":customer.phone_country_code,"phone_number":customer.phone_number,"phone_verified":bool(customer.phone_verified_at),"avatar_data":customer.avatar_data}}
 
 @app.post("/store/auth/change-password")
 def request_store_password_change(p:StoreChangePasswordPayload, request:Request, s:Session=Depends(db), customer:StoreCustomer=Depends(current_store_customer)):
