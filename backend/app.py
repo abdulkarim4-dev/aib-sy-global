@@ -765,7 +765,7 @@ def review_password_change_request(request_id:int, approve:bool, request:Request
         notify_account_change(target.email,"تم اعتماد تغيير كلمة المرور من قبل المالك")
     return {"status":row.status}
 
-USER_BUSINESS_SCOPES={"cars","trucks","heavy_equipment","agricultural","generators_pumps","road_equipment","industrial_machinery"}
+USER_BUSINESS_SCOPES={"car","truck","heavy","agri","special","cars","car_parts","car_engines","car_engine_parts","trucks","truck_parts","truck_engines","truck_engine_parts","heavy_parts","heavy_engines","heavy_engine_parts","agri_parts","agri_engines","agri_engine_parts","generators","hydraulic_compressors","water_pumps","road_equipment","special_parts","special_engines"}
 class UserCreate(BaseModel):
     username:str=Field(min_length=3,max_length=80)
     full_name:str=Field(min_length=2,max_length=160)
@@ -1069,11 +1069,9 @@ def prepare_record_inventory(s:Session, section:str, raw_data:dict, allow_legacy
             if category not in allowed.get(family,set()):
                 raise HTTPException(400,"اختر القسم الرئيسي والفرعي للمنتج بشكل صحيح قبل الحفظ")
             if user and user.role!="owner":
-                scope_for_family={"car":"cars","truck":"trucks","heavy":"heavy_equipment","agri":"agricultural","special":None}.get(family)
                 scopes=set(user.business_scopes or [])
-                special_scope={"generators":"generators_pumps","hydraulic_compressors":"industrial_machinery","water_pumps":"generators_pumps","road_equipment":"road_equipment","special_engines":"industrial_machinery","special_parts":"industrial_machinery"}.get(category)
-                required_scope=scope_for_family or special_scope
-                if not required_scope or required_scope not in scopes:
+                # A broad family permission unlocks its categories; a specific category can be granted alone.
+                if family not in scopes and category not in scopes:
                     raise HTTPException(403,"هذا القسم خارج مجالات العمل المصرح بها لحسابك. راجع المالك.")
         prepared.append(item)
     data["items"]=prepared
