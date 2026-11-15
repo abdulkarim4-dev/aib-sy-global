@@ -1250,6 +1250,63 @@ def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=
     store_categories,latest_purchase=latest_store_catalog_data(s)
     return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owner_user_id":p.owner_user_id,"condition":p.condition or "new","opening_quantity":float(p.opening_quantity or 0),"store_family":p.store_family,"store_category":p.store_category,"owned_stock":float(p.owned_stock or 0),"consigned_stock":float(p.consigned_stock or 0),"images":p.images or [],"shipping_included":bool(p.shipping_included),"video_url":p.video_url or "",**store_categories.get(p.sku,{}),**latest_purchase.get(p.sku,{"purchase_price":0,"sale_price":0,"currency":"—"}),"sale_price":float(p.sale_price) if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("sale_price"),"sale_currency":p.sale_currency if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("currency","")} for p in rows]
 
+class InventoryProductUpdate(BaseModel):
+    name: str=Field(min_length=2,max_length=240)
+    model: str=Field(default="",max_length=160)
+    sale_price: Optional[float]=Field(default=None,ge=0)
+    sale_currency: str="USD"
+    condition: str="new"
+    store_family: str
+    store_category: str
+
+@app.put("/inventory/products/{product_id}")
+def edit_inventory_product(product_id:int,p:InventoryProductUpdate,request:Request,s:Session=Depends(db),u:User=Depends(require_permission("inventory","edit"))):
+    product=s.get(InventoryProduct,product_id)
+    if not product or not product.active or (u.role!="owner" and product.owner_user_id!=u.id):
+        raise HTTPException(404,"المنتج غير موجود في مخزون حسابك")
+    if p.sale_currency not in {"USD","SYP"}:
+        raise HTTPException(400,"عملة سعر البيع غير مدعومة")
+    if p.condition not in {"new","used"}:
+        raise HTTPException(400,"اختر حالة المنتج: جديد أو مستعمل")
+    allowed={"car":{"cars","car_parts","car_engines","car_engine_parts"},"truck":{"trucks","truck_parts","truck_engines","truck_engine_parts"},"heavy":{"heavy","heavy_parts","heavy_engines","heavy_engine_parts"},"agri":{"agri","agri_parts","agri_engines","agri_engine_parts"},"special":{"generators","hydraulic_compressors","water_pumps","road_equipment","special_parts","special_engines"}}
+    if p.store_category not in allowed.get(p.store_family,set()):
+        raise HTTPException(400,"اختر قسم المتجر بشكل صحيح")
+    if u.role!="owner":
+        scopes=set(u.business_scopes or [])
+        if p.store_family not in scopes and p.store_category not in scopes:
+            raise HTTPException(403,"هذا القسم خارج مجالات العمل المصرح بها لحسابك")
+    before={"name":product.name,"model":product.model,"sale_price":float(product.sale_price) if product.sale_price is not None else None,"sale_currency":product.sale_currency,"condition":product.condition,"store_family":product.store_family,"store_category":product.store_category}
+    product.name=p.name.strip()
+    product.model=p.model.strip()
+    product.sale_price=p.sale_price
+    product.sale_currency=p.sale_currency
+    product.condition=p.condition
+    product.store_family=p.store_family
+    product.store_category=p.store_category
+    audit(s,u,"inventory_product_updated","inventory_product",product.id,{"sku":product.sku,"before":before,"after":{"name":product.name,"model":product.model,"sale_price":p.sale_price,"sale_currency":p.sale_currency,"condition":p.condition,"store_family":p.store_family,"store_category":p.store_category}},request)
+    s.commit()
+    _store_catalog_cache["value"]=None
+    _store_catalog_cache["at"]=0
+    _public_products_cache["value"].clear()
+    _public_products_cache["at"].clear()
+    return {"ok":True,"id":product.id,"sku":product.sku,"name":product.name,"model":product.model,"sale_price":float(product.sale_price) if product.sale_price is not None else None,"sale_currency":product.sale_currency,"condition":product.condition,"store_family":product.store_family,"store_category":product.store_category}
+
+@app.delete("/inventory/products/{product_id}")
+def delete_inventory_product(product_id:int,request:Request,s:Session=Depends(db),u:User=Depends(require_permission("inventory","edit"))):
+    product=s.get(InventoryProduct,product_id)
+    if not product or not product.active or (u.role!="owner" and product.owner_user_id!=u.id):
+        raise HTTPException(404,"المنتج غير موجود في مخزون حسابك")
+    if float(product.owned_stock or 0)>0 or float(product.consigned_stock or 0)>0:
+        raise HTTPException(409,"لا يمكن حذف منتج لديه كمية متبقية. صفّر المخزون عبر العمليات النظامية أولاً.")
+    product.active=False
+    audit(s,u,"inventory_product_archived","inventory_product",product.id,{"sku":product.sku,"name":product.name,"reason":"user_requested_soft_delete"},request)
+    s.commit()
+    _store_catalog_cache["value"]=None
+    _store_catalog_cache["at"]=0
+    _public_products_cache["value"].clear()
+    _public_products_cache["at"].clear()
+    return {"ok":True,"deleted":True,"sku":product.sku}
+
 class InventoryImagesPayload(BaseModel):
     images: list[str] = Field(default_factory=list, max_length=20)
 
