@@ -1678,7 +1678,7 @@ body.customer-orders-page-open{overflow:hidden}
 <button class="cat" onclick="category('agri_engine_parts',this)"><span class="cat-icon"><svg viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path d="M16 7h16v8l-3 4v15H19V19l-3-4zM14 11h20m-18 5h16"/><path d="M22 34v7h4v-7"/></svg></span><span>قطع محركات المعدات الزراعية</span></button></div></div></section><div id="specialCategorySection" class="category-zone">
 <div class="zone-heading"><span class="zone-icon">⚙</span><div><h2>المولدات والمضخات ومعدات الطرق والآليات الصناعية</h2><p>مولدات الكهرباء والضواغط الهيدروليكية ومضخات المياه وآليات تعبيد الطرق وما يرتبط بها</p></div></div>
 <div class="cats">
-<button class="cat" onclick="category('generators',this)"><span class="cat-icon">⚡</span><span>المولدات الكهربائية</span></button>
+<button class="cat aib-generator-category" onclick="category('generators',this)"><img class="aib-generator-photo" src="https://s7d2.scene7.com/is/image/Caterpillar/CM20161124-08278-55030?wid=1200" alt="مولد كهربائي ديزل صناعي من Caterpillar" loading="lazy"><span class="cat-icon">⚡</span><span>المولدات الكهربائية</span></button>
 <button class="cat" onclick="category('hydraulic_compressors',this)"><span class="cat-icon">⚙</span><span>الضواغط الهيدروليكية بمحركات احتراق داخلي</span></button>
 <button class="cat" onclick="category('water_pumps',this)"><span class="cat-icon">💧</span><span>مضخات المياه</span></button>
 <button class="cat" onclick="category('road_equipment',this)"><span class="cat-icon">🚧</span><span>معدات تزفيت وتعبيد الطرق</span></button>
@@ -2669,5 +2669,13 @@ html body .category-zone button.cat[onclick*="generators"]{
 }
 html body .category-zone button.cat[onclick*="generators"]::before{content:none!important;display:none!important}
 html body .category-zone button.cat[onclick*="generators"] .cat-icon{background:transparent!important}
+</style>
+
+<style id="aib-generator-visible-image-fix">
+/* استخدم صورة فعلية داخل البطاقة بدلاً من الاعتماد على background-image فقط */
+#specialCategorySection .cats button.aib-generator-category{position:relative!important;isolation:isolate!important;overflow:hidden!important;background:#17242b!important;}
+#specialCategorySection .cats button.aib-generator-category .aib-generator-photo{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;display:block!important;object-fit:cover!important;object-position:center 48%!important;z-index:0!important;opacity:1!important;visibility:visible!important;}
+#specialCategorySection .cats button.aib-generator-category::after{content:""!important;position:absolute!important;inset:0!important;z-index:1!important;display:block!important;background:linear-gradient(0deg,rgba(5,12,18,.78),rgba(5,12,18,.04) 82%)!important;pointer-events:none!important;}
+#specialCategorySection .cats button.aib-generator-category .cat-icon,#specialCategorySection .cats button.aib-generator-category>span:not(.cat-icon){position:relative!important;z-index:2!important;color:#fff!important;}
 </style>
 </body></html>
