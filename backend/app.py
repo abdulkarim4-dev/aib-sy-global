@@ -1718,6 +1718,12 @@ def list_user_wallets(s:Session=Depends(db),u:User=Depends(manager)):
     s.commit()
     return result
 
+@app.get("/wallets/summary")
+def wallet_totals(s:Session=Depends(db),u:User=Depends(manager)):
+    rows=s.execute(select(UserWallet.currency,func.coalesce(func.sum(UserWallet.balance),0)).join(User,User.id==UserWallet.user_id).where(User.deleted.is_(False),User.role!="owner").group_by(UserWallet.currency)).all()
+    totals={currency:float(balance or 0) for currency,balance in rows}
+    return [{"currency":currency,"balance":totals.get(currency,0.0)} for currency in ("USD","SYP")]
+
 @app.get("/users/{user_id}/wallet")
 def get_user_wallet(user_id:int,s:Session=Depends(db),u:User=Depends(current_user)):
     if u.role!="owner" and u.id!=user_id: raise HTTPException(403,"لا يمكنك الوصول إلى محفظة مستخدم آخر")
