@@ -1132,7 +1132,7 @@ def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=
         query=query.where(or_(InventoryProduct.sku.ilike(term),InventoryProduct.name.ilike(term),InventoryProduct.model.ilike(term)))
     rows=s.scalars(query.order_by(InventoryProduct.sku).limit(300)).all()
     store_categories,latest_purchase=latest_store_catalog_data(s)
-    return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owner_user_id":p.owner_user_id,"sale_price":float(p.sale_price) if p.sale_price is not None else None,"sale_currency":p.sale_currency,"owned_stock":float(p.owned_stock or 0),"consigned_stock":float(p.consigned_stock or 0),"images":p.images or [],"shipping_included":bool(p.shipping_included),"video_url":p.video_url or "",**store_categories.get(p.sku,{}),**latest_purchase.get(p.sku,{"purchase_price":0,"sale_price":0,"currency":"—"})} for p in rows]
+    return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owner_user_id":p.owner_user_id,"owned_stock":float(p.owned_stock or 0),"consigned_stock":float(p.consigned_stock or 0),"images":p.images or [],"shipping_included":bool(p.shipping_included),"video_url":p.video_url or "",**store_categories.get(p.sku,{}),**latest_purchase.get(p.sku,{"purchase_price":0,"sale_price":0,"currency":"—"}),"sale_price":float(p.sale_price) if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("sale_price"),"sale_currency":p.sale_currency if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("currency","")} for p in rows]
 
 class InventoryImagesPayload(BaseModel):
     images: list[str] = Field(default_factory=list, max_length=20)
@@ -1319,7 +1319,7 @@ def update_invoice_payment(record_id:int,payment_id:int,p:PaymentUpdatePayload,r
 @app.delete("/records/{record_id}/payments/{payment_id}")
 def delete_invoice_payment(record_id:int,payment_id:int,request:Request,s:Session=Depends(db),u:User=Depends(require_permission("invoices","delete"))):
     r=s.get(Record,record_id); x=s.get(InvoicePayment,payment_id)
-    if not r or r.deleted or not x or x.record_id!=record_id: raise HTTPException(404,"الدفعة غير موجودة")
+    if not r or r.deleted or (u.role!="owner" and r.created_by!=u.id) or not x or x.record_id!=record_id: raise HTTPException(404,"الدفعة غير موجودة")
     reverse_payment_cash_move(s,r,x,u,"حذف")
     audit(s,u,"invoice_payment_deleted","invoice_payment",x.id,{"record_id":record_id,"amount":float(x.amount),"method":x.method,"cash_box":x.cash_box,"cash_adjustment":"automatic_reversal"},request)
     s.delete(x); s.commit()
@@ -1331,7 +1331,8 @@ def request_change(record_id:int,p:ChangePayload,request:Request,s:Session=Depen
     if p.action not in ("update","delete"): raise HTTPException(400,"نوع الطلب غير صالح")
     needed="edit" if p.action=="update" else "delete"
     if not has_permission(u,"invoices",needed): raise HTTPException(403,"ليست لديك صلاحية طلب هذا الإجراء")
-    if not s.get(Record,record_id): raise HTTPException(404,"السجل غير موجود")
+    record=s.get(Record,record_id)
+    if not record or record.deleted or (u.role!="owner" and record.created_by!=u.id): raise HTTPException(404,"السجل غير موجود")
     if p.action=="update" and p.proposed_data is None: raise HTTPException(400,"البيانات المقترحة مطلوبة")
     cr=ChangeRequest(record_id=record_id,requested_by=u.id,action=p.action,proposed_data=p.proposed_data,reason=p.reason)
     s.add(cr); s.flush(); audit(s,u,"change_requested","record",record_id,{"request_id":cr.id,"action":p.action},request); s.commit(); return {"request_id":cr.id,"status":"pending"}
