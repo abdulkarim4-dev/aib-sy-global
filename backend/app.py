@@ -528,7 +528,7 @@ def confirm_accounting_login(p:AccountingLoginConfirmPayload,request:Request,s:S
     return {"access_token":token_for(u,email_otp_verified=True),"token_type":"bearer","user":accounting_login_user_payload(u)}
 
 @app.get("/auth/me")
-def me(u:User=Depends(current_user)): return {"id":u.id,"username":u.username,"name":u.full_name,"email":u.email,"role":u.role,"permissions":u.permissions or {}}
+def me(u:User=Depends(current_user)): return {"id":u.id,"username":u.username,"name":u.full_name,"email":u.email,"role":u.role,"permissions":u.permissions or {},"business_scopes":u.business_scopes or [],"company_name":u.company_name or ""}
 
 class AccountSettingsPayload(BaseModel):
     email: Optional[str] = None
