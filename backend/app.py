@@ -866,6 +866,8 @@ def update_user_permissions(user_id:int,p:UserPermissionsPayload,request:Request
         values=p.permissions.get(module,{})
         if not isinstance(values,dict): raise HTTPException(400,"صيغة الصلاحيات غير صحيحة")
         clean[module]={action:bool(values.get(action,False)) for action in actions}
+    if any(clean["inventory"][k] for k in ("create","edit")):
+        clean["inventory"]["view"]=True
     if any(clean["invoices"][k] for k in ("create","edit","delete","print")):
         clean["invoices"]["view"]=True
     if any(clean["cash"][k] for k in ("create","edit","delete","print")):
@@ -1114,6 +1116,10 @@ def create_inventory_product(p:InventoryProductCreate,request:Request,s:Session=
     s.add(product);s.flush()
     audit(s,u,"inventory_product_created","inventory_product",product.id,{"sku":sku,"owner_user_id":product.owner_user_id,"sale_price":p.sale_price,"sale_currency":p.sale_currency},request)
     s.commit()
+    _store_catalog_cache["value"]=None
+    _store_catalog_cache["at"]=0
+    _public_products_cache["value"].clear()
+    _public_products_cache["at"].clear()
     return {"id":product.id,"sku":product.sku,"name":product.name,"model":product.model,"owner_user_id":product.owner_user_id,"sale_price":float(product.sale_price) if product.sale_price is not None else None,"sale_currency":product.sale_currency,"owned_stock":0,"consigned_stock":0}
 
 @app.get("/inventory/products")
@@ -2368,7 +2374,7 @@ def public_products(q:Optional[str]=None, category:Optional[str]=None, s:Session
         # Keep the N20 engine visible as an out-of-stock catalog item; do not expose other zero-stock items.
         if stock <= 0 and (p.model or "").strip().upper() != "N20B20B": continue
         price=latest_purchase.get(p.sku,{})
-        out.append({"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"category":cat,"stock":stock,"images":p.images or [],"video_url":p.video_url or "","shipping_included":bool(p.shipping_included),"vehicle_details":store_categories.get(p.sku,{}).get("vehicle_details",{}),"sale_price":price.get("sale_price"),"currency":price.get("currency","")})
+        out.append({"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"category":cat,"stock":stock,"images":p.images or [],"video_url":p.video_url or "","shipping_included":bool(p.shipping_included),"vehicle_details":store_categories.get(p.sku,{}).get("vehicle_details",{}),"sale_price":float(p.sale_price) if p.sale_price is not None else price.get("sale_price"),"currency":p.sale_currency if p.sale_price is not None else price.get("currency","")})
     # Bound memory and retain only a short freshness window so stock/price edits appear quickly.
     if len(_public_products_cache["value"])>=_PUBLIC_PRODUCTS_CACHE_MAX:
         _public_products_cache["value"].clear();_public_products_cache["at"].clear()
