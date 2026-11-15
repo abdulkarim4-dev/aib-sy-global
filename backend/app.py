@@ -13,7 +13,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
 from pwdlib import PasswordHash
-from sqlalchemy import create_engine, String, Boolean, DateTime, Integer, ForeignKey, JSON, Text, Numeric, select, func, text, or_, case
+from sqlalchemy import create_engine, String, Boolean, DateTime, Integer, ForeignKey, JSON, Text, Numeric, UniqueConstraint, select, func, text, or_, case
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker, Session
 
 class Settings(BaseSettings):
@@ -1097,6 +1097,25 @@ def latest_store_catalog_data(s:Session)->tuple[dict,dict]:
 def latest_inventory_store_categories(s:Session)->dict:
     return latest_store_catalog_data(s)[0]
 
+class InventoryProductCreate(BaseModel):
+    sku: Optional[str]=Field(default=None,max_length=80)
+    name: str=Field(min_length=2,max_length=240)
+    model: str=Field(default="",max_length=160)
+    sale_price: Optional[float]=Field(default=None,ge=0)
+    sale_currency: str="USD"
+
+@app.post("/inventory/products")
+def create_inventory_product(p:InventoryProductCreate,request:Request,s:Session=Depends(db),u:User=Depends(require_permission("inventory","create"))):
+    if p.sale_currency not in {"USD","SYP"}: raise HTTPException(400,"عملة سعر البيع غير مدعومة")
+    sku=(p.sku or "").strip().upper() or next_inventory_sku(s)
+    if s.scalar(select(InventoryProduct.id).where(func.upper(InventoryProduct.sku)==sku)):
+        raise HTTPException(409,"رقم القطعة مستخدم مسبقاً")
+    product=InventoryProduct(sku=sku,name=p.name.strip(),model=p.model.strip(),owner_user_id=(None if u.role=="owner" else u.id),sale_price=p.sale_price,sale_currency=p.sale_currency,owned_stock=0,consigned_stock=0,active=True)
+    s.add(product);s.flush()
+    audit(s,u,"inventory_product_created","inventory_product",product.id,{"sku":sku,"owner_user_id":product.owner_user_id,"sale_price":p.sale_price,"sale_currency":p.sale_currency},request)
+    s.commit()
+    return {"id":product.id,"sku":product.sku,"name":product.name,"model":product.model,"owner_user_id":product.owner_user_id,"sale_price":float(product.sale_price) if product.sale_price is not None else None,"sale_currency":product.sale_currency,"owned_stock":0,"consigned_stock":0}
+
 @app.get("/inventory/products")
 def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=Depends(require_permission("inventory","view"))):
     # Legacy products with no owner remain in the owner's inventory only.
@@ -1107,7 +1126,7 @@ def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=
         query=query.where(or_(InventoryProduct.sku.ilike(term),InventoryProduct.name.ilike(term),InventoryProduct.model.ilike(term)))
     rows=s.scalars(query.order_by(InventoryProduct.sku).limit(300)).all()
     store_categories,latest_purchase=latest_store_catalog_data(s)
-    return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owned_stock":float(p.owned_stock or 0),"consigned_stock":float(p.consigned_stock or 0),"images":p.images or [],"shipping_included":bool(p.shipping_included),"video_url":p.video_url or "",**store_categories.get(p.sku,{}),**latest_purchase.get(p.sku,{"purchase_price":0,"sale_price":0,"currency":"—"})} for p in rows]
+    return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owner_user_id":p.owner_user_id,"sale_price":float(p.sale_price) if p.sale_price is not None else None,"sale_currency":p.sale_currency,"owned_stock":float(p.owned_stock or 0),"consigned_stock":float(p.consigned_stock or 0),"images":p.images or [],"shipping_included":bool(p.shipping_included),"video_url":p.video_url or "",**store_categories.get(p.sku,{}),**latest_purchase.get(p.sku,{"purchase_price":0,"sale_price":0,"currency":"—"})} for p in rows]
 
 class InventoryImagesPayload(BaseModel):
     images: list[str] = Field(default_factory=list, max_length=20)
