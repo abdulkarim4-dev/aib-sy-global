@@ -835,7 +835,7 @@ def add_user(payload:UserCreate, request:Request, s:Session=Depends(db), u:User=
     audit(s,u,"user_created_pending_email_approval","user",nu.id,{"username":nu.username},request); s.commit()
     return {"id":nu.id,"username":nu.username,"email":email,"email_verified":False,"approval_required":True}
 class EmployeeEmailApprovalPayload(BaseModel):
-    code:str=Field(min_length=6,max_length=6)
+    code:str=Field(min_length=1,max_length=32)
 
 @app.post("/users/{user_id}/confirm-email")
 def approve_employee_email(user_id:int,p:EmployeeEmailApprovalPayload,request:Request,s:Session=Depends(db),u:User=Depends(manager)):
@@ -847,8 +847,8 @@ def approve_employee_email(user_id:int,p:EmployeeEmailApprovalPayload,request:Re
     if not row or row.expires_at<now: raise HTTPException(400,"رمز التأكيد منتهي. أعد إنشاء الحساب أو اطلب رمزاً جديداً.")
     if row.attempts>=5: raise HTTPException(429,"تم تجاوز محاولات الرمز. يلزم إصدار رمز جديد.")
     # Normalize Arabic/Persian numerals and accidental spaces before checking the emailed code.
-    normalized_code=str(p.code).strip().translate(str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹","01234567890123456789"))
-    if len(normalized_code)!=6 or not normalized_code.isdigit() or not password_hash.verify(normalized_code,row.code_hash):
+    normalized_code="".join(str(int(ch)) for ch in __import__("unicodedata").normalize("NFKC",str(p.code)) if ch.isdigit())
+    if len(normalized_code)!=6 or not password_hash.verify(normalized_code,row.code_hash):
         row.attempts+=1;s.commit();raise HTTPException(400,"رمز تأكيد البريد غير صحيح. أدخل الأرقام الستة كما ظهرت في الرسالة.")
     row.used_at=now;target.email_verified=True
     audit(s,u,"employee_email_confirmed_by_owner","user",target.id,{"email":target.email},request);s.commit()
