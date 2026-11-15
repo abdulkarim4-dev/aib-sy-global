@@ -339,6 +339,13 @@ def require_permission(module:str,action:str):
         return u
     return checker
 
+def require_inventory_product_management():
+    def checker(u:User=Depends(current_user)):
+        if not (has_permission(u,"inventory","create") or has_permission(u,"inventory","edit")):
+            raise HTTPException(403,"تحتاج إلى صلاحية إضافة أو تعديل المنتجات لإدارة منتجات مخزونك.")
+        return u
+    return checker
+
 @app.on_event("startup")
 def startup():
     if settings.jwt_secret.startswith("CHANGE_THIS") and os.getenv("ENVIRONMENT")=="production":
@@ -1260,7 +1267,7 @@ class InventoryProductUpdate(BaseModel):
     store_category: str
 
 @app.put("/inventory/products/{product_id}")
-def edit_inventory_product(product_id:int,p:InventoryProductUpdate,request:Request,s:Session=Depends(db),u:User=Depends(require_permission("inventory","edit"))):
+def edit_inventory_product(product_id:int,p:InventoryProductUpdate,request:Request,s:Session=Depends(db),u:User=Depends(require_inventory_product_management())):
     product=s.get(InventoryProduct,product_id)
     if not product or not product.active or (u.role!="owner" and product.owner_user_id!=u.id):
         raise HTTPException(404,"المنتج غير موجود في مخزون حسابك")
