@@ -1746,6 +1746,9 @@ def store_product_category(name:str, model:str):
 
 def store_latest_prices(s:Session):
     prices={}
+    # User-entered prices are final selling prices and must not receive the legacy 35% markup.
+    for product in s.scalars(select(InventoryProduct).where(InventoryProduct.active.is_(True),InventoryProduct.sale_price.is_not(None))).all():
+        prices[product.sku]={"sale_price":round(float(product.sale_price or 0),2),"currency":product.sale_currency or "USD"}
     records=s.scalars(select(Record).where(Record.section.in_(["purchase","carPurchase"]),Record.deleted.is_(False)).order_by(Record.created_at.desc(),Record.id.desc())).all()
     for record in records:
         for item in (record.data or {}).get("items",[]):
