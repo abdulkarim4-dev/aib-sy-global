@@ -50,6 +50,10 @@ class User(Base):
     email_verified: Mapped[bool]=mapped_column(Boolean, default=False, nullable=False)
     password_hash: Mapped[str]=mapped_column(String(300))
     role: Mapped[str]=mapped_column(String(20), default="employee")
+    company_name: Mapped[str]=mapped_column(String(200), default="", nullable=False)
+    company_logo: Mapped[Optional[str]]=mapped_column(Text, nullable=True)
+    business_scopes: Mapped[list]=mapped_column(JSON, default=list, nullable=False)
+    profile_data: Mapped[dict]=mapped_column(JSON, default=dict, nullable=False)
     permissions: Mapped[dict]=mapped_column(JSON, default=dict, nullable=False)
     active: Mapped[bool]=mapped_column(Boolean, default=True)
     deleted: Mapped[bool]=mapped_column(Boolean, default=False, nullable=False)
@@ -341,6 +345,10 @@ def startup():
         conn.execute(text("SELECT pg_advisory_xact_lock(741920261115)"))
         Base.metadata.create_all(conn)
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS permissions JSONB NOT NULL DEFAULT '{}'::jsonb"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS company_name VARCHAR(200) NOT NULL DEFAULT ''"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS company_logo TEXT"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS business_scopes JSONB NOT NULL DEFAULT '[]'::jsonb"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_data JSONB NOT NULL DEFAULT '{}'::jsonb"))
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(254)"))
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT FALSE"))
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted BOOLEAN NOT NULL DEFAULT FALSE"))
@@ -757,7 +765,73 @@ def review_password_change_request(request_id:int, approve:bool, request:Request
         notify_account_change(target.email,"تم اعتماد تغيير كلمة المرور من قبل المالك")
     return {"status":row.status}
 
-class UserCreate(BaseModel): username:str=Field(min_length=3,max_length=80); full_name:str=Field(min_length=2,max_length=160); email:str=Field(min_length=5,max_length=254); email_confirm:str|None=None; password:str=Field(min_length=12); role:str="employee"
+USER_BUSINESS_SCOPES={"car","truck","heavy","agri","special","cars","car_parts","car_engines","car_engine_parts","trucks","truck_parts","truck_engines","truck_engine_parts","heavy_parts","heavy_engines","heavy_engine_parts","agri_parts","agri_engines","agri_engine_parts","generators","hydraulic_compressors","water_pumps","road_equipment","special_parts","special_engines"}
+class UserCreate(BaseModel):
+    username:str=Field(min_length=3,max_length=80)
+    full_name:str=Field(min_length=2,max_length=160)
+    email:str=Field(min_length=5,max_length=254)
+    email_confirm:str|None=None
+    password:str=Field(min_length=12)
+    role:str="employee"
+    company_name:str=Field(default="",max_length=200)
+    business_scopes:list[str]=Field(default_factory=list)
+
+class UserProfilePayload(BaseModel):
+    company_name:str=Field(min_length=2,max_length=200)
+    company_logo:Optional[str]=Field(default=None,max_length=1400000)
+    profile_data:dict=Field(default_factory=dict)
+
+@app.get("/my-profile")
+def get_my_profile(u:User=Depends(current_user)):
+    return {"user_id":u.id,"company_name":u.company_name or "","company_logo":u.company_logo,"profile_data":u.profile_data or {}}
+
+@app.put("/my-profile")
+def update_my_profile(p:UserProfilePayload,request:Request,s:Session=Depends(db),u:User=Depends(current_user)):
+    logo=(p.company_logo or "").strip() or None
+    if logo and not (logo.startswith("https://") or logo.startswith("http://") or logo.startswith("data:image/png;base64,") or logo.startswith("data:image/jpeg;base64,") or logo.startswith("data:image/webp;base64,")):
+        raise HTTPException(400,"صيغة الشعار غير مدعومة")
+    if logo and logo.startswith("data:image/"):
+        try: raw=base64.b64decode(logo.split(",",1)[1],validate=True)
+        except (ValueError,binascii.Error): raise HTTPException(400,"ملف الشعار غير صالح")
+        if not raw or len(raw)>1024*1024: raise HTTPException(413,"يجب ألا يتجاوز حجم الشعار 1 ميغابايت")
+    required_profile_fields={"first_name","last_name","father_name","mother_name","national_no","birth_place_date","document_type","document_no","issuing_authority","registry","residence","address"}
+    missing=[key for key in sorted(required_profile_fields) if not str((p.profile_data or {}).get(key) or "").strip()]
+    if missing: raise HTTPException(400,"أكمل جميع بيانات الهوية المطلوبة قبل الحفظ")
+    u.company_name=p.company_name.strip()
+    u.company_logo=logo
+    u.profile_data=p.profile_data or {}
+    audit(s,u,"user_profile_updated","user",u.id,{"company_name":u.company_name,"has_logo":bool(logo),"profile_fields":sorted(u.profile_data.keys())},request)
+    s.commit()
+    return {"ok":True,"company_name":u.company_name,"has_logo":bool(logo)}
+
+class UserScopesPayload(BaseModel):
+    business_scopes:list[str]=Field(default_factory=list)
+
+@app.patch("/users/{user_id}/business-scopes")
+def update_user_business_scopes(user_id:int,p:UserScopesPayload,request:Request,s:Session=Depends(db),u:User=Depends(manager)):
+    target=s.get(User,user_id)
+    if not target or target.deleted or target.role=="owner": raise HTTPException(404,"المستخدم غير موجود")
+    scopes=sorted(set(p.business_scopes or []))
+    if set(scopes)-USER_BUSINESS_SCOPES: raise HTTPException(400,"يوجد مجال عمل غير معروف")
+    target.business_scopes=scopes
+    audit(s,u,"user_business_scopes_updated","user",target.id,{"business_scopes":scopes},request)
+    s.commit()
+    return {"ok":True,"business_scopes":scopes}
+
+@app.get("/users/{user_id}/profile")
+def get_user_profile(user_id:int,s:Session=Depends(db),u:User=Depends(current_user)):
+    if u.role!="owner" and u.id!=user_id: raise HTTPException(403,"لا يمكنك عرض بيانات مستخدم آخر")
+    target=s.get(User,user_id)
+    if not target or target.deleted: raise HTTPException(404,"المستخدم غير موجود")
+    return {"user_id":target.id,"company_name":target.company_name or "","company_logo":target.company_logo,"profile_data":target.profile_data or {}}
+
+@app.get("/users/{user_id}/inventory")
+def get_user_inventory(user_id:int,s:Session=Depends(db),u:User=Depends(manager)):
+    target=s.get(User,user_id)
+    if not target or target.deleted: raise HTTPException(404,"المستخدم غير موجود")
+    products=s.scalars(select(InventoryProduct).where(InventoryProduct.owner_user_id==user_id).order_by(InventoryProduct.sku)).all()
+    return {"user_id":target.id,"username":target.username,"company_name":target.company_name or "","products":[{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owned_stock":float(p.owned_stock or 0),"consigned_stock":float(p.consigned_stock or 0),"sale_price":float(p.sale_price) if p.sale_price is not None else None,"sale_currency":p.sale_currency,"images":p.images or [],"video_url":p.video_url or ""} for p in products]}
+
 class CompanyProfilePayload(BaseModel):
     data: dict
 
@@ -807,10 +881,13 @@ def update_public_site_settings(p:PublicSiteSettingsPayload, request:Request, s:
 
 @app.get("/users")
 def list_users(s:Session=Depends(db), _:User=Depends(manager)):
-    return [{"id":u.id,"username":u.username,"name":u.full_name,"email":u.email,"role":u.role,"active":u.active,"permissions":u.permissions or {}} for u in s.scalars(select(User).where(User.deleted.is_(False))).all()]
+    return [{"id":u.id,"username":u.username,"name":u.full_name,"email":u.email,"role":u.role,"active":u.active,"permissions":u.permissions or {},"company_name":u.company_name or "","business_scopes":u.business_scopes or []} for u in s.scalars(select(User).where(User.deleted.is_(False))).all()]
 @app.post("/users")
 def add_user(payload:UserCreate, request:Request, s:Session=Depends(db), u:User=Depends(manager)):
     if payload.role not in ("employee","owner"): raise HTTPException(400,"دور غير صالح")
+    invalid_scopes=set(payload.business_scopes or [])-USER_BUSINESS_SCOPES
+    if invalid_scopes: raise HTTPException(400,"يوجد مجال عمل غير معروف")
+    if payload.role=="owner" and payload.business_scopes: raise HTTPException(400,"لا تُحدد مجالات عمل لحساب المالك")
     if s.scalar(select(User).where(User.username==payload.username)): raise HTTPException(409,"اسم المستخدم مستخدم")
     email=(payload.email or "").strip().lower()
     if (not email) or ("@" not in email) or ("." not in email.rsplit("@",1)[-1]) or len(email)>254: raise HTTPException(400,"البريد الإلكتروني مطلوب ويجب أن يكون صالحاً")
@@ -819,7 +896,7 @@ def add_user(payload:UserCreate, request:Request, s:Session=Depends(db), u:User=
     for archived in s.scalars(select(User).where(User.email==email,User.deleted.is_(True))).all():
         archived.email=None
         archived.email_verified=False
-    nu=User(username=payload.username,full_name=payload.full_name,email=email,email_verified=False,password_hash=password_hash.hash(payload.password),role="employee")
+    nu=User(username=payload.username,full_name=payload.full_name,email=email,email_verified=False,password_hash=password_hash.hash(payload.password),role="employee",company_name=payload.company_name.strip(),business_scopes=sorted(set(payload.business_scopes or [])),profile_data={})
     nu.permissions={}; s.add(nu); s.flush()
     for wallet_currency in ("USD","SYP"):
         s.add(UserWallet(user_id=nu.id,currency=wallet_currency,balance=0))
@@ -833,7 +910,7 @@ def add_user(payload:UserCreate, request:Request, s:Session=Depends(db), u:User=
     except Exception:
         s.rollback(); raise HTTPException(503,"تعذر إرسال رمز التأكيد إلى بريد الموظف. لم يتم إنشاء الحساب.")
     audit(s,u,"user_created_pending_email_approval","user",nu.id,{"username":nu.username},request); s.commit()
-    return {"id":nu.id,"username":nu.username,"email":email,"email_verified":False,"approval_required":True}
+    return {"id":nu.id,"username":nu.username,"email":email,"email_verified":False,"approval_required":True,"company_name":nu.company_name,"business_scopes":nu.business_scopes}
 class EmployeeEmailApprovalPayload(BaseModel):
     code:str=Field(min_length=1,max_length=32)
 
@@ -1001,6 +1078,11 @@ def prepare_record_inventory(s:Session, section:str, raw_data:dict, allow_legacy
         if family or category:
             if category not in allowed.get(family,set()):
                 raise HTTPException(400,"اختر القسم الرئيسي والفرعي للمنتج بشكل صحيح قبل الحفظ")
+            if user and user.role!="owner":
+                scopes=set(user.business_scopes or [])
+                # A broad family permission unlocks its categories; a specific category can be granted alone.
+                if family not in scopes and category not in scopes:
+                    raise HTTPException(403,"هذا القسم خارج مجالات العمل المصرح بها لحسابك. راجع المالك.")
         prepared.append(item)
     data["items"]=prepared
     return data
@@ -1142,7 +1224,7 @@ def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=
         for item in record_items:
             if isinstance(item,dict) and item.get("sku"):
                 invoiced_skus.add(str(item["sku"]).strip().upper())
-    rows=[p for p in rows if str(p.sku or "").strip().upper() in invoiced_skus]
+    rows=[p for p in rows if (u.role!="owner" and p.owner_user_id==u.id) or str(p.sku or "").strip().upper() in invoiced_skus]
     store_categories,latest_purchase=latest_store_catalog_data(s)
     return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owner_user_id":p.owner_user_id,"owned_stock":float(p.owned_stock or 0),"consigned_stock":float(p.consigned_stock or 0),"images":p.images or [],"shipping_included":bool(p.shipping_included),"video_url":p.video_url or "",**store_categories.get(p.sku,{}),**latest_purchase.get(p.sku,{"purchase_price":0,"sale_price":0,"currency":"—"}),"sale_price":float(p.sale_price) if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("sale_price"),"sale_currency":p.sale_currency if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("currency","")} for p in rows]
 
@@ -1539,7 +1621,9 @@ def delete_cash_movement(move_id:int,request:Request,s:Session=Depends(db),u:Use
 @app.post("/audit-log/print")
 def audit_invoice_print(request:Request, record_id:int, invoice_no:str="", section:str="", s:Session=Depends(db), u:User=Depends(require_permission("invoices","print"))):
     record=s.get(Record,record_id)
-    if not record or record.deleted: raise HTTPException(404,"الفاتورة غير موجودة")
+    if not record or record.deleted or (u.role!="owner" and record.created_by!=u.id): raise HTTPException(404,"الفاتورة غير موجودة أو لا تملك صلاحية طباعتها")
+    if u.role!="owner" and record.section=="directSale" and not bool((record.data or {}).get("verified_payment")):
+        raise HTTPException(403,"لا يمكن طباعة فاتورة البيع اليدوي قبل توثيق الدفع واعتماده من النظام")
     audit(s,u,"invoice_printed","record",record.id,{"record_id":record.id,"invoice_no":record.invoice_no or invoice_no,"section":record.section or section},request)
     s.commit()
     return {"ok":True}
@@ -1635,6 +1719,12 @@ def list_user_wallets(s:Session=Depends(db),u:User=Depends(manager)):
         result.append({"user_id":usr.id,"username":usr.username,"name":usr.full_name,"wallets":[{"id":w.id,"currency":w.currency,"balance":float(w.balance or 0)} for w in wallets]})
     s.commit()
     return result
+
+@app.get("/wallets/summary")
+def wallet_totals(s:Session=Depends(db),u:User=Depends(manager)):
+    rows=s.execute(select(UserWallet.currency,func.coalesce(func.sum(UserWallet.balance),0)).join(User,User.id==UserWallet.user_id).where(User.deleted.is_(False),User.role!="owner").group_by(UserWallet.currency)).all()
+    totals={currency:float(balance or 0) for currency,balance in rows}
+    return [{"currency":currency,"balance":totals.get(currency,0.0)} for currency in ("USD","SYP")]
 
 @app.get("/users/{user_id}/wallet")
 def get_user_wallet(user_id:int,s:Session=Depends(db),u:User=Depends(current_user)):
