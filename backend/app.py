@@ -1062,7 +1062,24 @@ def latest_inventory_store_categories(s:Session)->dict:
 
 @app.get("/inventory/products")
 def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=Depends(require_permission("inventory","view"))):
-    query=select(InventoryProduct).where(InventoryProduct.active.is_(True))
+    # Show only inventory items referenced by at least one non-deleted invoice.
+    # Products whose only invoice was deleted (or which never had an invoice)
+    # remain in the database for audit/history, but are hidden from this list.
+    linked_skus=set()
+    active_records=s.scalars(select(Record).where(Record.deleted.is_(False))).all()
+    for record in active_records:
+        data=record.data if isinstance(record.data,dict) else {}
+        items=data.get("items") if isinstance(data.get("items"),list) else []
+        for item in items:
+            if isinstance(item,dict):
+                sku=str(item.get("sku") or "").strip().upper()
+                if sku:
+                    linked_skus.add(sku)
+
+    query=select(InventoryProduct).where(
+        InventoryProduct.active.is_(True),
+        func.upper(func.trim(InventoryProduct.sku)).in_(linked_skus) if linked_skus else text("1=0")
+    )
     if q:
         term=f"%{q.strip()}%"
         query=query.where(or_(InventoryProduct.sku.ilike(term),InventoryProduct.name.ilike(term),InventoryProduct.model.ilike(term)))
