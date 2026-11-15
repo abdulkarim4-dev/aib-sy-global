@@ -933,6 +933,7 @@ def approve_employee_email(user_id:int,p:EmployeeEmailApprovalPayload,request:Re
 
 class UserPermissionsPayload(BaseModel):
     permissions: dict
+    business_scopes: list[str] = Field(default_factory=list)
 @app.patch("/users/{user_id}/permissions")
 def update_user_permissions(user_id:int,p:UserPermissionsPayload,request:Request,s:Session=Depends(db),u:User=Depends(manager)):
     target=s.get(User,user_id)
@@ -949,8 +950,11 @@ def update_user_permissions(user_id:int,p:UserPermissionsPayload,request:Request
         clean["invoices"]["view"]=True
     if any(clean["cash"][k] for k in ("create","edit","delete","print")):
         clean["cash"]["view"]=True
+    invalid_scopes=set(p.business_scopes or [])-USER_BUSINESS_SCOPES
+    if invalid_scopes: raise HTTPException(400,"يوجد قسم أو قسم فرعي غير معروف")
+    target.business_scopes=sorted(set(p.business_scopes or []))
     target.permissions=clean
-    audit(s,u,"user_permissions_updated","user",user_id,{"permissions":clean},request)
+    audit(s,u,"user_permissions_updated","user",user_id,{"permissions":clean,"business_scopes":target.business_scopes},request)
     s.commit()
     return {"ok":True,"permissions":clean}
 class UserPasswordResetPayload(BaseModel):
