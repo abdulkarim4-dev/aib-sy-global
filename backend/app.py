@@ -2388,8 +2388,17 @@ def delete_online_purchase_order(order_id:int,s:Session=Depends(db),u:User=Depen
     return {"ok":True,"deleted_order_id":order_id}
 
 @app.get("/online-purchase-orders")
-def list_online_purchase_orders(s:Session=Depends(db),u:User=Depends(manager)):
-    return [{"id":o.id,"customer":o.customer_data,"items":o.items,"total":float(o.total),"currency":o.currency,"payment_proof":o.payment_proof,"proof_type":o.proof_type,"status":o.status,"record_id":o.record_id,"review_note":o.review_note,"created_at":o.created_at} for o in s.scalars(select(OnlinePurchaseOrder).order_by(OnlinePurchaseOrder.id.desc())).all()]
+def list_online_purchase_orders(s:Session=Depends(db),u:User=Depends(current_user)):
+    owner_phone="+963 997 439 627"
+    rows=s.scalars(select(OnlinePurchaseOrder).order_by(OnlinePurchaseOrder.id.desc())).all()
+    result=[]
+    for o in rows:
+        customer=dict(o.customer_data or {})
+        if u.role!="owner":
+            for key in ("phone","full_phone","phone_number","phone_country_code","phone_country"):
+                customer.pop(key,None)
+        result.append({"id":o.id,"customer":customer,"owner_phone":owner_phone,"items":o.items,"total":float(o.total),"currency":o.currency,"payment_proof":o.payment_proof,"proof_type":o.proof_type,"status":o.status,"record_id":o.record_id,"review_note":o.review_note,"created_at":o.created_at})
+    return result
 
 class OnlineOrderReviewPayload(BaseModel):
     action: str
