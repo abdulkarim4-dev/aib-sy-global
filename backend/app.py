@@ -2415,32 +2415,93 @@ def _gemini_reply(message: str, history: list[dict[str, str]], system_prompt: st
     return answer.strip()
 
 def _store_inventory_search(s: Session, message: str) -> list[dict]:
+    """Search the full active store catalogue using short Arabic/English keywords."""
     normalized = _normalize_order_search(message)
-    stop_words = {"اريد","ابغي","ابحث","بحث","عن","لي","من","في","متجر","المتجر","قسم","المحركات","محركات","محرك","مكينة","كامل","كامله","كاملة","رجاء","لو","سمحت","هل","يوجد","موجود","متوفر","شراء","طلب","السعر","كم","تفاصيل","اريد","engine","full","complete","please","find","search","the","for"}
-    tokens = [x for x in normalized.split() if len(x) > 1 and x not in stop_words]
-    query = select(InventoryProduct).where(InventoryProduct.active.is_(True))
-    # Prefer explicit model/SKU/name identifiers such as N63; when absent, search engine products.
-    if tokens:
-        clauses = []
-        for token in tokens:
-            pattern = f"%{token}%"
-            clauses.extend([InventoryProduct.sku.ilike(pattern), InventoryProduct.name.ilike(pattern), InventoryProduct.model.ilike(pattern)])
-        query = query.where(or_(*clauses))
-    else:
-        query = query.where(or_(InventoryProduct.name.ilike("%محرك%"), InventoryProduct.name.ilike("%engine%"), InventoryProduct.model.ilike("%N63%")))
-    rows = s.scalars(query.order_by(InventoryProduct.sku).limit(40)).all()
-    # For generic "complete engine" requests, do not return unrelated parts.
-    engine_rows = [p for p in rows if any(term in _normalize_order_search((p.name or "") + " " + (p.model or "")) for term in ("محرك","engine","مكينه")) or (p.model or "").upper().startswith(("N","B","M","S"))]
-    if engine_rows:
-        rows = engine_rows
-    _, latest_purchase = latest_store_catalog_data(s)
-    results = []
-    for p in rows[:12]:
+    stop_words = {
+        "اريد","ابغي","ابحث","بحث","عن","لي","من","في","متجر","المتجر","قسم",
+        "رجاء","لو","سمحت","هل","يوجد","موجود","متوفر","شراء","طلب","السعر",
+        "كم","تفاصيل","اعرض","وريني","اظهر","هات","جيب","عندي","عندكم",
+        "please","find","search","show","get","want","need","the","for","me"
+    }
+    raw_tokens = [x for x in normalized.split() if len(x) > 1 and x not in stop_words]
+    if not raw_tokens:
+        return []
+
+    # Expand everyday customer wording to the terms used in inventory records/categories.
+    synonym_groups = [
+        ("محرك","محركات","مكينة","مكينه","موتور","engine","motor"),
+        ("جير","قير","فتيس","علبة","علب","سرعة","gearbox","transmission"),
+        ("سيارة","سيارات","مركبة","مركبات","سياحية","car","cars","vehicle"),
+        ("شاحنة","شاحنات","تريلا","قاطرة","رأس","truck","trucks","lorry"),
+        ("حفارة","حفارات","حفار","بوكلين","تركس","لودر","بلدوزر","excavator","loader"),
+        ("جرار","جرارات","تركتور","زراعي","زراعية","tractor","agricultural"),
+        ("مولد","مولدة","مولدات","كهرباء","generator","generators"),
+        ("مضخة","مضخات","طرمبة","طلمبة","pump","pumps"),
+        ("قطع","قطعة","غيار","سبير","spare","parts"),
+        ("بستم","مكبس","piston"),("بخاخ","انجكتر","injector"),
+        ("فلتر","مرشح","filter"),("فرامل","بريك","brake"),
+        ("باب","ابواب","أبواب","door"),("كشاف","مصباح","ضوء","headlight"),
+    ]
+    expanded = set(raw_tokens)
+    for group in synonym_groups:
+        normalized_group = {_normalize_order_search(x) for x in group}
+        if expanded.intersection(normalized_group):
+            expanded.update(normalized_group)
+    tokens = list(expanded)
+
+    rows = s.scalars(select(InventoryProduct).where(
+        InventoryProduct.active.is_(True)
+    ).order_by(InventoryProduct.sku).limit(500)).all()
+    store_categories, latest_purchase = latest_store_catalog_data(s)
+
+    category_labels = {
+        "cars":"سيارات مركبات سياحية","trucks":"شاحنات","heavy":"معدات ثقيلة حفارات",
+        "agri":"معدات زراعية جرارات","car_parts":"قطع غيار سيارات",
+        "car_engines":"محركات سيارات","car_engine_parts":"قطع محركات سيارات",
+        "truck_parts":"قطع غيار شاحنات","truck_engines":"محركات شاحنات",
+        "truck_engine_parts":"قطع محركات شاحنات","heavy_parts":"قطع غيار معدات ثقيلة",
+        "heavy_engines":"محركات معدات ثقيلة","heavy_engine_parts":"قطع محركات معدات ثقيلة",
+        "agri_parts":"قطع غيار جرارات معدات زراعية","agri_engines":"محركات جرارات",
+        "agri_engine_parts":"قطع محركات جرارات","generators":"مولدات كهربائية",
+        "water_pumps":"مضخات مياه","hydraulic_compressors":"ضواغط هيدروليك",
+        "road_equipment":"معدات طرق","special_parts":"قطع غيار متنوعة",
+        "special_engines":"محركات متنوعة","parts":"قطع غيار","engines":"محركات"
+    }
+    scored = []
+    for p in rows:
         stock = float(p.owned_stock or 0) + float(p.consigned_stock or 0)
+        catalog = store_categories.get(p.sku, {})
+        category = catalog.get("store_category", "")
+        vehicle = catalog.get("vehicle_details", {}) or {}
+        vehicle_text = " ".join(str(v) for v in vehicle.values() if v not in (None, ""))
+        category_text = category_labels.get(category, category.replace("_"," "))
+        searchable = _normalize_order_search(" ".join([
+            p.sku or "", p.name or "", p.model or "", vehicle_text,
+            category_text, catalog.get("store_family", "")
+        ]))
+        matched = [token for token in tokens if token in searchable]
+        if not matched:
+            continue
+        # Exact SKU/model hits rank above broad category/description matches.
+        sku_model = _normalize_order_search((p.sku or "") + " " + (p.model or ""))
+        score = len(matched) * 3
+        score += sum(8 for token in matched if token in sku_model)
+        if len(tokens) > 1 and len(matched) == len(tokens):
+            score += 5
+        scored.append((score, p, stock, catalog, category))
+
+    scored.sort(key=lambda item: (item[0], item[1].sku), reverse=True)
+    results = []
+    for _, p, stock, catalog, category in scored[:12]:
         pricing = latest_purchase.get(p.sku, {})
-        results.append({"id":p.id,"sku":p.sku,"name":p.name,"model":p.model or "","stock":stock,
-                        "sale_price":pricing.get("sale_price"),"currency":pricing.get("currency",""),
-                        "images":(p.images or [])[:3]})
+        results.append({
+            "id":p.id, "sku":p.sku, "name":p.name, "model":p.model or "",
+            "category":category or "parts", "store_family":catalog.get("store_family",""),
+            "vehicle_details":catalog.get("vehicle_details",{}),
+            "stock":stock, "sale_price":pricing.get("sale_price"),
+            "currency":pricing.get("currency",""), "images":(p.images or [])[:5],
+            "shipping_included":bool(p.shipping_included)
+        })
     return results
 
 @app.post("/ai/store-chat")
@@ -2449,9 +2510,10 @@ def gemini_store_chat(payload: GeminiChatPayload, s: Session = Depends(db)):
     product_context = json.dumps(products, ensure_ascii=False)
     system_prompt = (
         "أنت مساعد خدمة العملاء لمتجر مجموعة AIB التجارية. أجب بالعربية الواضحة. "
-        "إذا طلب العميل منتجاً أو محركاً أو قطعة، اعتمد أولاً على نتائج المخزون الفعلية التالية بصيغة JSON: " + product_context + ". "
-        "إذا وجدت منتجات فاذكر الاسم والطراز ورقم الصنف والكمية والسعر فقط إذا كانت متاحة في البيانات، ولا تطلب من العميل البحث يدوياً. "
-        "إذا لم توجد نتائج مطابقة فقل بوضوح إن البحث لم يعثر على منتج مطابق واطلب معلومة واحدة تساعد على تضييق البحث. "
+        "افهم كلمات العملاء البسيطة واللهجات والأسماء المختصرة بالعربية والإنجليزية، مثل مكينة/محرك، جير/علبة سرعة، بوكلين/حفارة، تركتور/جرار، طرمبة/مضخة، وقطع/سبير. "
+        "نتائج البحث المباشر من كامل كتالوج المتجر الفعلي، وتشمل الاسم والطراز ورقم الصنف والتصنيف ومواصفات المركبة والكمية والسعر والصور، موجودة هنا بصيغة JSON: " + product_context + ". "
+        "إذا وجدت منتجات فاعرضها للعميل ووجّهه إلى بطاقات المنتجات الظاهرة أسفل ردك لفتح التفاصيل أو الشراء؛ لا تطلب منه إعادة البحث يدوياً. "
+        "اذكر السعر والكمية فقط إذا كانت متاحة في البيانات. إذا لم توجد نتائج فاطلب كلمة واحدة إضافية مثل الماركة أو رقم الطراز. "
         "لا تخترع سعراً أو كمية أو مواصفة، ولا تدّع توفر منتج غير موجود في النتائج. لا تكشف بيانات العملاء أو الطلبات. لا تطلب كلمات مرور أو رموز تحقق أو بيانات بطاقات."
     )
     try:
