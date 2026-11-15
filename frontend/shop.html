@@ -2660,4 +2660,14 @@ html body .category-zone .cats button.cat[onclick="category('generators',this)"]
 .aib-drawer-language small{display:block;margin-top:8px;color:#667582;font-size:11px;line-height:1.7}
 </style>
 
-<script src="/customer-i18n.js?v=20261115" defer></script></body></html>
+<script src="/customer-i18n.js?v=20261115" defer></script>
+<style id="aib-generators-photo-final">
+/* صورة المولدات الكهربائية: قاعدة مستقلة لا تعتمد على معرّف القسم */
+html body .category-zone button.cat[onclick*="generators"]{
+ background-image:linear-gradient(0deg,rgba(5,12,18,.70),rgba(5,12,18,.04)),url("https://upload.wikimedia.org/wikipedia/commons/a/ad/Enclosed_Caterpillar_C15_Generator_Set.JPG")!important;
+ background-color:#17242b!important;background-position:center 48%!important;background-size:cover!important;background-repeat:no-repeat!important;
+}
+html body .category-zone button.cat[onclick*="generators"]::before{content:none!important;display:none!important}
+html body .category-zone button.cat[onclick*="generators"] .cat-icon{background:transparent!important}
+</style>
+</body></html>
