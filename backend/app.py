@@ -324,7 +324,7 @@ def manager(u:User=Depends(current_user)):
     return u
 def can_add(u:User=Depends(current_user)): return u
 
-PERMISSION_SCHEMA={"inventory":{"view","create","edit"},"invoices":{"view","create","edit","delete","print"},"cash":{"view","create","edit","delete","print"}}
+PERMISSION_SCHEMA={"inventory":{"view","create","edit"},"invoices":{"view","create","edit","delete","print"},"vehicles":{"sell"},"cash":{"view","create","edit","delete","print"}}
 def has_permission(user:User,module:str,action:str)->bool:
     if user.role=="owner": return True
     return bool(((user.permissions or {}).get(module) or {}).get(action,False))
