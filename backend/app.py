@@ -2095,6 +2095,15 @@ def count_online_purchase_orders(s:Session=Depends(db),u:User=Depends(manager)):
     pending=int(s.scalar(select(func.count(OnlinePurchaseOrder.id)).where(OnlinePurchaseOrder.status=="pending")) or 0)
     return {"pending":pending}
 
+@app.delete("/online-purchase-orders/{order_id}")
+def delete_online_purchase_order(order_id:int,s:Session=Depends(db),u:User=Depends(manager)):
+    order=s.get(OnlinePurchaseOrder,order_id)
+    if not order: raise HTTPException(404,"الطلب غير موجود")
+    audit(s,u,"online_order_deleted","online_purchase_order",order.id,{"status":order.status,"record_id":order.record_id},request=None)
+    s.delete(order)
+    s.commit()
+    return {"ok":True,"deleted_order_id":order_id}
+
 @app.get("/online-purchase-orders")
 def list_online_purchase_orders(s:Session=Depends(db),u:User=Depends(manager)):
     return [{"id":o.id,"customer":o.customer_data,"items":o.items,"total":float(o.total),"currency":o.currency,"payment_proof":o.payment_proof,"proof_type":o.proof_type,"status":o.status,"record_id":o.record_id,"review_note":o.review_note,"created_at":o.created_at} for o in s.scalars(select(OnlinePurchaseOrder).order_by(OnlinePurchaseOrder.id.desc())).all()]
