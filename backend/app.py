@@ -1131,6 +1131,18 @@ def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=
         term=f"%{q.strip()}%"
         query=query.where(or_(InventoryProduct.sku.ilike(term),InventoryProduct.name.ilike(term),InventoryProduct.model.ilike(term)))
     rows=s.scalars(query.order_by(InventoryProduct.sku).limit(300)).all()
+    # Only show products referenced by at least one non-deleted invoice record.
+    # A product whose only invoice was deleted is hidden as well; no rows or
+    # stock values are deleted or modified by this display filter.
+    invoiced_skus=set()
+    invoice_rows=s.scalars(select(Record).where(Record.deleted.is_(False))).all()
+    for record in invoice_rows:
+        record_items=(record.data or {}).get("items",[]) if isinstance(record.data,dict) else []
+        if not isinstance(record_items,list): continue
+        for item in record_items:
+            if isinstance(item,dict) and item.get("sku"):
+                invoiced_skus.add(str(item["sku"]).strip().upper())
+    rows=[p for p in rows if str(p.sku or "").strip().upper() in invoiced_skus]
     store_categories,latest_purchase=latest_store_catalog_data(s)
     return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owner_user_id":p.owner_user_id,"owned_stock":float(p.owned_stock or 0),"consigned_stock":float(p.consigned_stock or 0),"images":p.images or [],"shipping_included":bool(p.shipping_included),"video_url":p.video_url or "",**store_categories.get(p.sku,{}),**latest_purchase.get(p.sku,{"purchase_price":0,"sale_price":0,"currency":"—"}),"sale_price":float(p.sale_price) if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("sale_price"),"sale_currency":p.sale_currency if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("currency","")} for p in rows]
 
