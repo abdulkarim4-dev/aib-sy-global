@@ -307,9 +307,11 @@ def require_permission(module:str,action:str):
 def startup():
     if settings.jwt_secret.startswith("CHANGE_THIS") and os.getenv("ENVIRONMENT")=="production":
         raise RuntimeError("Set a strong JWT_SECRET before production")
-    Base.metadata.create_all(engine)
-    # Migrate existing cash_moves before any ORM query selects the new columns.
+    # Serialize schema creation/migrations across concurrent Render instances.
+    # Keep the advisory transaction lock on the same connection as create_all and ALTERs.
     with engine.begin() as conn:
+        conn.execute(text("SELECT pg_advisory_xact_lock(741920261115)"))
+        Base.metadata.create_all(conn)
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS permissions JSONB NOT NULL DEFAULT '{}'::jsonb"))
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(254)"))
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT FALSE"))
