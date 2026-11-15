@@ -1622,6 +1622,8 @@ def delete_cash_movement(move_id:int,request:Request,s:Session=Depends(db),u:Use
 def audit_invoice_print(request:Request, record_id:int, invoice_no:str="", section:str="", s:Session=Depends(db), u:User=Depends(require_permission("invoices","print"))):
     record=s.get(Record,record_id)
     if not record or record.deleted or (u.role!="owner" and record.created_by!=u.id): raise HTTPException(404,"الفاتورة غير موجودة أو لا تملك صلاحية طباعتها")
+    if u.role!="owner" and record.section=="directSale" and not bool((record.data or {}).get("verified_payment")):
+        raise HTTPException(403,"لا يمكن طباعة فاتورة البيع اليدوي قبل توثيق الدفع واعتماده من النظام")
     audit(s,u,"invoice_printed","record",record.id,{"record_id":record.id,"invoice_no":record.invoice_no or invoice_no,"section":record.section or section},request)
     s.commit()
     return {"ok":True}
