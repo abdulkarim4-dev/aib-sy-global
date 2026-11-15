@@ -794,6 +794,9 @@ def update_my_profile(p:UserProfilePayload,request:Request,s:Session=Depends(db)
         try: raw=base64.b64decode(logo.split(",",1)[1],validate=True)
         except (ValueError,binascii.Error): raise HTTPException(400,"ملف الشعار غير صالح")
         if not raw or len(raw)>1024*1024: raise HTTPException(413,"يجب ألا يتجاوز حجم الشعار 1 ميغابايت")
+    required_profile_fields={"first_name","last_name","father_name","mother_name","national_no","birth_place_date","document_type","document_no","issuing_authority","registry","residence","address"}
+    missing=[key for key in sorted(required_profile_fields) if not str((p.profile_data or {}).get(key) or "").strip()]
+    if missing: raise HTTPException(400,"أكمل جميع بيانات الهوية المطلوبة قبل الحفظ")
     u.company_name=p.company_name.strip()
     u.company_logo=logo
     u.profile_data=p.profile_data or {}
@@ -1214,7 +1217,7 @@ def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=
         for item in record_items:
             if isinstance(item,dict) and item.get("sku"):
                 invoiced_skus.add(str(item["sku"]).strip().upper())
-    rows=[p for p in rows if str(p.sku or "").strip().upper() in invoiced_skus]
+    rows=[p for p in rows if (u.role!="owner" and p.owner_user_id==u.id) or str(p.sku or "").strip().upper() in invoiced_skus]
     store_categories,latest_purchase=latest_store_catalog_data(s)
     return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owner_user_id":p.owner_user_id,"owned_stock":float(p.owned_stock or 0),"consigned_stock":float(p.consigned_stock or 0),"images":p.images or [],"shipping_included":bool(p.shipping_included),"video_url":p.video_url or "",**store_categories.get(p.sku,{}),**latest_purchase.get(p.sku,{"purchase_price":0,"sale_price":0,"currency":"—"}),"sale_price":float(p.sale_price) if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("sale_price"),"sale_currency":p.sale_currency if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("currency","")} for p in rows]
 
