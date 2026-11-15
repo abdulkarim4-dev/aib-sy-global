@@ -1299,7 +1299,7 @@ def edit_inventory_product(product_id:int,p:InventoryProductUpdate,request:Reque
     return {"ok":True,"id":product.id,"sku":product.sku,"name":product.name,"model":product.model,"sale_price":float(product.sale_price) if product.sale_price is not None else None,"sale_currency":product.sale_currency,"condition":product.condition,"store_family":product.store_family,"store_category":product.store_category}
 
 @app.delete("/inventory/products/{product_id}")
-def delete_inventory_product(product_id:int,request:Request,s:Session=Depends(db),u:User=Depends(require_permission("inventory","edit"))):
+def delete_inventory_product(product_id:int,request:Request,s:Session=Depends(db),u:User=Depends(require_inventory_product_management())):
     product=s.get(InventoryProduct,product_id)
     if not product or not product.active or (u.role!="owner" and product.owner_user_id!=u.id):
         raise HTTPException(404,"المنتج غير موجود في مخزون حسابك")
