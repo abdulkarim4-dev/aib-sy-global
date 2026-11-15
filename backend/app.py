@@ -818,6 +818,13 @@ def update_user_business_scopes(user_id:int,p:UserScopesPayload,request:Request,
     s.commit()
     return {"ok":True,"business_scopes":scopes}
 
+@app.get("/users/{user_id}/profile")
+def get_user_profile(user_id:int,s:Session=Depends(db),u:User=Depends(current_user)):
+    if u.role!="owner" and u.id!=user_id: raise HTTPException(403,"لا يمكنك عرض بيانات مستخدم آخر")
+    target=s.get(User,user_id)
+    if not target or target.deleted: raise HTTPException(404,"المستخدم غير موجود")
+    return {"user_id":target.id,"company_name":target.company_name or "","company_logo":target.company_logo,"profile_data":target.profile_data or {}}
+
 @app.get("/users/{user_id}/inventory")
 def get_user_inventory(user_id:int,s:Session=Depends(db),u:User=Depends(manager)):
     target=s.get(User,user_id)
@@ -1614,7 +1621,7 @@ def delete_cash_movement(move_id:int,request:Request,s:Session=Depends(db),u:Use
 @app.post("/audit-log/print")
 def audit_invoice_print(request:Request, record_id:int, invoice_no:str="", section:str="", s:Session=Depends(db), u:User=Depends(require_permission("invoices","print"))):
     record=s.get(Record,record_id)
-    if not record or record.deleted: raise HTTPException(404,"الفاتورة غير موجودة")
+    if not record or record.deleted or (u.role!="owner" and record.created_by!=u.id): raise HTTPException(404,"الفاتورة غير موجودة أو لا تملك صلاحية طباعتها")
     audit(s,u,"invoice_printed","record",record.id,{"record_id":record.id,"invoice_no":record.invoice_no or invoice_no,"section":record.section or section},request)
     s.commit()
     return {"ok":True}
