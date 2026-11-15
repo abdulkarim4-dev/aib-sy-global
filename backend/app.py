@@ -171,6 +171,9 @@ class InventoryProduct(Base):
     images: Mapped[list]=mapped_column(JSON, default=list, nullable=False)
     shipping_included: Mapped[bool]=mapped_column(Boolean, default=False, nullable=False)
     video_url: Mapped[Optional[str]]=mapped_column(Text, nullable=True)
+    owner_user_id: Mapped[Optional[int]]=mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    sale_price: Mapped[Optional[Any]]=mapped_column(Numeric(18,2), nullable=True)
+    sale_currency: Mapped[str]=mapped_column(String(8), default="USD", nullable=False)
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
 
 class InvoicePayment(Base):
@@ -198,6 +201,30 @@ class CashMove(Base):
     voided: Mapped[bool]=mapped_column(Boolean, default=False, nullable=False)
     voided_by: Mapped[Optional[int]]=mapped_column(ForeignKey("users.id"), nullable=True)
     voided_at: Mapped[Optional[datetime]]=mapped_column(DateTime(timezone=True), nullable=True)
+class UserWallet(Base):
+    __tablename__="user_wallets"
+    id: Mapped[int]=mapped_column(primary_key=True)
+    user_id: Mapped[int]=mapped_column(ForeignKey("users.id"), index=True)
+    currency: Mapped[str]=mapped_column(String(8), nullable=False)
+    balance: Mapped[Any]=mapped_column(Numeric(18,2), default=0, nullable=False)
+    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
+    updated_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
+    __table_args__=(UniqueConstraint("user_id","currency",name="uq_user_wallet_currency"),)
+
+class WalletTransaction(Base):
+    __tablename__="wallet_transactions"
+    id: Mapped[int]=mapped_column(primary_key=True)
+    wallet_id: Mapped[int]=mapped_column(ForeignKey("user_wallets.id"), index=True)
+    user_id: Mapped[int]=mapped_column(ForeignKey("users.id"), index=True)
+    amount: Mapped[Any]=mapped_column(Numeric(18,2), nullable=False)
+    currency: Mapped[str]=mapped_column(String(8), nullable=False)
+    direction: Mapped[str]=mapped_column(String(12), nullable=False)
+    reason: Mapped[str]=mapped_column(Text, default="")
+    reference_type: Mapped[Optional[str]]=mapped_column(String(40), nullable=True)
+    reference_id: Mapped[Optional[int]]=mapped_column(Integer, nullable=True)
+    created_by: Mapped[int]=mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
+
 class ChangeRequest(Base):
     __tablename__="record_change_requests"
     id: Mapped[int]=mapped_column(primary_key=True)
@@ -293,7 +320,7 @@ def manager(u:User=Depends(current_user)):
     return u
 def can_add(u:User=Depends(current_user)): return u
 
-PERMISSION_SCHEMA={"inventory":{"view"},"invoices":{"view","create","edit","delete","print"},"cash":{"view","create","edit","delete","print"}}
+PERMISSION_SCHEMA={"inventory":{"view","create","edit"},"invoices":{"view","create","edit","delete","print"},"cash":{"view","create","edit","delete","print"}}
 def has_permission(user:User,module:str,action:str)->bool:
     if user.role=="owner": return True
     return bool(((user.permissions or {}).get(module) or {}).get(action,False))
@@ -320,6 +347,9 @@ def startup():
         conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_email_unique ON users (email) WHERE email IS NOT NULL"))
         conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS images JSONB NOT NULL DEFAULT '[]'::jsonb"))
         conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS shipping_included BOOLEAN NOT NULL DEFAULT FALSE"))
+        conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS owner_user_id INTEGER REFERENCES users(id)"))
+        conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS sale_price NUMERIC(18,2)"))
+        conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS sale_currency VARCHAR(8) NOT NULL DEFAULT 'USD'"))
         conn.execute(text("ALTER TABLE store_password_resets ADD COLUMN IF NOT EXISTS pending_password_hash VARCHAR(300)"))
         conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS first_name VARCHAR(80) NOT NULL DEFAULT ''"))
         conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS last_name VARCHAR(80) NOT NULL DEFAULT ''"))
@@ -332,6 +362,8 @@ def startup():
         conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_store_customers_google_sub ON store_customers (google_sub) WHERE google_sub IS NOT NULL"))
 
         conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS voided BOOLEAN NOT NULL DEFAULT FALSE"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_inventory_products_owner_user_id ON inventory_products(owner_user_id)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_wallet_transactions_user_id ON wallet_transactions(user_id)"))
         conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS record_id INTEGER REFERENCES records(id)"))
         conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS voided_by INTEGER REFERENCES users(id)"))
         conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS voided_at TIMESTAMP WITH TIME ZONE"))
@@ -789,6 +821,8 @@ def add_user(payload:UserCreate, request:Request, s:Session=Depends(db), u:User=
         archived.email_verified=False
     nu=User(username=payload.username,full_name=payload.full_name,email=email,email_verified=False,password_hash=password_hash.hash(payload.password),role="employee")
     nu.permissions={}; s.add(nu); s.flush()
+    for wallet_currency in ("USD","SYP"):
+        s.add(UserWallet(user_id=nu.id,currency=wallet_currency,balance=0))
     code=f"{secrets.randbelow(1000000):06d}"
     approval=EmployeeEmailApproval(user_id=nu.id,code_hash=password_hash.hash(code),expires_at=datetime.now(timezone.utc)+timedelta(minutes=15))
     s.add(approval)
@@ -887,7 +921,7 @@ def next_inventory_sku(s:Session)->str:
             return sku
         serial+=1
 
-def prepare_record_inventory(s:Session, section:str, raw_data:dict, allow_legacy:bool=False)->dict:
+def prepare_record_inventory(s:Session, section:str, raw_data:dict, allow_legacy:bool=False, user:Optional[User]=None)->dict:
     data=dict(raw_data or {})
     items=data.get("items") if isinstance(data.get("items"),list) else []
     prepared=[]
@@ -944,7 +978,7 @@ def prepare_record_inventory(s:Session, section:str, raw_data:dict, allow_legacy
         if not product:
             if section not in {"purchase","deposit"}:
                 raise HTTPException(400,f"رقم القطعة {sku} غير موجود في المخزون. أضفها أولاً عبر الشراء أو الأمانة.")
-            product=InventoryProduct(sku=sku,name=name or sku,model=model)
+            product=InventoryProduct(sku=sku,name=name or sku,model=model,owner_user_id=(user.id if user and user.role!="owner" else None))
             s.add(product)
             try: s.flush()
             except Exception:
@@ -952,6 +986,8 @@ def prepare_record_inventory(s:Session, section:str, raw_data:dict, allow_legacy
                 raise HTTPException(409,f"رقم القطعة {sku} مستخدم مسبقاً. ابحث عنها واخترها.")
         else:
             if not product.active: raise HTTPException(400,f"القطعة {sku} غير مفعلة")
+            if user and user.role!="owner" and product.owner_user_id!=user.id:
+                raise HTTPException(403,f"القطعة {sku} ليست ضمن مخزون حسابك")
             if not name: item["description"]=product.name
             if not model: item["model"]=product.model
         item["sku"]=sku
@@ -1063,24 +1099,9 @@ def latest_inventory_store_categories(s:Session)->dict:
 
 @app.get("/inventory/products")
 def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=Depends(require_permission("inventory","view"))):
-    # Show only inventory items referenced by at least one non-deleted invoice.
-    # Products whose only invoice was deleted (or which never had an invoice)
-    # remain in the database for audit/history, but are hidden from this list.
-    linked_skus=set()
-    active_records=s.scalars(select(Record).where(Record.deleted.is_(False))).all()
-    for record in active_records:
-        data=record.data if isinstance(record.data,dict) else {}
-        items=data.get("items") if isinstance(data.get("items"),list) else []
-        for item in items:
-            if isinstance(item,dict):
-                sku=str(item.get("sku") or "").strip().upper()
-                if sku:
-                    linked_skus.add(sku)
-
-    query=select(InventoryProduct).where(
-        InventoryProduct.active.is_(True),
-        func.upper(func.trim(InventoryProduct.sku)).in_(linked_skus) if linked_skus else text("1=0")
-    )
+    # Legacy products with no owner remain in the owner's inventory only.
+    query=select(InventoryProduct).where(InventoryProduct.active.is_(True))
+    if u.role!="owner": query=query.where(InventoryProduct.owner_user_id==u.id)
     if q:
         term=f"%{q.strip()}%"
         query=query.where(or_(InventoryProduct.sku.ilike(term),InventoryProduct.name.ilike(term),InventoryProduct.model.ilike(term)))
@@ -1100,7 +1121,7 @@ class InventoryVideoPayload(BaseModel):
 @app.put("/inventory/products/{product_id}/video")
 def update_inventory_product_video(product_id:int,p:InventoryVideoPayload,request:Request,s:Session=Depends(db),u:User=Depends(require_permission("inventory","edit"))):
     product=s.get(InventoryProduct,product_id)
-    if not product or not product.active: raise HTTPException(404,"المنتج غير موجود في المخزون")
+    if not product or not product.active or (u.role!="owner" and product.owner_user_id!=u.id): raise HTTPException(404,"المنتج غير موجود في مخزون حسابك")
     url=(p.video_url or "").strip()
     if url and not url.startswith(("https://","http://")): raise HTTPException(400,"أدخل رابط فيديو صحيحاً يبدأ بـ https:// أو http://")
     product.video_url=url or None
@@ -1111,7 +1132,7 @@ def update_inventory_product_video(product_id:int,p:InventoryVideoPayload,reques
 @app.put("/inventory/products/{product_id}/shipping")
 def update_inventory_product_shipping(product_id:int, p:InventoryShippingPayload, request:Request, s:Session=Depends(db), u:User=Depends(require_permission("inventory","edit"))):
     product=s.get(InventoryProduct,product_id)
-    if not product or not product.active: raise HTTPException(404,"القطعة غير موجودة في المخزون")
+    if not product or not product.active or (u.role!="owner" and product.owner_user_id!=u.id): raise HTTPException(404,"القطعة غير موجودة في مخزون حسابك")
     product.shipping_included=bool(p.included)
     audit(s,u,"inventory_shipping_updated","inventory_product",product.id,{"sku":product.sku,"shipping_included":product.shipping_included},request)
     s.commit()
@@ -1120,7 +1141,7 @@ def update_inventory_product_shipping(product_id:int, p:InventoryShippingPayload
 @app.put("/inventory/products/{product_id}/images")
 def update_inventory_product_images(product_id:int, p:InventoryImagesPayload, request:Request, s:Session=Depends(db), u:User=Depends(require_permission("inventory","edit"))):
     product=s.get(InventoryProduct,product_id)
-    if not product or not product.active: raise HTTPException(404,"القطعة غير موجودة في المخزون")
+    if not product or not product.active or (u.role!="owner" and product.owner_user_id!=u.id): raise HTTPException(404,"القطعة غير موجودة في مخزون حسابك")
     total_bytes=0
     for image_data in p.images:
         if not isinstance(image_data,str) or "," not in image_data: raise HTTPException(400,"صيغة إحدى الصور غير صالحة")
@@ -1140,13 +1161,15 @@ class RecordCreate(BaseModel): section:str; invoice_no:Optional[str]=None; curre
 @app.post("/records")
 def create_record(p:RecordCreate, request:Request, s:Session=Depends(db), u:User=Depends(require_permission("invoices","create"))):
     if p.section not in {"deposit","purchase","consignSale","directSale","repair","carPurchase","carSale"}: raise HTTPException(400,"قسم غير معروف")
+    if u.role!="owner" and p.section!="directSale":
+        raise HTTPException(403,"يمكن لحساب المستخدم تسجيل مبيعات منتجاته فقط. الشراء والإيداع وبقية الأقسام متاحة للمالك.")
     if p.currency not in {"USD","SYP"}: raise HTTPException(400,"عملة غير مدعومة")
     section_codes={"directSale":"A","purchase":"B","consignSale":"C","deposit":"D","repair":"E","carPurchase":"F","carSale":"G"}
     # Serialize numbering per section so simultaneous users cannot receive the same sequence.
     s.execute(text("SELECT pg_advisory_xact_lock(hashtext(:key))"), {"key":"aib-invoice:"+p.section})
     serial=int(s.scalar(select(func.count(Record.id)).where(Record.section==p.section)) or 0)+1
     invoice_no=f"{section_codes[p.section]}-{serial:05d}-B"
-    prepared_data=prepare_record_inventory(s,p.section,p.data)
+    prepared_data=prepare_record_inventory(s,p.section,p.data,user=u)
     consume_operation_verification(s,u,"invoice_create",p.verification_token)
     r=Record(section=p.section,invoice_no=invoice_no,currency=p.currency,data=prepared_data,created_by=u.id)
     s.add(r); s.flush(); recalculate_inventory(s); audit(s,u,"record_created","record",r.id,{"section":r.section,"invoice_no":r.invoice_no},request); s.commit()
@@ -1160,6 +1183,7 @@ def create_record(p:RecordCreate, request:Request, s:Session=Depends(db), u:User
 @app.get("/records")
 def list_records(section:Optional[str]=None, s:Session=Depends(db), u:User=Depends(require_permission("invoices","view"))):
     q=select(Record).where(Record.deleted==False)
+    if u.role!="owner": q=q.where(Record.created_by==u.id)
     if section: q=q.where(Record.section==section)
     rows=s.scalars(q.order_by(Record.id.desc())).all()
     if not rows: return []
@@ -1212,7 +1236,7 @@ def invoice_cash_description(record:Record, action:str="دفعة فاتورة")-
 @app.post("/records/{record_id}/payments")
 def add_invoice_payment(record_id:int,p:PaymentPayload,request:Request,s:Session=Depends(db),u:User=Depends(require_permission("invoices","create"))):
     r=s.get(Record,record_id)
-    if not r or r.deleted: raise HTTPException(404,"الفاتورة غير موجودة")
+    if not r or r.deleted or (u.role!="owner" and r.created_by!=u.id): raise HTTPException(404,"الفاتورة غير موجودة")
     if p.method not in {"cash","baraka_bank","sham_cash","syriatel_cash"}: raise HTTPException(400,"طريقة الدفع غير صالحة")
     total=float(r.data.get("amount",r.data.get("price",r.data.get("sale",0))) or 0)
     paid=float(s.scalar(select(func.coalesce(func.sum(InvoicePayment.amount),0)).where(InvoicePayment.record_id==record_id)) or 0)
@@ -1230,7 +1254,7 @@ def add_invoice_payment(record_id:int,p:PaymentPayload,request:Request,s:Session
 @app.get("/records/{record_id}/payments")
 def list_invoice_payments(record_id:int,s:Session=Depends(db),u:User=Depends(require_permission("invoices","view"))):
     r=s.get(Record,record_id)
-    if not r or r.deleted: raise HTTPException(404,"الفاتورة غير موجودة")
+    if not r or r.deleted or (u.role!="owner" and r.created_by!=u.id): raise HTTPException(404,"الفاتورة غير موجودة")
     return [{"id":x.id,"amount":float(x.amount),"method":x.method,"cash_box":x.cash_box,"paid_at":x.paid_at} for x in s.scalars(select(InvoicePayment).where(InvoicePayment.record_id==record_id).order_by(InvoicePayment.id)).all()]
 
 class PaymentUpdatePayload(BaseModel):
@@ -1248,7 +1272,7 @@ def reverse_payment_cash_move(s:Session, r:Record, payment:InvoicePayment, u:Use
 @app.put("/records/{record_id}/payments/{payment_id}")
 def update_invoice_payment(record_id:int,payment_id:int,p:PaymentUpdatePayload,request:Request,s:Session=Depends(db),u:User=Depends(require_permission("invoices","edit"))):
     r=s.get(Record,record_id); x=s.get(InvoicePayment,payment_id)
-    if not r or r.deleted or not x or x.record_id!=record_id: raise HTTPException(404,"الدفعة غير موجودة")
+    if not r or r.deleted or (u.role!="owner" and r.created_by!=u.id) or not x or x.record_id!=record_id: raise HTTPException(404,"الدفعة غير موجودة")
     if p.method not in {"cash","baraka_bank","sham_cash","syriatel_cash"}: raise HTTPException(400,"طريقة الدفع غير صالحة")
     if not p.cash_box.strip(): raise HTTPException(400,"اختر الصندوق")
     paid=float(s.scalar(select(func.coalesce(func.sum(InvoicePayment.amount),0)).where(InvoicePayment.record_id==record_id)) or 0)
@@ -1496,10 +1520,10 @@ class RecordUpdate(BaseModel):
 @app.patch("/records/{record_id}")
 def update_record(record_id:int, p:RecordUpdate, request:Request, s:Session=Depends(db), u:User=Depends(require_permission("invoices","edit"))):
     r=s.get(Record,record_id)
-    if not r or r.deleted: raise HTTPException(404,"السجل غير موجود")
+    if not r or r.deleted or (u.role!="owner" and r.created_by!=u.id): raise HTTPException(404,"السجل غير موجود")
     if p.currency not in ("USD","SYP"): raise HTTPException(400,"عملة غير مدعومة")
     ensure_total_covers_payments(s,r.id,p.data)
-    r.data=prepare_record_inventory(s,r.section,p.data,allow_legacy=True); r.invoice_no=p.invoice_no; r.currency=p.currency; r.updated_at=datetime.now(timezone.utc)
+    r.data=prepare_record_inventory(s,r.section,p.data,allow_legacy=True,user=u); r.invoice_no=p.invoice_no; r.currency=p.currency; r.updated_at=datetime.now(timezone.utc)
     recalculate_inventory(s)
     audit(s,u,"record_updated","record",r.id,{"section":r.section,"invoice_no":r.invoice_no},request); s.commit()
     if r.section in {"purchase","carPurchase","deposit"}:
@@ -1521,7 +1545,7 @@ def sale_cash_moves_for_record(s:Session, record:Record):
 @app.delete("/records/{record_id}")
 def delete_record(record_id:int, request:Request, s:Session=Depends(db), u:User=Depends(require_permission("invoices","delete"))):
     r=s.get(Record,record_id)
-    if not r or r.deleted: raise HTTPException(404,"السجل غير موجود")
+    if not r or r.deleted or (u.role!="owner" and r.created_by!=u.id): raise HTTPException(404,"السجل غير موجود")
     r.deleted=True; r.updated_at=datetime.now(timezone.utc)
     recalculate_inventory(s)
     for payment in s.scalars(select(InvoicePayment).where(InvoicePayment.record_id==r.id)).all():
@@ -1542,6 +1566,51 @@ def my_requests(s:Session=Depends(db),u:User=Depends(current_user)):
         rec=s.get(Record,x.record_id)
         out.append({"id":x.id,"record_id":x.record_id,"section":rec.section if rec else None,"invoice_no":rec.invoice_no if rec else None,"action":x.action,"proposed_data":x.proposed_data,"reason":x.reason,"status":x.status,"created_at":x.created_at})
     return out
+
+
+def ensure_user_wallets(s:Session,user_id:int):
+    rows=s.scalars(select(UserWallet).where(UserWallet.user_id==user_id)).all()
+    existing={x.currency for x in rows}
+    for currency in ("USD","SYP"):
+        if currency not in existing:
+            s.add(UserWallet(user_id=user_id,currency=currency,balance=0))
+    s.flush()
+
+@app.get("/my-wallet")
+def get_my_wallet(s:Session=Depends(db),u:User=Depends(current_user)):
+    ensure_user_wallets(s,u.id)
+    wallets=s.scalars(select(UserWallet).where(UserWallet.user_id==u.id).order_by(UserWallet.currency)).all()
+    out=[]
+    for w in wallets:
+        tx=s.scalars(select(WalletTransaction).where(WalletTransaction.wallet_id==w.id).order_by(WalletTransaction.id.desc()).limit(100)).all()
+        out.append({"id":w.id,"currency":w.currency,"balance":float(w.balance or 0),"transactions":[{"id":x.id,"amount":float(x.amount),"direction":x.direction,"reason":x.reason,"reference_type":x.reference_type,"reference_id":x.reference_id,"created_at":x.created_at} for x in tx]})
+    s.commit()
+    return out
+
+@app.get("/wallets")
+def list_user_wallets(s:Session=Depends(db),u:User=Depends(manager)):
+    rows=s.scalars(select(User).where(User.deleted.is_(False),User.role!="owner").order_by(User.id)).all()
+    result=[]
+    for usr in rows:
+        ensure_user_wallets(s,usr.id)
+        wallets=s.scalars(select(UserWallet).where(UserWallet.user_id==usr.id).order_by(UserWallet.currency)).all()
+        result.append({"user_id":usr.id,"username":usr.username,"name":usr.full_name,"wallets":[{"id":w.id,"currency":w.currency,"balance":float(w.balance or 0)} for w in wallets]})
+    s.commit()
+    return result
+
+@app.get("/users/{user_id}/wallet")
+def get_user_wallet(user_id:int,s:Session=Depends(db),u:User=Depends(current_user)):
+    if u.role!="owner" and u.id!=user_id: raise HTTPException(403,"لا يمكنك الوصول إلى محفظة مستخدم آخر")
+    target=s.get(User,user_id)
+    if not target or target.deleted: raise HTTPException(404,"المستخدم غير موجود")
+    ensure_user_wallets(s,target.id)
+    wallets=s.scalars(select(UserWallet).where(UserWallet.user_id==target.id).order_by(UserWallet.currency)).all()
+    result=[]
+    for w in wallets:
+        tx=s.scalars(select(WalletTransaction).where(WalletTransaction.wallet_id==w.id).order_by(WalletTransaction.id.desc()).limit(100)).all()
+        result.append({"id":w.id,"currency":w.currency,"balance":float(w.balance or 0),"transactions":[{"id":x.id,"amount":float(x.amount),"direction":x.direction,"reason":x.reason,"reference_type":x.reference_type,"reference_id":x.reference_id,"created_at":x.created_at} for x in tx]})
+    s.commit()
+    return {"user_id":target.id,"username":target.username,"name":target.full_name,"wallets":result}
 
 @app.get("/cash-summary")
 def cash_summary(s:Session=Depends(db),u:User=Depends(require_permission("cash","view"))):
