@@ -170,6 +170,7 @@ class InventoryProduct(Base):
     active: Mapped[bool]=mapped_column(Boolean, default=True)
     images: Mapped[list]=mapped_column(JSON, default=list, nullable=False)
     shipping_included: Mapped[bool]=mapped_column(Boolean, default=False, nullable=False)
+    video_url: Mapped[Optional[str]]=mapped_column(Text, nullable=True)
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
 
 class InvoicePayment(Base):
@@ -1085,13 +1086,27 @@ def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=
         query=query.where(or_(InventoryProduct.sku.ilike(term),InventoryProduct.name.ilike(term),InventoryProduct.model.ilike(term)))
     rows=s.scalars(query.order_by(InventoryProduct.sku).limit(300)).all()
     store_categories,latest_purchase=latest_store_catalog_data(s)
-    return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owned_stock":float(p.owned_stock or 0),"consigned_stock":float(p.consigned_stock or 0),"images":p.images or [],"shipping_included":bool(p.shipping_included),**store_categories.get(p.sku,{}),**latest_purchase.get(p.sku,{"purchase_price":0,"sale_price":0,"currency":"—"})} for p in rows]
+    return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owned_stock":float(p.owned_stock or 0),"consigned_stock":float(p.consigned_stock or 0),"images":p.images or [],"shipping_included":bool(p.shipping_included),"video_url":p.video_url or "","video_url":p.video_url or "",**store_categories.get(p.sku,{}),**latest_purchase.get(p.sku,{"purchase_price":0,"sale_price":0,"currency":"—"})} for p in rows]
 
 class InventoryImagesPayload(BaseModel):
     images: list[str] = Field(default_factory=list, max_length=20)
 
 class InventoryShippingPayload(BaseModel):
     included: bool = False
+
+class InventoryVideoPayload(BaseModel):
+    video_url: str = Field(default="", max_length=2000)
+
+@app.put("/inventory/products/{product_id}/video")
+def update_inventory_product_video(product_id:int,p:InventoryVideoPayload,request:Request,s:Session=Depends(db),u:User=Depends(require_permission("inventory","edit"))):
+    product=s.get(InventoryProduct,product_id)
+    if not product or not product.active: raise HTTPException(404,"المنتج غير موجود في المخزون")
+    url=(p.video_url or "").strip()
+    if url and not url.startswith(("https://","http://")): raise HTTPException(400,"أدخل رابط فيديو صحيحاً يبدأ بـ https:// أو http://")
+    product.video_url=url or None
+    audit(s,u,"inventory_video_updated","inventory_product",product.id,{"sku":product.sku,"has_video":bool(url)},request)
+    s.commit()
+    return {"ok":True,"video_url":product.video_url or ""}
 
 @app.put("/inventory/products/{product_id}/shipping")
 def update_inventory_product_shipping(product_id:int, p:InventoryShippingPayload, request:Request, s:Session=Depends(db), u:User=Depends(require_permission("inventory","edit"))):
