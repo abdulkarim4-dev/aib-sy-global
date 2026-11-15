@@ -178,6 +178,10 @@ class InventoryProduct(Base):
     owner_user_id: Mapped[Optional[int]]=mapped_column(ForeignKey("users.id"), nullable=True, index=True)
     sale_price: Mapped[Optional[Any]]=mapped_column(Numeric(18,2), nullable=True)
     sale_currency: Mapped[str]=mapped_column(String(8), default="USD", nullable=False)
+    condition: Mapped[str]=mapped_column(String(16), default="new", nullable=False)
+    opening_quantity: Mapped[Any]=mapped_column(Numeric(18,3), default=0, nullable=False)
+    store_family: Mapped[Optional[str]]=mapped_column(String(40), nullable=True)
+    store_category: Mapped[Optional[str]]=mapped_column(String(60), nullable=True)
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
 
 class InvoicePayment(Base):
@@ -358,6 +362,10 @@ def startup():
         conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS owner_user_id INTEGER REFERENCES users(id)"))
         conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS sale_price NUMERIC(18,2)"))
         conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS sale_currency VARCHAR(8) NOT NULL DEFAULT 'USD'"))
+        conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS condition VARCHAR(16) NOT NULL DEFAULT 'new'"))
+        conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS opening_quantity NUMERIC(18,3) NOT NULL DEFAULT 0"))
+        conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS store_family VARCHAR(40)"))
+        conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS store_category VARCHAR(60)"))
         conn.execute(text("ALTER TABLE store_password_resets ADD COLUMN IF NOT EXISTS pending_password_hash VARCHAR(300)"))
         conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS first_name VARCHAR(80) NOT NULL DEFAULT ''"))
         conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS last_name VARCHAR(80) NOT NULL DEFAULT ''"))
@@ -1092,7 +1100,7 @@ def prepare_record_inventory(s:Session, section:str, raw_data:dict, allow_legacy
     return data
 
 def recalculate_inventory(s:Session):
-    totals={p.id:{"owned":0.0,"consigned":0.0} for p in s.scalars(select(InventoryProduct)).all()}
+    totals={p.id:{"owned":float(p.opening_quantity or 0),"consigned":0.0} for p in s.scalars(select(InventoryProduct)).all()}
     for record in s.scalars(select(Record).where(Record.deleted.is_(False))).all():
         if record.section not in {"purchase","carPurchase","directSale","deposit","consignSale"}: continue
         items=record.data.get("items") if isinstance(record.data,dict) else []
@@ -1191,22 +1199,32 @@ class InventoryProductCreate(BaseModel):
     model: str=Field(default="",max_length=160)
     sale_price: Optional[float]=Field(default=None,ge=0)
     sale_currency: str="USD"
+    condition: str="new"
+    quantity: float=Field(default=0,ge=0)
+    store_family: str
+    store_category: str
 
 @app.post("/inventory/products")
 def create_inventory_product(p:InventoryProductCreate,request:Request,s:Session=Depends(db),u:User=Depends(require_permission("inventory","create"))):
     if p.sale_currency not in {"USD","SYP"}: raise HTTPException(400,"عملة سعر البيع غير مدعومة")
+    if p.condition not in {"new","used"}: raise HTTPException(400,"اختر حالة المنتج: جديد أو مستعمل")
+    allowed={"car":{"cars","car_parts","car_engines","car_engine_parts"},"truck":{"trucks","truck_parts","truck_engines","truck_engine_parts"},"heavy":{"heavy","heavy_parts","heavy_engines","heavy_engine_parts"},"agri":{"agri","agri_parts","agri_engines","agri_engine_parts"},"special":{"generators","hydraulic_compressors","water_pumps","road_equipment","special_parts","special_engines"}}
+    if p.store_category not in allowed.get(p.store_family,set()): raise HTTPException(400,"اختر قسم المتجر بشكل صحيح")
+    if u.role!="owner":
+        scopes=set(u.business_scopes or [])
+        if p.store_family not in scopes and p.store_category not in scopes: raise HTTPException(403,"هذا القسم خارج مجالات العمل المصرح بها لحسابك")
     sku=(p.sku or "").strip().upper() or next_inventory_sku(s)
     if s.scalar(select(InventoryProduct.id).where(func.upper(InventoryProduct.sku)==sku)):
         raise HTTPException(409,"رقم القطعة مستخدم مسبقاً")
-    product=InventoryProduct(sku=sku,name=p.name.strip(),model=p.model.strip(),owner_user_id=(None if u.role=="owner" else u.id),sale_price=p.sale_price,sale_currency=p.sale_currency,owned_stock=0,consigned_stock=0,active=True)
+    product=InventoryProduct(sku=sku,name=p.name.strip(),model=p.model.strip(),owner_user_id=(None if u.role=="owner" else u.id),sale_price=p.sale_price,sale_currency=p.sale_currency,condition=p.condition,opening_quantity=p.quantity,store_family=p.store_family,store_category=p.store_category,owned_stock=p.quantity,consigned_stock=0,active=True)
     s.add(product);s.flush()
-    audit(s,u,"inventory_product_created","inventory_product",product.id,{"sku":sku,"owner_user_id":product.owner_user_id,"sale_price":p.sale_price,"sale_currency":p.sale_currency},request)
+    audit(s,u,"inventory_product_created","inventory_product",product.id,{"sku":sku,"owner_user_id":product.owner_user_id,"sale_price":p.sale_price,"sale_currency":p.sale_currency,"condition":p.condition,"opening_quantity":p.quantity,"store_family":p.store_family,"store_category":p.store_category},request)
     s.commit()
     _store_catalog_cache["value"]=None
     _store_catalog_cache["at"]=0
     _public_products_cache["value"].clear()
     _public_products_cache["at"].clear()
-    return {"id":product.id,"sku":product.sku,"name":product.name,"model":product.model,"owner_user_id":product.owner_user_id,"sale_price":float(product.sale_price) if product.sale_price is not None else None,"sale_currency":product.sale_currency,"owned_stock":0,"consigned_stock":0}
+    return {"id":product.id,"sku":product.sku,"name":product.name,"model":product.model,"owner_user_id":product.owner_user_id,"sale_price":float(product.sale_price) if product.sale_price is not None else None,"sale_currency":product.sale_currency,"condition":product.condition,"opening_quantity":float(product.opening_quantity or 0),"store_family":product.store_family,"store_category":product.store_category,"owned_stock":float(product.owned_stock or 0),"consigned_stock":0}
 
 @app.get("/inventory/products")
 def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=Depends(require_permission("inventory","view"))):
@@ -1230,7 +1248,7 @@ def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=
                 invoiced_skus.add(str(item["sku"]).strip().upper())
     rows=[p for p in rows if (u.role!="owner" and p.owner_user_id==u.id) or str(p.sku or "").strip().upper() in invoiced_skus]
     store_categories,latest_purchase=latest_store_catalog_data(s)
-    return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owner_user_id":p.owner_user_id,"owned_stock":float(p.owned_stock or 0),"consigned_stock":float(p.consigned_stock or 0),"images":p.images or [],"shipping_included":bool(p.shipping_included),"video_url":p.video_url or "",**store_categories.get(p.sku,{}),**latest_purchase.get(p.sku,{"purchase_price":0,"sale_price":0,"currency":"—"}),"sale_price":float(p.sale_price) if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("sale_price"),"sale_currency":p.sale_currency if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("currency","")} for p in rows]
+    return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owner_user_id":p.owner_user_id,"condition":p.condition or "new","opening_quantity":float(p.opening_quantity or 0),"store_family":p.store_family,"store_category":p.store_category,"owned_stock":float(p.owned_stock or 0),"consigned_stock":float(p.consigned_stock or 0),"images":p.images or [],"shipping_included":bool(p.shipping_included),"video_url":p.video_url or "",**store_categories.get(p.sku,{}),**latest_purchase.get(p.sku,{"purchase_price":0,"sale_price":0,"currency":"—"}),"sale_price":float(p.sale_price) if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("sale_price"),"sale_currency":p.sale_currency if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("currency","")} for p in rows]
 
 class InventoryImagesPayload(BaseModel):
     images: list[str] = Field(default_factory=list, max_length=20)
@@ -2465,7 +2483,10 @@ def public_products(q:Optional[str]=None, category:Optional[str]=None, s:Session
         elif family=="heavy": cat="heavy"
         else: cat="agri"
         explicit_category=store_categories.get(p.sku,{})
-        if explicit_category:
+        if p.store_family and p.store_category:
+            family=p.store_family
+            cat=p.store_category
+        elif explicit_category:
             family=explicit_category["store_family"]
             cat=explicit_category["store_category"]
         if category:
@@ -2481,10 +2502,8 @@ def public_products(q:Optional[str]=None, category:Optional[str]=None, s:Session
                 # Exact shop subcategories do not duplicate their products into parent categories.
                 continue
         stock=float(p.owned_stock or 0)+float(p.consigned_stock or 0)
-        # Keep the N20 engine visible as an out-of-stock catalog item; do not expose other zero-stock items.
-        if stock <= 0 and (p.model or "").strip().upper() != "N20B20B": continue
         price=latest_purchase.get(p.sku,{})
-        out.append({"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"category":cat,"stock":stock,"images":p.images or [],"video_url":p.video_url or "","shipping_included":bool(p.shipping_included),"vehicle_details":store_categories.get(p.sku,{}).get("vehicle_details",{}),"sale_price":float(p.sale_price) if p.sale_price is not None else price.get("sale_price"),"currency":p.sale_currency if p.sale_price is not None else price.get("currency","")})
+        out.append({"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"category":cat,"stock":stock,"condition":p.condition or "new","images":p.images or [],"video_url":p.video_url or "","shipping_included":bool(p.shipping_included),"vehicle_details":store_categories.get(p.sku,{}).get("vehicle_details",{}),"sale_price":float(p.sale_price) if p.sale_price is not None else price.get("sale_price"),"currency":p.sale_currency if p.sale_price is not None else price.get("currency","")})
     # Bound memory and retain only a short freshness window so stock/price edits appear quickly.
     if len(_public_products_cache["value"])>=_PUBLIC_PRODUCTS_CACHE_MAX:
         _public_products_cache["value"].clear();_public_products_cache["at"].clear()
