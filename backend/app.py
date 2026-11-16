@@ -2820,20 +2820,20 @@ def review_online_purchase_order(order_id:int,p:OnlineOrderReviewPayload,s:Sessi
         if not seller or not (seller.email or "").strip():
             continue
         seller_lines=[line for line in allocated_items if line.get("owner_user_id")==seller_id and float(line.get("user_owned_quantity") or 0)>0]
-        seller_item_text="\\n".join(f"- {line['description']} ({line['sku']}) × {float(line['user_owned_quantity']):g} = {float(line['user_owned_quantity'])*float(line['price']):.2f} {order.currency}" for line in seller_lines)
+        seller_item_text="\n".join(f"- {line['description']} ({line['sku']}) × {float(line['user_owned_quantity']):g} = {float(line['user_owned_quantity'])*float(line['price']):.2f} {order.currency}" for line in seller_lines)
         buyer_name=str(buyer.get("full_name") or (str(buyer.get("first_name") or "")+" "+str(buyer.get("last_name") or "")).strip())
         buyer_phone=str(buyer.get("full_phone") or ((buyer.get("phone_country_code") or "")+(buyer.get("phone_number") or "")))
-        seller_body=(f"تم تأكيد الدفع للطلب الإلكتروني رقم #{order.id}.\\nرقم الفاتورة: {record.invoice_no}\\n"
-            f"اسم المستلم: {buyer_name}\\nعنوان المستلم: {buyer.get('shipping_address') or 'غير متوفر'}\\n"
-            f"رقم هاتف المستلم: {buyer_phone or 'غير متوفر'}\\nالمنتجات المباعة من مخزونك:\\n{seller_item_text}\\n"
-            f"إجمالي قيمة منتجاتك: {amounts['gross']:.2f} {order.currency}\\n"
-            f"عمولة المتجر 1.5٪: {amounts['commission']:.2f} {order.currency}\\n"
+        seller_body=(f"تم تأكيد الدفع للطلب الإلكتروني رقم #{order.id}.\nرقم الفاتورة: {record.invoice_no}\n"
+            f"اسم المستلم: {buyer_name}\nعنوان المستلم: {buyer.get('shipping_address') or 'غير متوفر'}\n"
+            f"رقم هاتف المستلم: {buyer_phone or 'غير متوفر'}\nالمنتجات المباعة من مخزونك:\n{seller_item_text}\n"
+            f"إجمالي قيمة منتجاتك: {amounts['gross']:.2f} {order.currency}\n"
+            f"عمولة المتجر 1.5٪: {amounts['commission']:.2f} {order.currency}\n"
             f"صافي المبلغ المضاف إلى محفظتك: {amounts['net']:.2f} {order.currency}")
         seller_html=aib_email_html(f"تم بيع منتجاتك – الطلب #{order.id}",
             "تم تأكيد الدفع بنجاح، وهذه تفاصيل المستلم والمنتجات التي بيعت من مخزونك.",
             [("رقم الطلب",f"#{order.id}"),("رقم الفاتورة",html.escape(record.invoice_no)),
              ("اسم المستلم",html.escape(buyer_name)),("عنوان المستلم",html.escape(str(buyer.get("shipping_address") or "غير متوفر"))),
-             ("هاتف المستلم",html.escape(buyer_phone or "غير متوفر")),("المنتجات المباعة",html.escape(seller_item_text).replace("\\n","<br>")),
+             ("هاتف المستلم",html.escape(buyer_phone or "غير متوفر")),("المنتجات المباعة",html.escape(seller_item_text).replace("\n","<br>")),
              ("إجمالي قيمة منتجاتك",f"{amounts['gross']:.2f} {html.escape(order.currency)}"),
              ("عمولة المتجر 1.5٪",f"{amounts['commission']:.2f} {html.escape(order.currency)}"),
              ("صافي المبلغ المضاف لمحفظتك",f"{amounts['net']:.2f} {html.escape(order.currency)}")],
