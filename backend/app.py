@@ -2687,6 +2687,31 @@ def public_products(q:Optional[str]=None, category:Optional[str]=None, s:Session
         term=f"%{q.strip()}%"
         query=query.where(or_(InventoryProduct.sku.ilike(term),InventoryProduct.name.ilike(term),InventoryProduct.model.ilike(term)))
     rows=s.scalars(query.order_by(InventoryProduct.sku).limit(300)).all()
+    # Match the inventory page's visibility rule exactly: employee-owned products
+    # belong to that employee's inventory; legacy/owner products are visible only
+    # when referenced by a non-deleted invoice. This prevents stale/orphaned
+    # catalog rows from appearing in the public storefront.
+    invoiced_skus={
+        str(value).strip().upper()
+        for value in s.execute(text("""
+            SELECT DISTINCT UPPER(BTRIM(item->>'sku'))
+            FROM records AS r
+            CROSS JOIN LATERAL jsonb_array_elements(
+                CASE
+                    WHEN jsonb_typeof(CAST(r.data AS JSONB)->'items')='array'
+                    THEN CAST(r.data AS JSONB)->'items'
+                    ELSE '[]'::jsonb
+                END
+            ) AS item
+            WHERE r.deleted IS FALSE
+              AND NULLIF(BTRIM(item->>'sku'),'') IS NOT NULL
+        """)).scalars().all()
+    }
+    rows=[
+        p for p in rows
+        if p.owner_user_id is not None
+        or str(p.sku or "").strip().upper() in invoiced_skus
+    ]
     store_categories,latest_purchase=latest_store_catalog_data(s)
     out=[]
     for p in rows:
