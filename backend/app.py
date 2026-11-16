@@ -241,6 +241,7 @@ class WalletRequest(Base):
     amount: Mapped[Any]=mapped_column(Numeric(18,2),nullable=False)
     currency: Mapped[str]=mapped_column(String(8),nullable=False)
     note: Mapped[str]=mapped_column(Text,default="")
+    withdrawal_method: Mapped[str]=mapped_column(String(40),nullable=False,default="")
     review_note: Mapped[str]=mapped_column(Text,default="")
     status: Mapped[str]=mapped_column(String(16),default="pending",index=True)
     reviewed_by: Mapped[Optional[int]]=mapped_column(ForeignKey("users.id"),nullable=True)
@@ -455,6 +456,7 @@ def startup():
         conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS voided_by INTEGER REFERENCES users(id)"))
         conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS voided_at TIMESTAMP WITH TIME ZONE"))
         conn.execute(text("ALTER TABLE wallet_requests ADD COLUMN IF NOT EXISTS review_note TEXT NOT NULL DEFAULT ''"))
+        conn.execute(text("ALTER TABLE wallet_requests ADD COLUMN IF NOT EXISTS withdrawal_method VARCHAR(40) NOT NULL DEFAULT ''"))
     with SessionLocal() as s:
         if not s.get(CompanyProfile,1):
             s.add(CompanyProfile(id=1,data={
@@ -2061,6 +2063,7 @@ class WalletRequestPayload(BaseModel):
     amount: float
     currency: str
     note: str = ""
+    withdrawal_method: str = ""
 
 class WalletRequestReviewPayload(BaseModel):
     decision: str
@@ -2069,7 +2072,7 @@ class WalletRequestReviewPayload(BaseModel):
 @app.get("/my-wallet/requests")
 def list_my_wallet_requests(s:Session=Depends(db),u:User=Depends(current_user)):
     rows=s.scalars(select(WalletRequest).where(WalletRequest.user_id==u.id).order_by(WalletRequest.id.desc()).limit(100)).all()
-    return [{"id":r.id,"movement":r.movement,"amount":float(r.amount),"currency":r.currency,"note":r.note,"review_note":r.review_note,"status":r.status,"created_at":r.created_at.isoformat() if r.created_at else None,"reviewed_at":r.reviewed_at.isoformat() if r.reviewed_at else None} for r in rows]
+    return [{"id":r.id,"movement":r.movement,"amount":float(r.amount),"currency":r.currency,"note":r.note,"withdrawal_method":r.withdrawal_method,"review_note":r.review_note,"status":r.status,"created_at":r.created_at.isoformat() if r.created_at else None,"reviewed_at":r.reviewed_at.isoformat() if r.reviewed_at else None} for r in rows]
 
 @app.post("/my-wallet/requests")
 def create_wallet_request(p:WalletRequestPayload,request:Request,s:Session=Depends(db),u:User=Depends(current_user)):
@@ -2077,6 +2080,10 @@ def create_wallet_request(p:WalletRequestPayload,request:Request,s:Session=Depen
     currency=str(p.currency or "").upper().strip()
     amount=round(float(p.amount),2)
     if movement not in {"deposit","withdrawal"}: raise HTTPException(400,"نوع الطلب غير صحيح")
+    withdrawal_method=str(p.withdrawal_method or "").strip()
+    allowed_withdrawal_methods={"cash","sham_cash","al_baraka","syria_gulf"}
+    if movement=="withdrawal" and withdrawal_method not in allowed_withdrawal_methods: raise HTTPException(400,"يرجى اختيار طريقة السحب")
+    if movement=="deposit": withdrawal_method=""
     if currency not in {"USD","SYP"}: raise HTTPException(400,"العملة غير مدعومة")
     if amount<=0 or amount!=amount or amount==float("inf"): raise HTTPException(400,"أدخل مبلغاً صحيحاً أكبر من الصفر")
     ensure_user_wallets(s,u.id)
@@ -2085,16 +2092,16 @@ def create_wallet_request(p:WalletRequestPayload,request:Request,s:Session=Depen
         if not wallet or float(wallet.balance or 0)<amount: raise HTTPException(409,"رصيد محفظتك غير كافٍ لطلب هذا السحب")
     pending=s.scalar(select(func.count(WalletRequest.id)).where(WalletRequest.user_id==u.id,WalletRequest.status=="pending",WalletRequest.movement==movement))
     if pending: raise HTTPException(409,"لديك طلب من هذا النوع قيد المراجعة بالفعل")
-    row=WalletRequest(user_id=u.id,movement=movement,amount=amount,currency=currency,note=(p.note or "").strip()[:500])
+    row=WalletRequest(user_id=u.id,movement=movement,amount=amount,currency=currency,note=(p.note or "").strip()[:500],withdrawal_method=withdrawal_method)
     s.add(row);s.flush()
-    audit(s,u,"wallet_deposit_request" if movement=="deposit" else "wallet_withdrawal_request","wallet_request",row.id,{"amount":amount,"currency":currency,"note":row.note},request)
+    audit(s,u,"wallet_deposit_request" if movement=="deposit" else "wallet_withdrawal_request","wallet_request",row.id,{"amount":amount,"currency":currency,"note":row.note,"withdrawal_method":row.withdrawal_method},request)
     s.commit()
     return {"ok":True,"id":row.id,"status":row.status}
 
 @app.get("/wallet-requests")
 def list_wallet_requests(s:Session=Depends(db),u:User=Depends(manager)):
     rows=s.scalars(select(WalletRequest).order_by(WalletRequest.id.desc()).limit(300)).all()
-    return [{"id":r.id,"user_id":r.user_id,"user_name":(s.get(User,r.user_id).full_name if s.get(User,r.user_id) else ""),"username":(s.get(User,r.user_id).username if s.get(User,r.user_id) else ""),"movement":r.movement,"amount":float(r.amount),"currency":r.currency,"note":r.note,"review_note":r.review_note,"status":r.status,"created_at":r.created_at} for r in rows]
+    return [{"id":r.id,"user_id":r.user_id,"user_name":(s.get(User,r.user_id).full_name if s.get(User,r.user_id) else ""),"username":(s.get(User,r.user_id).username if s.get(User,r.user_id) else ""),"movement":r.movement,"amount":float(r.amount),"currency":r.currency,"note":r.note,"withdrawal_method":r.withdrawal_method,"review_note":r.review_note,"status":r.status,"created_at":r.created_at} for r in rows]
 
 @app.post("/wallet-requests/{request_id}/review")
 def review_wallet_request(request_id:int,p:WalletRequestReviewPayload,request:Request,s:Session=Depends(db),u:User=Depends(manager)):
