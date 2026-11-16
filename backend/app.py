@@ -2078,7 +2078,8 @@ def verify_store_login(p:StoreEmailConfirmPayload, request:Request, response:Res
         raise HTTPException(400,"رمز الدخول غير صحيح")
     s.query(StoreLoginVerification).filter(StoreLoginVerification.customer_id==customer.id).delete(synchronize_session=False)
     s.commit()
-    return {"access_token":store_customer_token(customer),"token_type":"bearer","customer":{"id":customer.id,"email":customer.email,"full_name":customer.full_name}}
+    set_store_session(response,customer)
+    return {"ok":True,"customer":{"id":customer.id,"email":customer.email,"full_name":customer.full_name}}
 
 @app.post("/store/auth/password-reset/request")
 def request_store_password_reset(p:StorePasswordResetRequestPayload, request:Request, s:Session=Depends(db)):
