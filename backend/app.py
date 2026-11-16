@@ -1819,11 +1819,18 @@ def confirm_outside_store_commission(record_id:int,p:OwnerCommissionConfirmPaylo
         raise HTTPException(409,"تم تأكيد تسديد عمولة هذه الفاتورة مسبقاً")
     amount=round(float(commission.get("amount") or 0),2)
     if amount<=0: raise HTTPException(409,"قيمة العمولة غير صالحة؛ لا يمكن اعتمادها")
-    commission.update({"status":"paid","paid_at":datetime.now(timezone.utc).isoformat(),"paid_by":u.id,"note":p.note.strip()[:500]})
+    ensure_user_wallets(s,u.id)
+    owner_wallet=s.scalar(select(UserWallet).where(UserWallet.user_id==u.id,UserWallet.currency==record.currency).with_for_update())
+    if not owner_wallet: raise HTTPException(500,"تعذر تجهيز محفظة المالك بعملة الفاتورة")
+    owner_wallet.balance=float(owner_wallet.balance or 0)+amount
+    owner_wallet.updated_at=datetime.now(timezone.utc)
+    wallet_tx=WalletTransaction(wallet_id=owner_wallet.id,user_id=u.id,amount=amount,currency=record.currency,direction="in",reason="عمولة بيع خارج المتجر · "+str(record.invoice_no or record.id),reference_type="outside_store_commission",reference_id=record.id,created_by=u.id)
+    s.add(wallet_tx);s.flush()
+    commission.update({"status":"paid","paid_at":datetime.now(timezone.utc).isoformat(),"paid_by":u.id,"note":p.note.strip()[:500],"wallet_transaction_id":wallet_tx.id})
     data["owner_commission"]=commission
     record.data=data
     record.updated_at=datetime.now(timezone.utc)
-    audit(s,u,"owner_commission_payment_confirmed","record",record.id,{"invoice_no":record.invoice_no,"commission_amount":amount,"currency":record.currency,"rate":0.015,"seller_id":record.created_by,"note":commission["note"]},request)
+    audit(s,u,"owner_commission_payment_confirmed","record",record.id,{"invoice_no":record.invoice_no,"commission_amount":amount,"currency":record.currency,"rate":0.015,"seller_id":record.created_by,"owner_wallet_id":owner_wallet.id,"wallet_transaction_id":wallet_tx.id,"note":commission["note"]},request)
     s.commit()
     return {"ok":True,"record_id":record.id,"status":"paid","amount":amount,"currency":record.currency}
 
@@ -1889,6 +1896,8 @@ def sale_cash_moves_for_record(s:Session, record:Record):
 def delete_record(record_id:int, request:Request, s:Session=Depends(db), u:User=Depends(require_permission("invoices","delete"))):
     r=s.get(Record,record_id)
     if not r or r.deleted or (u.role!="owner" and r.created_by!=u.id): raise HTTPException(404,"السجل غير موجود")
+    if (r.data or {}).get("outside_store_sale") and u.role!="owner":
+        raise HTTPException(403,"لا يمكن حذف بيع خارج المتجر؛ راجع المالك لتسوية العملية")
     r.deleted=True; r.updated_at=datetime.now(timezone.utc)
     recalculate_inventory(s)
     for payment in s.scalars(select(InvoicePayment).where(InvoicePayment.record_id==r.id)).all():
