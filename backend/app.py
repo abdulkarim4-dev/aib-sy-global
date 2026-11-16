@@ -233,6 +233,19 @@ class WalletTransaction(Base):
     created_by: Mapped[int]=mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
 
+class WalletRequest(Base):
+    __tablename__="wallet_requests"
+    id: Mapped[int]=mapped_column(primary_key=True)
+    user_id: Mapped[int]=mapped_column(ForeignKey("users.id"),index=True)
+    movement: Mapped[str]=mapped_column(String(16),nullable=False)
+    amount: Mapped[Any]=mapped_column(Numeric(18,2),nullable=False)
+    currency: Mapped[str]=mapped_column(String(8),nullable=False)
+    note: Mapped[str]=mapped_column(Text,default="")
+    status: Mapped[str]=mapped_column(String(16),default="pending",index=True)
+    reviewed_by: Mapped[Optional[int]]=mapped_column(ForeignKey("users.id"),nullable=True)
+    reviewed_at: Mapped[Optional[datetime]]=mapped_column(DateTime(timezone=True),nullable=True)
+    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True),default=lambda:datetime.now(timezone.utc))
+
 class ChangeRequest(Base):
     __tablename__="record_change_requests"
     id: Mapped[int]=mapped_column(primary_key=True)
@@ -2040,6 +2053,69 @@ def get_user_wallet(user_id:int,s:Session=Depends(db),u:User=Depends(current_use
         result.append({"id":w.id,"currency":w.currency,"balance":float(w.balance or 0),"transactions":[{"id":x.id,"amount":float(x.amount),"direction":x.direction,"reason":x.reason,"reference_type":x.reference_type,"reference_id":x.reference_id,"created_at":x.created_at} for x in tx]})
     s.commit()
     return {"user_id":target.id,"username":target.username,"name":target.full_name,"wallets":result}
+
+class WalletRequestPayload(BaseModel):
+    movement: str
+    amount: float
+    currency: str
+    note: str = ""
+
+class WalletRequestReviewPayload(BaseModel):
+    decision: str
+    note: str = ""
+
+@app.post("/my-wallet/requests")
+def create_wallet_request(p:WalletRequestPayload,request:Request,s:Session=Depends(db),u:User=Depends(current_user)):
+    movement=str(p.movement or "").strip()
+    currency=str(p.currency or "").upper().strip()
+    amount=round(float(p.amount),2)
+    if movement not in {"deposit","withdrawal"}: raise HTTPException(400,"نوع الطلب غير صحيح")
+    if currency not in {"USD","SYP"}: raise HTTPException(400,"العملة غير مدعومة")
+    if amount<=0 or amount!=amount or amount==float("inf"): raise HTTPException(400,"أدخل مبلغاً صحيحاً أكبر من الصفر")
+    ensure_user_wallets(s,u.id)
+    if movement=="withdrawal":
+        wallet=s.scalar(select(UserWallet).where(UserWallet.user_id==u.id,UserWallet.currency==currency).with_for_update())
+        if not wallet or float(wallet.balance or 0)<amount: raise HTTPException(409,"رصيد محفظتك غير كافٍ لطلب هذا السحب")
+    pending=s.scalar(select(func.count(WalletRequest.id)).where(WalletRequest.user_id==u.id,WalletRequest.status=="pending",WalletRequest.movement==movement))
+    if pending: raise HTTPException(409,"لديك طلب من هذا النوع قيد المراجعة بالفعل")
+    row=WalletRequest(user_id=u.id,movement=movement,amount=amount,currency=currency,note=(p.note or "").strip()[:500])
+    s.add(row);s.flush()
+    audit(s,u,"wallet_deposit_request" if movement=="deposit" else "wallet_withdrawal_request","wallet_request",row.id,{"amount":amount,"currency":currency,"note":row.note},request)
+    s.commit()
+    return {"ok":True,"id":row.id,"status":row.status}
+
+@app.get("/wallet-requests")
+def list_wallet_requests(s:Session=Depends(db),u:User=Depends(manager)):
+    rows=s.scalars(select(WalletRequest).order_by(WalletRequest.id.desc()).limit(300)).all()
+    return [{"id":r.id,"user_id":r.user_id,"user_name":(s.get(User,r.user_id).full_name if s.get(User,r.user_id) else ""),"username":(s.get(User,r.user_id).username if s.get(User,r.user_id) else ""),"movement":r.movement,"amount":float(r.amount),"currency":r.currency,"note":r.note,"status":r.status,"created_at":r.created_at} for r in rows]
+
+@app.post("/wallet-requests/{request_id}/review")
+def review_wallet_request(request_id:int,p:WalletRequestReviewPayload,request:Request,s:Session=Depends(db),u:User=Depends(manager)):
+    if u.role!="owner": raise HTTPException(403,"مراجعة طلبات المحافظ للمالك حصراً")
+    row=s.scalar(select(WalletRequest).where(WalletRequest.id==request_id).with_for_update())
+    if not row: raise HTTPException(404,"الطلب غير موجود")
+    if row.status!="pending": raise HTTPException(409,"تمت معالجة هذا الطلب مسبقاً")
+    decision=str(p.decision or "").strip()
+    if decision not in {"approve","reject"}: raise HTTPException(400,"قرار المراجعة غير صحيح")
+    target=s.get(User,row.user_id)
+    if not target or target.deleted: raise HTTPException(404,"حساب المستخدم غير موجود")
+    if decision=="approve":
+        ensure_user_wallets(s,target.id)
+        wallet=s.scalar(select(UserWallet).where(UserWallet.user_id==target.id,UserWallet.currency==row.currency).with_for_update())
+        before=round(float(wallet.balance or 0),2)
+        if row.movement=="withdrawal" and before<float(row.amount): raise HTTPException(409,"رصيد المحفظة لم يعد كافياً لتنفيذ السحب")
+        wallet.balance=round(before+float(row.amount) if row.movement=="deposit" else before-float(row.amount),2)
+        wallet.updated_at=datetime.now(timezone.utc)
+        reason=("إيداع وافق عليه المالك بناءً على طلب المستخدم" if row.movement=="deposit" else "سحب نقدي نفذه المالك بناءً على طلب المستخدم")
+        tx=WalletTransaction(wallet_id=wallet.id,user_id=target.id,amount=row.amount,currency=row.currency,direction="in" if row.movement=="deposit" else "out",reason=(p.note or "").strip()[:500] or reason,reference_type="wallet_request",reference_id=row.id,created_by=u.id)
+        s.add(tx)
+        row.status="approved"
+    else:
+        row.status="rejected"
+    row.reviewed_by=u.id;row.reviewed_at=datetime.now(timezone.utc)
+    audit(s,u,"wallet_request_"+row.status,"wallet_request",row.id,{"user_id":target.id,"movement":row.movement,"amount":float(row.amount),"currency":row.currency,"review_note":(p.note or "").strip()[:500]},request)
+    s.commit()
+    return {"ok":True,"status":row.status}
 
 class WalletAdjustmentPayload(BaseModel):
     amount: float
