@@ -318,18 +318,57 @@ function aibDialog(message,{title='تنبيه من مجموعة AIB',confirm=fal
 async function issueUserCard(id){
  const u=(users||[]).find(x=>x.id===id);if(!u||u.role==='owner')return;
  const password=await aibPrompt('أدخل كلمة مرور جديدة للموظف (12 محرفاً على الأقل). سيتم اعتمادها فوراً وإظهارها على بطاقة الدخول المطبوعة.',{title:'إصدار بطاقة دخول',placeholder:'كلمة المرور الجديدة'});
- if(password===null)return;if(String(password).length<12){aibAlert('يجب أن تتكون كلمة المرور من 12 محرفاً على الأقل');return}
+ if(password===null)return;
+ if(String(password).length<12){aibAlert('يجب أن تتكون كلمة المرور من 12 محرفاً على الأقل');return}
  try{
   const result=await api('/users/'+id+'/password',{method:'PATCH',body:{password:String(password)}});
   const p=document.getElementById('print');
-  p.innerHTML="<section style='width:92mm;min-height:58mm;margin:12mm auto;padding:7mm;border:1px solid #b8c8d4;border-top:4mm solid #247b91;border-radius:4mm;background:#fff;color:#173b5e;font-family:Tahoma,Arial,sans-serif;box-sizing:border-box;direction:rtl'>"+
-   "<div style='display:flex;align-items:center;gap:5mm;border-bottom:1px solid #d9e3e9;padding-bottom:3mm'><img src='/aib-logo.png?v=20261113-aib2' alt='AIB' style='width:25mm;height:18mm;object-fit:contain'><div><b style='font-size:15px'>مجموعة AIB التجارية</b><div style='font-size:9px;color:#607583'>بطاقة دخول نظام المحاسبة</div></div></div>"+
-   "<div style='padding-top:3mm;display:grid;gap:2mm;font-size:11px'><div><b>الاسم الكامل:</b> "+esc(result.full_name||u.name)+"</div>"+
-   "<div><b>اسم المستخدم:</b> <span dir='ltr'>"+esc(result.username||u.username)+"</span></div>"+
-   "<div><b>البريد الإلكتروني:</b> <span dir='ltr'>"+esc(result.email||'غير مضاف')+"</span></div>"+
-   "<div style='padding:2mm;background:#edf4f8;border-radius:2mm'><b>كلمة المرور:</b> <span dir='ltr' style='font-weight:900'>"+esc(password)+"</span></div></div>"+
-   "<div style='margin-top:3mm;font-size:8px;color:#647987'>يرجى حفظ البطاقة وعدم مشاركتها مع أي شخص.</div></section>";
-  window.print();await renderPage('users');
+  const fullName=esc(result.full_name||u.name||'—');
+  const username=esc(result.username||u.username||'—');
+  const email=esc(result.email||'غير مضاف');
+  const safePassword=esc(password);
+  let card=`
+   <section class="aib-employee-print-card" dir="rtl" style="width:90mm;min-height:58mm;margin:8mm auto;padding:0;overflow:hidden;box-sizing:border-box;border:1px solid #aeb8c2;border-radius:4mm;background:#fff;color:#202a33;font-family:Tahoma,Arial,sans-serif;box-shadow:0 2mm 5mm rgba(18,32,44,.12);-webkit-print-color-adjust:exact;print-color-adjust:exact">
+    <div style="height:3mm;background:linear-gradient(90deg,#242b32 0%,#53616d 55%,#e87536 82%,#3197ce 100%)"></div>
+    <header style="display:flex;align-items:center;gap:4mm;padding:3.5mm 5mm 2.8mm;background:linear-gradient(135deg,#202830,#35434e);color:#fff">
+     <img src="/aib-logo.png?v=20261113-aib2" alt="شعار AIB" style="display:block;width:27mm;height:17mm;object-fit:contain;object-position:center;background:transparent;flex:0 0 auto">
+     <div style="min-width:0;flex:1">
+      <div style="font-size:14px;font-weight:900;letter-spacing:.2px;white-space:nowrap">مجموعة AIB التجارية</div>
+      <div style="font-size:9px;color:#d5dde3;margin-top:1.2mm">بطاقة دخول نظام المحاسبة</div>
+      <div style="width:18mm;height:1mm;margin-top:2mm;border-radius:2mm;background:linear-gradient(90deg,#ed783c,#55a9d6)"></div>
+     </div>
+     <div style="align-self:flex-start;border:1px solid #83909a;border-radius:2mm;padding:1mm 2mm;font-size:7px;color:#e9edf0;white-space:nowrap">AIB · STAFF</div>
+    </header>
+    <div style="padding:3mm 5mm 2mm">
+     <div style="display:grid;grid-template-columns:1fr 1fr;gap:2mm 4mm;font-size:9px">
+      <div style="min-width:0;border-right:1mm solid #e87536;padding-right:2mm"><div style="font-size:7px;color:#78848d;margin-bottom:.7mm">الاسم الكامل</div><div style="font-size:10px;font-weight:800;overflow-wrap:anywhere">__FULLNAME__</div></div>
+      <div style="min-width:0;border-right:1mm solid #3197ce;padding-right:2mm"><div style="font-size:7px;color:#78848d;margin-bottom:.7mm">اسم المستخدم</div><div dir="ltr" style="text-align:right;font-size:10px;font-weight:800;overflow-wrap:anywhere">__USERNAME__</div></div>
+      <div style="grid-column:1/-1;min-width:0;border-top:1px solid #e3e7ea;padding-top:1.7mm"><div style="font-size:7px;color:#78848d;margin-bottom:.5mm">البريد الإلكتروني</div><div dir="ltr" style="text-align:right;font-size:9px;font-weight:700;overflow-wrap:anywhere">__EMAIL__</div></div>
+     </div>
+     <div style="display:flex;align-items:center;justify-content:space-between;gap:3mm;margin-top:2.5mm;padding:2mm 3mm;border:1px solid #d5dde3;border-radius:2mm;background:#f1f4f6">
+      <div><div style="font-size:7px;color:#697781;margin-bottom:.5mm">كلمة المرور المؤقتة</div><div dir="ltr" style="font-size:11px;font-weight:900;letter-spacing:.35px;overflow-wrap:anywhere">__PASSWORD__</div></div>
+      <div style="font-size:7px;color:#65727c;text-align:left;white-space:nowrap">بيانات سرية<br>للاستخدام الشخصي</div>
+     </div>
+    </div>
+    <footer style="display:flex;justify-content:space-between;align-items:center;gap:3mm;padding:1.8mm 5mm;background:#e9eef1;border-top:1px solid #d5dde3;font-size:7px;color:#596772">
+     <span>يرجى الحفاظ على سرية بيانات الدخول</span><strong style="color:#344653;letter-spacing:.7px">AIB TRADING GROUP</strong>
+    </footer>
+   </section>
+   <style>
+    @page{size:auto;margin:8mm}
+    @media print{
+     body{background:#fff!important}
+     body *{visibility:hidden!important}
+     #print,#print *{visibility:visible!important}
+     #print{display:block!important;position:absolute!important;inset:0 auto auto 0!important;width:100%!important;margin:0!important;padding:0!important;background:#fff!important}
+     #print .aib-employee-print-card{margin:0 auto!important;box-shadow:none!important;break-inside:avoid;page-break-inside:avoid}
+    }
+   </style>`;
+  card=card.replace('__FULLNAME__',fullName).replace('__USERNAME__',username).replace('__EMAIL__',email).replace('__PASSWORD__',safePassword);
+  p.innerHTML=card;
+  const logo=p.querySelector('img');
+  const doPrint=()=>{window.print();setTimeout(()=>renderPage('users'),250)};
+  if(logo&&!logo.complete){logo.onload=doPrint;logo.onerror=doPrint}else doPrint();
  }catch(e){aibAlert(e.message)}
 }
 function normalizeEmployeeEmailCode(value){return Array.from(String(value??'').normalize('NFKC')).map(ch=>{const n=ch.codePointAt(0);if(n>=48&&n<=57)return String(n-48);if(n>=1632&&n<=1641)return String(n-1632);if(n>=1776&&n<=1785)return String(n-1776);if(n>=65296&&n<=65305)return String(n-65296);return ''}).join('')}
