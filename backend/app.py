@@ -1893,7 +1893,7 @@ def confirm_outside_store_commission(record_id:int,p:OwnerCommissionConfirmPaylo
 @app.post("/audit-log/print")
 def audit_invoice_print(request:Request, record_id:int, invoice_no:str="", section:str="", s:Session=Depends(db), u:User=Depends(require_permission("invoices","print"))):
     record=s.get(Record,record_id)
-    if not record or record.deleted or (u.role!="owner" and record.created_by!=u.id): raise HTTPException(404,"الفاتورة غير موجودة أو لا تملك صلاحية طباعتها")
+    if not record or record.deleted or (u.role!="owner" and (record.created_by!=u.id or record.section in {"deposit","consignSale"})): raise HTTPException(404,"الفاتورة غير موجودة أو لا تملك صلاحية طباعتها")
     data=record.data if isinstance(record.data,dict) else {}
     if u.role!="owner" and data.get("outside_store_sale") and (data.get("owner_commission") or {}).get("status")!="paid":
         raise HTTPException(403,"لا يمكن طباعة فاتورة البيع خارج المتجر قبل أن يؤكد المالك تسديد عمولته البالغة 1.5٪")
@@ -1917,7 +1917,7 @@ class RecordUpdate(BaseModel):
 @app.patch("/records/{record_id}")
 def update_record(record_id:int, p:RecordUpdate, request:Request, s:Session=Depends(db), u:User=Depends(require_permission("invoices","edit"))):
     r=s.get(Record,record_id)
-    if not r or r.deleted or (u.role!="owner" and r.created_by!=u.id): raise HTTPException(404,"السجل غير موجود")
+    if not r or r.deleted or (u.role!="owner" and (r.created_by!=u.id or r.section in {"deposit","consignSale"})): raise HTTPException(404,"السجل غير موجود")
     if p.currency not in ("USD","SYP"): raise HTTPException(400,"عملة غير مدعومة")
     if isinstance(r.data,dict) and r.data.get("outside_store_sale"):
         if (r.data.get("owner_commission") or {}).get("status")=="paid":
@@ -1954,7 +1954,7 @@ def sale_cash_moves_for_record(s:Session, record:Record):
 @app.delete("/records/{record_id}")
 def delete_record(record_id:int, request:Request, s:Session=Depends(db), u:User=Depends(require_permission("invoices","delete"))):
     r=s.get(Record,record_id)
-    if not r or r.deleted or (u.role!="owner" and r.created_by!=u.id): raise HTTPException(404,"السجل غير موجود")
+    if not r or r.deleted or (u.role!="owner" and (r.created_by!=u.id or r.section in {"deposit","consignSale"})): raise HTTPException(404,"السجل غير موجود")
     if (r.data or {}).get("outside_store_sale"):
         if ((r.data or {}).get("owner_commission") or {}).get("status")=="paid":
             raise HTTPException(409,"لا يمكن حذف فاتورة بعد تسديد عمولة المالك وإضافتها إلى محفظته")
@@ -1983,6 +1983,8 @@ def my_requests(s:Session=Depends(db),u:User=Depends(current_user)):
     out=[]
     for x in rows:
         rec=s.get(Record,x.record_id)
+        if u.role!="owner" and rec and rec.section in {"deposit","consignSale"}:
+            continue
         out.append({"id":x.id,"record_id":x.record_id,"section":rec.section if rec else None,"invoice_no":rec.invoice_no if rec else None,"action":x.action,"proposed_data":x.proposed_data,"reason":x.reason,"status":x.status,"created_at":x.created_at})
     return out
 
