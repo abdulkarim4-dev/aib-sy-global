@@ -2065,6 +2065,11 @@ class WalletRequestReviewPayload(BaseModel):
     decision: str
     note: str = ""
 
+@app.get("/my-wallet/requests")
+def list_my_wallet_requests(s:Session=Depends(db),u:User=Depends(current_user)):
+    rows=s.scalars(select(WalletRequest).where(WalletRequest.user_id==u.id).order_by(WalletRequest.id.desc()).limit(100)).all()
+    return [{"id":r.id,"movement":r.movement,"amount":float(r.amount),"currency":r.currency,"note":r.note,"review_note":r.review_note,"status":r.status,"created_at":r.created_at.isoformat() if r.created_at else None,"reviewed_at":r.reviewed_at.isoformat() if r.reviewed_at else None} for r in rows]
+
 @app.post("/my-wallet/requests")
 def create_wallet_request(p:WalletRequestPayload,request:Request,s:Session=Depends(db),u:User=Depends(current_user)):
     movement=str(p.movement or "").strip()
