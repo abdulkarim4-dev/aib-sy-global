@@ -1488,31 +1488,12 @@ def create_record(p:RecordCreate, request:Request, s:Session=Depends(db), u:User
         seller_net=round(commission_base-commission_amount,2)
         if seller_net<0: raise HTTPException(400,"تعذر احتساب صافي مستحقات المستخدم")
         prepared_data["outside_store_sale"]=True
-        prepared_data["owner_commission"]={"rate":0.015,"base_amount":commission_base,"amount":commission_amount,"seller_net":seller_net,"currency":p.currency,"status":"paid","paid_at":datetime.now(timezone.utc).isoformat(),"paid_by":None,"note":"اقتطاع تلقائي عند تسجيل البيع"}
+        prepared_data["owner_commission"]={"rate":0.015,"base_amount":commission_base,"amount":commission_amount,"seller_net":seller_net,"currency":p.currency,"status":"pending","payment_status":"awaiting_payment","payment_method":None,"payment_reference":None,"payment_submitted_at":None,"paid_at":None,"paid_by":None,"note":"بانتظار تحويل عمولة المالك وتأكيد الاستلام"}
     consume_operation_verification(s,u,"invoice_create",p.verification_token)
     r=Record(section=p.section,invoice_no=invoice_no,currency=p.currency,data=prepared_data,created_by=u.id)
     s.add(r); s.flush()
-    if employee_sale:
-        owner=s.scalar(select(User).where(User.role=="owner",User.deleted.is_(False)).order_by(User.id).limit(1))
-        if not owner: raise HTTPException(500,"تعذر العثور على حساب المالك لتسجيل عمولة البيع")
-        ensure_user_wallets(s,u.id)
-        ensure_user_wallets(s,owner.id)
-        seller_wallet=s.scalar(select(UserWallet).where(UserWallet.user_id==u.id,UserWallet.currency==p.currency).with_for_update())
-        owner_wallet=s.scalar(select(UserWallet).where(UserWallet.user_id==owner.id,UserWallet.currency==p.currency).with_for_update())
-        if not seller_wallet or not owner_wallet: raise HTTPException(500,"تعذر تجهيز محافظ البيع بالعملة المحددة")
-        now=datetime.now(timezone.utc)
-        seller_wallet.balance=float(seller_wallet.balance or 0)+seller_net
-        seller_wallet.updated_at=now
-        owner_wallet.balance=float(owner_wallet.balance or 0)+commission_amount
-        owner_wallet.updated_at=now
-        seller_tx=WalletTransaction(wallet_id=seller_wallet.id,user_id=u.id,amount=seller_net,currency=p.currency,direction="in",reason="صافي عائد بيع منتجات المخزون · "+str(r.invoice_no or r.id),reference_type="inventory_sale_net",reference_id=r.id,created_by=u.id)
-        owner_tx=WalletTransaction(wallet_id=owner_wallet.id,user_id=owner.id,amount=commission_amount,currency=p.currency,direction="in",reason="عمولة المالك 1.5٪ من بيع المستخدم · "+str(r.invoice_no or r.id),reference_type="inventory_sale_commission",reference_id=r.id,created_by=u.id)
-        s.add_all([seller_tx,owner_tx]); s.flush()
-        prepared_data["owner_commission"]["wallet_transaction_id"]=owner_tx.id
-        prepared_data["seller_wallet_credit"]={"amount":seller_net,"currency":p.currency,"wallet_transaction_id":seller_tx.id}
-        r.data=prepared_data
     recalculate_inventory(s)
-    audit(s,u,"record_created","record",r.id,{"section":r.section,"invoice_no":r.invoice_no,"seller_wallet_credit":seller_net if employee_sale else 0,"owner_commission":commission_amount if employee_sale else 0,"currency":p.currency},request)
+    audit(s,u,"record_created","record",r.id,{"section":r.section,"invoice_no":r.invoice_no,"seller_wallet_credit":0,"seller_wallet_credit_pending":seller_net if employee_sale else 0,"owner_commission":commission_amount if employee_sale else 0,"currency":p.currency},request)
     s.commit()
     # Invalidate shop catalog caches immediately after a stock-changing record.
     if p.section in {"purchase","carPurchase","deposit","directSale","consignSale"}:
@@ -1866,6 +1847,10 @@ def delete_cash_movement(move_id:int,request:Request,s:Session=Depends(db),u:Use
 class OwnerCommissionConfirmPayload(BaseModel):
     note: str = ""
 
+class OutsideStorePaymentPayload(BaseModel):
+    method: str
+    reference: str = Field(min_length=3,max_length=160)
+
 @app.get("/outside-store-sales/mine")
 def my_outside_store_sales(s:Session=Depends(db),u:User=Depends(current_user)):
     rows=s.scalars(select(Record).where(Record.created_by==u.id,Record.deleted.is_(False),Record.section=="directSale").order_by(Record.id.desc())).all()
@@ -1883,6 +1868,30 @@ def pending_outside_store_sales(s:Session=Depends(db),u:User=Depends(manager)):
             out.append({"id":r.id,"invoice_no":r.invoice_no,"currency":r.currency,"created_at":r.created_at,"seller":seller.full_name if seller else "—","username":seller.username if seller else "—","commission":commission,"items":data.get("items",[])})
     return out
 
+@app.post("/outside-store-sales/{record_id}/submit-payment")
+def submit_outside_store_payment(record_id:int,p:OutsideStorePaymentPayload,request:Request,s:Session=Depends(db),u:User=Depends(current_user)):
+    if p.method not in {"baraka_bank","sham_cash","syriatel_cash"}:
+        raise HTTPException(400,"طريقة الدفع غير مدعومة")
+    payment_reference=p.reference.strip()
+    if len(payment_reference)<3:
+        raise HTTPException(400,"مرجع التحويل غير صالح")
+    record=s.scalar(select(Record).where(Record.id==record_id).with_for_update())
+    if not record or record.deleted or record.created_by!=u.id or record.section!="directSale" or not (record.data or {}).get("outside_store_sale"):
+        raise HTTPException(404,"عملية البيع خارج المتجر غير موجودة")
+    data=dict(record.data or {})
+    commission=dict(data.get("owner_commission") or {})
+    if commission.get("status")=="paid":
+        raise HTTPException(409,"تم تأكيد الدفع لهذه العملية مسبقاً")
+    if commission.get("payment_status")=="submitted":
+        raise HTTPException(409,"تم إرسال بيانات الدفع بالفعل، وهي بانتظار مراجعة المالك")
+    commission.update({"payment_status":"submitted","payment_method":p.method,"payment_reference":payment_reference,"payment_submitted_at":datetime.now(timezone.utc).isoformat()})
+    data["owner_commission"]=commission
+    record.data=data
+    record.updated_at=datetime.now(timezone.utc)
+    audit(s,u,"outside_store_commission_payment_submitted","record",record.id,{"invoice_no":record.invoice_no,"amount":commission.get("amount"),"currency":record.currency,"method":p.method,"reference":payment_reference},request)
+    s.commit()
+    return {"ok":True,"payment_status":"submitted"}
+
 @app.post("/outside-store-sales/{record_id}/confirm-commission")
 def confirm_outside_store_commission(record_id:int,p:OwnerCommissionConfirmPayload,request:Request,s:Session=Depends(db),u:User=Depends(manager)):
     record=s.scalar(select(Record).where(Record.id==record_id).with_for_update())
@@ -1892,22 +1901,34 @@ def confirm_outside_store_commission(record_id:int,p:OwnerCommissionConfirmPaylo
     commission=dict(data.get("owner_commission") or {})
     if commission.get("status")=="paid":
         raise HTTPException(409,"تم تأكيد تسديد عمولة هذه الفاتورة مسبقاً")
+    if commission.get("payment_status")!="submitted" or not commission.get("payment_reference"):
+        raise HTTPException(409,"لا يمكن تأكيد الدفعة قبل أن يرسل المستخدم بيانات التحويل")
     amount=round(float(commission.get("amount") or 0),2)
-    if amount<=0: raise HTTPException(409,"قيمة العمولة غير صالحة؛ لا يمكن اعتمادها")
+    seller_net=round(float(commission.get("seller_net") or 0),2)
+    if amount<=0 or seller_net<0: raise HTTPException(409,"قيمة العمولة أو مستحقات المستخدم غير صالحة")
+    seller=s.get(User,record.created_by)
+    if not seller or seller.deleted: raise HTTPException(409,"حساب المستخدم صاحب عملية البيع غير متاح")
     ensure_user_wallets(s,u.id)
+    ensure_user_wallets(s,seller.id)
     owner_wallet=s.scalar(select(UserWallet).where(UserWallet.user_id==u.id,UserWallet.currency==record.currency).with_for_update())
-    if not owner_wallet: raise HTTPException(500,"تعذر تجهيز محفظة المالك بعملة الفاتورة")
+    seller_wallet=s.scalar(select(UserWallet).where(UserWallet.user_id==seller.id,UserWallet.currency==record.currency).with_for_update())
+    if not owner_wallet or not seller_wallet: raise HTTPException(500,"تعذر تجهيز المحافظ بعملة الفاتورة")
+    now=datetime.now(timezone.utc)
     owner_wallet.balance=float(owner_wallet.balance or 0)+amount
-    owner_wallet.updated_at=datetime.now(timezone.utc)
-    wallet_tx=WalletTransaction(wallet_id=owner_wallet.id,user_id=u.id,amount=amount,currency=record.currency,direction="in",reason="عمولة بيع خارج المتجر · "+str(record.invoice_no or record.id),reference_type="outside_store_commission",reference_id=record.id,created_by=u.id)
-    s.add(wallet_tx);s.flush()
-    commission.update({"status":"paid","paid_at":datetime.now(timezone.utc).isoformat(),"paid_by":u.id,"note":p.note.strip()[:500],"wallet_transaction_id":wallet_tx.id})
+    owner_wallet.updated_at=now
+    seller_wallet.balance=float(seller_wallet.balance or 0)+seller_net
+    seller_wallet.updated_at=now
+    owner_tx=WalletTransaction(wallet_id=owner_wallet.id,user_id=u.id,amount=amount,currency=record.currency,direction="in",reason="عمولة بيع خارج المتجر · "+str(record.invoice_no or record.id),reference_type="outside_store_commission",reference_id=record.id,created_by=u.id)
+    seller_tx=WalletTransaction(wallet_id=seller_wallet.id,user_id=seller.id,amount=seller_net,currency=record.currency,direction="in",reason="صافي مستحق بيع خارج المتجر · "+str(record.invoice_no or record.id),reference_type="outside_store_sale_net",reference_id=record.id,created_by=u.id)
+    s.add_all([owner_tx,seller_tx]);s.flush()
+    commission.update({"status":"paid","payment_status":"confirmed","paid_at":now.isoformat(),"paid_by":u.id,"note":p.note.strip()[:500],"wallet_transaction_id":owner_tx.id,"seller_wallet_transaction_id":seller_tx.id})
     data["owner_commission"]=commission
+    data["seller_wallet_credit"]={"amount":seller_net,"currency":record.currency,"wallet_transaction_id":seller_tx.id}
     record.data=data
-    record.updated_at=datetime.now(timezone.utc)
-    audit(s,u,"owner_commission_payment_confirmed","record",record.id,{"invoice_no":record.invoice_no,"commission_amount":amount,"currency":record.currency,"rate":0.015,"seller_id":record.created_by,"owner_wallet_id":owner_wallet.id,"wallet_transaction_id":wallet_tx.id,"note":commission["note"]},request)
+    record.updated_at=now
+    audit(s,u,"owner_commission_payment_confirmed","record",record.id,{"invoice_no":record.invoice_no,"commission_amount":amount,"seller_net":seller_net,"currency":record.currency,"rate":0.015,"seller_id":seller.id,"owner_wallet_id":owner_wallet.id,"seller_wallet_id":seller_wallet.id,"owner_wallet_transaction_id":owner_tx.id,"seller_wallet_transaction_id":seller_tx.id,"payment_method":commission.get("payment_method"),"payment_reference":commission.get("payment_reference"),"note":commission["note"]},request)
     s.commit()
-    return {"ok":True,"record_id":record.id,"status":"paid","amount":amount,"currency":record.currency}
+    return {"ok":True,"record_id":record.id,"status":"paid","seller_credit":seller_net,"amount":amount,"currency":record.currency}
 
 @app.post("/audit-log/print")
 def audit_invoice_print(request:Request, record_id:int, invoice_no:str="", section:str="", s:Session=Depends(db), u:User=Depends(require_permission("invoices","print"))):
