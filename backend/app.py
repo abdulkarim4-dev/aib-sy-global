@@ -1269,17 +1269,27 @@ def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=
     # Only show products referenced by at least one non-deleted invoice record.
     # A product whose only invoice was deleted is hidden as well; no rows or
     # stock values are deleted or modified by this display filter.
-    invoiced_skus=set()
-    invoice_rows=s.scalars(select(Record).where(Record.deleted.is_(False))).all()
-    for record in invoice_rows:
-        record_items=(record.data or {}).get("items",[]) if isinstance(record.data,dict) else []
-        if not isinstance(record_items,list): continue
-        for item in record_items:
-            if isinstance(item,dict) and item.get("sku"):
-                invoiced_skus.add(str(item["sku"]).strip().upper())
+    # Extract only invoice SKUs in PostgreSQL instead of loading every full invoice
+    # (including unrelated fields) into Python whenever inventory is opened.
+    invoiced_skus={
+        str(value).strip().upper()
+        for value in s.execute(text("""
+            SELECT DISTINCT UPPER(BTRIM(item->>'sku'))
+            FROM records AS r
+            CROSS JOIN LATERAL jsonb_array_elements(
+                CASE
+                    WHEN jsonb_typeof(CAST(r.data AS JSONB)->'items')='array'
+                    THEN CAST(r.data AS JSONB)->'items'
+                    ELSE '[]'::jsonb
+                END
+            ) AS item
+            WHERE r.deleted IS FALSE
+              AND NULLIF(BTRIM(item->>'sku'),'') IS NOT NULL
+        """)).scalars().all()
+    }
     rows=[p for p in rows if (u.role!="owner" and p.owner_user_id==u.id) or str(p.sku or "").strip().upper() in invoiced_skus]
     store_categories,latest_purchase=latest_store_catalog_data(s)
-    return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owner_user_id":p.owner_user_id,"condition":p.condition or "new","opening_quantity":float(p.opening_quantity or 0),"store_family":p.store_family,"store_category":p.store_category,"owned_stock":float(p.owned_stock or 0),"consigned_stock":float(p.consigned_stock or 0),"images":p.images or [],"shipping_included":bool(p.shipping_included),"video_url":p.video_url or "",**store_categories.get(p.sku,{}),**latest_purchase.get(p.sku,{"purchase_price":0,"sale_price":0,"currency":"—"}),"sale_price":float(p.sale_price) if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("sale_price"),"sale_currency":p.sale_currency if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("currency","")} for p in rows]
+    return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owner_user_id":p.owner_user_id,"condition":p.condition or "new","opening_quantity":float(p.opening_quantity or 0),"store_family":p.store_family,"store_category":p.store_category,"owned_stock":float(p.owned_stock or 0),"consigned_stock":float(p.consigned_stock or 0),"image_count":len(p.images or []),"shipping_included":bool(p.shipping_included),"video_url":p.video_url or "",**store_categories.get(p.sku,{}),**latest_purchase.get(p.sku,{"purchase_price":0,"sale_price":0,"currency":"—"}),"sale_price":float(p.sale_price) if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("sale_price"),"sale_currency":p.sale_currency if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("currency","")} for p in rows]
 
 class InventoryProductUpdate(BaseModel):
     name: str=Field(min_length=2,max_length=240)
@@ -1354,6 +1364,34 @@ def delete_inventory_product(product_id:int,request:Request,s:Session=Depends(db
 class InventoryImagesPayload(BaseModel):
     images: list[str] = Field(default_factory=list, max_length=20)
 
+@app.get("/inventory/products/{product_id}/images")
+def get_inventory_product_images(product_id:int, s:Session=Depends(db), u:User=Depends(require_permission("inventory","view"))):
+    product=s.get(InventoryProduct,product_id)
+    if not product or not product.active or (u.role!="owner" and product.owner_user_id!=u.id):
+        raise HTTPException(404,"القطعة غير موجودة في مخزون حسابك")
+    return {"images":product.images or [],"count":len(product.images or [])}
+
+@app.get("/public/products/{product_id}/image/{image_index}")
+def get_public_product_image(product_id:int,image_index:int,s:Session=Depends(db)):
+    product=s.get(InventoryProduct,product_id)
+    if not product or not product.active:
+        raise HTTPException(404,"الصورة غير موجودة")
+    images=product.images or []
+    if image_index<0 or image_index>=len(images):
+        raise HTTPException(404,"الصورة غير موجودة")
+    image_data=images[image_index]
+    if not isinstance(image_data,str) or "," not in image_data:
+        raise HTTPException(404,"الصورة غير صالحة")
+    header,encoded=image_data.split(",",1)
+    media_type={"data:image/jpeg;base64":"image/jpeg","data:image/png;base64":"image/png","data:image/webp;base64":"image/webp"}.get(header)
+    if not media_type:
+        raise HTTPException(404,"صيغة الصورة غير مدعومة")
+    try:
+        raw=base64.b64decode(encoded,validate=True)
+    except (binascii.Error,ValueError):
+        raise HTTPException(404,"بيانات الصورة غير صالحة")
+    return Response(content=raw,media_type=media_type,headers={"Cache-Control":"public, max-age=60"})
+
 class InventoryShippingPayload(BaseModel):
     included: bool = False
 
@@ -1397,7 +1435,9 @@ def update_inventory_product_images(product_id:int, p:InventoryImagesPayload, re
     product.images=p.images
     audit(s,u,"inventory_images_updated","inventory_product",product.id,{"sku":product.sku,"image_count":len(p.images)},request)
     s.commit()
-    return {"ok":True,"images":product.images,"count":len(product.images)}
+    _public_products_cache["value"].clear()
+    _public_products_cache["at"].clear()
+    return {"ok":True,"count":len(product.images or [])}
 
 class RecordCreate(BaseModel): section:str; invoice_no:Optional[str]=None; currency:str="USD"; data:dict; verification_token:Optional[str]=None
 @app.post("/records")
@@ -2627,7 +2667,7 @@ def public_products(q:Optional[str]=None, category:Optional[str]=None, s:Session
                 continue
         stock=float(p.owned_stock or 0)+float(p.consigned_stock or 0)
         price=latest_purchase.get(p.sku,{})
-        out.append({"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"category":cat,"stock":stock,"condition":p.condition or "new","images":p.images or [],"video_url":p.video_url or "","shipping_included":bool(p.shipping_included),"vehicle_details":store_categories.get(p.sku,{}).get("vehicle_details",{}),"sale_price":float(p.sale_price) if p.sale_price is not None else price.get("sale_price"),"currency":p.sale_currency if p.sale_price is not None else price.get("currency","")})
+        out.append({"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"category":cat,"stock":stock,"condition":p.condition or "new","images":[f"/public/products/{p.id}/image/{i}?v={int(now*1000)}" for i in range(len(p.images or []))],"video_url":p.video_url or "","shipping_included":bool(p.shipping_included),"vehicle_details":store_categories.get(p.sku,{}).get("vehicle_details",{}),"sale_price":float(p.sale_price) if p.sale_price is not None else price.get("sale_price"),"currency":p.sale_currency if p.sale_price is not None else price.get("currency","")})
     # Bound memory and retain only a short freshness window so stock/price edits appear quickly.
     if len(_public_products_cache["value"])>=_PUBLIC_PRODUCTS_CACHE_MAX:
         _public_products_cache["value"].clear();_public_products_cache["at"].clear()
