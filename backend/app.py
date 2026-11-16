@@ -2695,16 +2695,25 @@ def delete_online_purchase_order(order_id:int,s:Session=Depends(db),u:User=Depen
     return {"ok":True,"deleted_order_id":order_id}
 
 @app.get("/online-purchase-orders")
-def list_online_purchase_orders(s:Session=Depends(db),u:User=Depends(manager)):
+def list_online_purchase_orders(s:Session=Depends(db),u:User=Depends(current_user)):
     owner_phone="+963 997 439 627"
     rows=s.scalars(select(OnlinePurchaseOrder).order_by(OnlinePurchaseOrder.id.desc())).all()
     result=[]
     for o in rows:
         customer=dict(o.customer_data or {})
+        order_items=list(o.items or [])
         if u.role!="owner":
-            for key in ("phone","full_phone","phone_number","phone_country_code","phone_country"):
-                customer.pop(key,None)
-        result.append({"id":o.id,"customer":customer,"owner_phone":owner_phone,"items":o.items,"total":float(o.total),"currency":o.currency,"payment_proof":o.payment_proof,"proof_type":o.proof_type,"status":o.status,"record_id":o.record_id,"review_note":o.review_note,"created_at":o.created_at})
+            # Sellers can see only orders containing their own inventory, and only their own sold lines.
+            seller_lines=[]
+            for item in order_items:
+                product=s.scalar(select(InventoryProduct).where(InventoryProduct.sku==str(item.get("sku") or "").strip().upper()))
+                if product and product.owner_user_id==u.id:
+                    seller_lines.append(item)
+            if not seller_lines or o.status not in {"approved","shipping","delivered"}:
+                continue
+            order_items=seller_lines
+            customer={k:customer.get(k) for k in ("first_name","last_name","full_name","email","shipping_address","full_phone") if customer.get(k) is not None}
+        result.append({"id":o.id,"customer":customer,"owner_phone":owner_phone,"items":order_items,"total":float(o.total),"currency":o.currency,"payment_proof":o.payment_proof if u.role=="owner" else None,"proof_type":o.proof_type,"status":o.status,"record_id":o.record_id,"invoice_no":(s.get(Record,o.record_id).invoice_no if o.record_id and s.get(Record,o.record_id) else None),"review_note":o.review_note,"created_at":o.created_at})
     return result
 
 class OnlineOrderReviewPayload(BaseModel):
@@ -2795,6 +2804,32 @@ def review_online_purchase_order(order_id:int,p:OnlineOrderReviewPayload,s:Sessi
     approval_body=f"تم اعتماد طلب الشراء رقم #{order.id} بعد مراجعة إثبات الدفع.\\nرقم فاتورة المبيع: {record.invoice_no}\\nالإجمالي: {float(order.total):.2f} {order.currency}"
     approval_html=aib_email_html("تم اعتماد طلبك بنجاح",f"مرحباً {(order.customer_data or {}).get('full_name','')}، تمت مراجعة إثبات الدفع واعتماد طلبك. شكراً لثقتك بمجموعة AIB.",[("رقم الطلب",f"#{order.id}"),("رقم الفاتورة",html.escape(record.invoice_no)),("الإجمالي",f"{float(order.total):.2f} {html.escape(order.currency)}"),("الحالة","تم اعتماد الطلب")],accent="#168447",note="احتفظ برقم الفاتورة لمتابعة طلبك. سيقوم فريقنا بالتواصل معك بشأن التسليم.")
     send_notification_email(customer_email,f"تم اعتماد طلب الشراء #{order.id} - مجموعة AIB",approval_body,approval_html)
+    # Notify each actual product owner only after the payment approval and wallet settlement have committed.
+    buyer=dict(order.customer_data or {})
+    for seller_id,amounts in seller_totals.items():
+        seller=s.get(User,seller_id)
+        if not seller or not (seller.email or "").strip():
+            continue
+        seller_lines=[line for line in allocated_items if line.get("owner_user_id")==seller_id and float(line.get("user_owned_quantity") or 0)>0]
+        seller_item_text="\\n".join(f"- {line['description']} ({line['sku']}) × {float(line['user_owned_quantity']):g} = {float(line['user_owned_quantity'])*float(line['price']):.2f} {order.currency}" for line in seller_lines)
+        buyer_name=str(buyer.get("full_name") or (str(buyer.get("first_name") or "")+" "+str(buyer.get("last_name") or "")).strip())
+        buyer_phone=str(buyer.get("full_phone") or ((buyer.get("phone_country_code") or "")+(buyer.get("phone_number") or "")))
+        seller_body=(f"تم تأكيد الدفع للطلب الإلكتروني رقم #{order.id}.\\nرقم الفاتورة: {record.invoice_no}\\n"
+            f"اسم المستلم: {buyer_name}\\nعنوان المستلم: {buyer.get('shipping_address') or 'غير متوفر'}\\n"
+            f"رقم هاتف المستلم: {buyer_phone or 'غير متوفر'}\\nالمنتجات المباعة من مخزونك:\\n{seller_item_text}\\n"
+            f"إجمالي قيمة منتجاتك: {amounts['gross']:.2f} {order.currency}\\n"
+            f"عمولة المتجر 1.5٪: {amounts['commission']:.2f} {order.currency}\\n"
+            f"صافي المبلغ المضاف إلى محفظتك: {amounts['net']:.2f} {order.currency}")
+        seller_html=aib_email_html(f"تم بيع منتجاتك – الطلب #{order.id}",
+            "تم تأكيد الدفع بنجاح، وهذه تفاصيل المستلم والمنتجات التي بيعت من مخزونك.",
+            [("رقم الطلب",f"#{order.id}"),("رقم الفاتورة",html.escape(record.invoice_no)),
+             ("اسم المستلم",html.escape(buyer_name)),("عنوان المستلم",html.escape(str(buyer.get("shipping_address") or "غير متوفر"))),
+             ("هاتف المستلم",html.escape(buyer_phone or "غير متوفر")),("المنتجات المباعة",html.escape(seller_item_text).replace("\\n","<br>")),
+             ("إجمالي قيمة منتجاتك",f"{amounts['gross']:.2f} {html.escape(order.currency)}"),
+             ("عمولة المتجر 1.5٪",f"{amounts['commission']:.2f} {html.escape(order.currency)}"),
+             ("صافي المبلغ المضاف لمحفظتك",f"{amounts['net']:.2f} {html.escape(order.currency)}")],
+            accent="#168447",note="يمكنك مراجعة تفاصيل الطلب وطباعة إشعار البيع من صفحة طلبات الشراء عبر الإنترنت في تطبيق AIB.")
+        send_notification_email(seller.email,f"تم بيع منتج من مخزونك – طلب #{order.id} | AIB",seller_body,seller_html)
     return {"ok":True,"status":"approved","record_id":record.id,"invoice_no":record.invoice_no,"customer":order.customer_data}
 
 
