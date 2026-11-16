@@ -1295,7 +1295,7 @@ def edit_inventory_product(product_id:int,p:InventoryProductUpdate,request:Reque
     old_owned=float(product.owned_stock or 0)
     old_consigned=float(product.consigned_stock or 0)
     new_owned=float(p.owned_stock) if p.owned_stock is not None else old_owned
-    new_consigned=float(p.consigned_stock) if p.consigned_stock is not None else old_consigned
+    new_consigned=0.0 if u.role!="owner" else (float(p.consigned_stock) if p.consigned_stock is not None else old_consigned)
     stock_adjustment={"owned_delta":round(new_owned-old_owned,3),"consigned_delta":round(new_consigned-old_consigned,3)}
     before={"name":product.name,"model":product.model,"sale_price":float(product.sale_price) if product.sale_price is not None else None,"sale_currency":product.sale_currency,"condition":product.condition,"store_family":product.store_family,"store_category":product.store_category,"owned_stock":old_owned,"consigned_stock":old_consigned}
     product.owned_stock=new_owned
