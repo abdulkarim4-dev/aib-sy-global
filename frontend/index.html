@@ -662,11 +662,25 @@ window.renderItemRows=function(){
    const currency=document.querySelector('[name="currency"]');if(currency)currency.value=p.currency||p.sale_currency||'USD';
    renderItemRows();updateInvoiceGrandTotal();
   });
-  host.querySelectorAll('[data-outside-qty]').forEach(el=>el.addEventListener('input',()=>{
-   const i=Number(el.dataset.outsideQty),item=window.draftItems?.[i];if(!item)return;
-   item.quantity=Math.max(1,Math.min(Number(el.max)||1,Math.floor(Number(el.value)||1)));
-   el.value=item.quantity;updateInvoiceGrandTotal();
-  }));
+  host.querySelectorAll('[data-outside-qty]').forEach(el=>{
+   const applyQuantity=()=>{
+    const i=Number(el.dataset.outsideQty),item=window.draftItems?.[i];if(!item)return;
+    const available=Math.max(1,Number(el.max)||1);
+    const entered=el.value.trim()===''?1:Number(el.value);
+    item.quantity=Math.max(1,Math.min(available,Number.isFinite(entered)?Math.floor(entered):1));
+    el.value=String(item.quantity);updateInvoiceGrandTotal();
+   };
+   el.addEventListener('input',()=>{
+    const i=Number(el.dataset.outsideQty),item=window.draftItems?.[i];if(!item)return;
+    if(el.value.trim()==='')return;
+    const entered=Number(el.value);
+    if(Number.isFinite(entered)&&entered>=1&&entered<=Number(el.max||1)){
+     item.quantity=Math.floor(entered);updateInvoiceGrandTotal();
+    }
+   });
+   el.addEventListener('change',applyQuantity);
+   el.addEventListener('blur',applyQuantity);
+  });
   updateInvoiceGrandTotal();return;
  }
  const rowsUnused=window.draftItems||[],section=document.getElementById('sectionSel')?.value,isRepair=section==='repair';
