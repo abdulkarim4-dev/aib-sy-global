@@ -635,7 +635,7 @@ window.renderItemRows=function(){
   const readOnly=(label,value)=>'<div class="field outside-sale-readonly-field"><label>'+label+'</label><input type="text" value="'+esc(value!==undefined&&value!==null&&value!==''?String(value):'—')+'" readonly aria-readonly="true" tabindex="-1" autocomplete="off" class="readonly-value" style="min-height:40px;padding:10px 12px;border:1px solid var(--border,#555);border-radius:8px;background:#f7f8fa;color:#26323b;cursor:default;pointer-events:none"></div>';
   const cards=rows.map((item,i)=>{
    const p=products.find(x=>String(x.sku)===String(item.sku));if(!p)return '';
-   return '<div class="card outside-sale-product-card" style="grid-column:1/-1;margin:8px 0;padding:12px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><strong>المنتج '+(i+1)+'</strong><button type="button" class="btn danger" onclick="removeOutsideSaleProduct('+i+')">إزالة</button></div><div class="form-grid" style="margin-top:10px">'+readOnly('اسم القطعة',outsideProductName(p))+readOnly('رقم SKU',p.sku)+readOnly('مكان عرض المنتج — القسم الرئيسي',families[p.store_family]||p.store_family)+readOnly('مكان عرض المنتج — القسم الفرعي',categories[p.store_category]||p.store_category)+readOnly('معلومات المنتج / الموديل',p.model)+readOnly('حالة المنتج',p.condition==='used'?'مستعمل':'جديد')+readOnly('سعر البيع المعتمد',Number(p.sale_price||0)+' '+(p.currency||p.sale_currency||''))+readOnly('الكمية المتاحة',Number(p.owned_stock||0))+'<div class="field"><label>كمية البيع</label><input type="number" min="1" max="'+Number(p.owned_stock||0)+'" step="1" value="'+Number(item.quantity||1)+'" data-outside-qty="'+i+'"></div></div></div>';
+   return '<div class="card outside-sale-product-card" style="grid-column:1/-1;margin:8px 0;padding:12px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><strong>المنتج '+(i+1)+'</strong><button type="button" class="btn danger" onclick="removeOutsideSaleProduct('+i+')">إزالة</button></div><div class="form-grid" style="margin-top:10px">'+readOnly('اسم القطعة',outsideProductName(p))+readOnly('رقم SKU',p.sku)+readOnly('مكان عرض المنتج — القسم الرئيسي',families[p.store_family]||p.store_family)+readOnly('مكان عرض المنتج — القسم الفرعي',categories[p.store_category]||p.store_category)+readOnly('معلومات المنتج / الموديل',p.model)+readOnly('حالة المنتج',p.condition==='used'?'مستعمل':'جديد')+readOnly('سعر البيع المعتمد',Number(p.sale_price||0)+' '+(p.currency||p.sale_currency||''))+readOnly('الكمية المتاحة',Number(p.owned_stock||0))+'<div class="field"><label>كمية البيع</label><input type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="'+Number(item.quantity||1)+'" data-max-qty="'+Number(p.owned_stock||0)+'" data-outside-qty="'+i+'" aria-label="كمية البيع"></div></div></div>';
   }).join('');
   host.innerHTML='<div class="field outside-sale-picker" style="width:100%;position:relative"><label for="outsideSaleSearch">اختر اسم القطعة أو رقم SKU من المخزون</label><input id="outsideSaleSearch" type="text" autocomplete="off" placeholder="اضغط هنا لعرض المنتجات أو اكتب الاسم / SKU" aria-haspopup="listbox" aria-expanded="false"><div id="outsideSaleProductOptions" role="listbox" class="outside-sale-options hidden" style="position:absolute;z-index:30;top:100%;right:0;left:0;max-height:260px;overflow:auto;background:#202830;border:1px solid #53606c;border-radius:10px;box-shadow:0 12px 28px #0008;padding:6px"></div><div class="small muted">اضغط على الحقل لعرض المنتجات المتاحة، أو اكتب للبحث. يمكنك اختيار أكثر من منتج.</div><button type="button" class="btn primary" id="addOutsideSaleProduct" style="margin-top:8px">إضافة المنتج المحدد</button></div>'+(cards?'<div id="outsideSaleProductDetails" class="form-grid" style="margin-top:10px">'+cards+'</div>':'');
   const search=document.getElementById('outsideSaleSearch'),options=document.getElementById('outsideSaleProductOptions');
@@ -663,20 +663,24 @@ window.renderItemRows=function(){
    renderItemRows();updateInvoiceGrandTotal();
   });
   host.querySelectorAll('[data-outside-qty]').forEach(el=>{
+   const available=()=>Math.max(1,Number(el.dataset.maxQty)||1);
    const applyQuantity=()=>{
     const i=Number(el.dataset.outsideQty),item=window.draftItems?.[i];if(!item)return;
-    const available=Math.max(1,Number(el.max)||1);
-    const entered=el.value.trim()===''?1:Number(el.value);
-    item.quantity=Math.max(1,Math.min(available,Number.isFinite(entered)?Math.floor(entered):1));
-    el.value=String(item.quantity);updateInvoiceGrandTotal();
+    const raw=String(el.value||'').trim();
+    const entered=raw===''?1:Number(raw);
+    item.quantity=Math.max(1,Math.min(available(),Number.isFinite(entered)?Math.floor(entered):1));
+    el.value=String(item.quantity);
+    updateInvoiceGrandTotal();
    };
    el.addEventListener('input',()=>{
     const i=Number(el.dataset.outsideQty),item=window.draftItems?.[i];if(!item)return;
-    if(el.value.trim()==='')return;
-    const entered=Number(el.value);
-    if(Number.isFinite(entered)&&entered>=1&&entered<=Number(el.max||1)){
-     item.quantity=Math.floor(entered);updateInvoiceGrandTotal();
-    }
+    const raw=String(el.value||'').trim();
+    if(raw===''){item.quantity=1;updateInvoiceGrandTotal();return;}
+    if(!/^[0-9]+$/.test(raw))return;
+    const entered=Number(raw);
+    if(!Number.isSafeInteger(entered)||entered<1)return;
+    item.quantity=Math.min(entered,available());
+    updateInvoiceGrandTotal();
    });
    el.addEventListener('change',applyQuantity);
    el.addEventListener('blur',applyQuantity);
