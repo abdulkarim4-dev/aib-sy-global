@@ -280,7 +280,44 @@ async function adjustUserWallet(userId,currency,movement){
  if(!await aibConfirm((isDeposit?'تأكيد إيداع ':'تأكيد صرف نقدي وخصم ')+fmt(amount)+' '+currency+'؟','تأكيد حركة المحفظة',!isDeposit))return;
  try{await api('/users/'+userId+'/wallet/adjust',{method:'POST',body:{amount,currency,movement,description:description.trim()}});aibAlert(isDeposit?'تم الإيداع في محفظة المستخدم':'تم السحب وصرف المبلغ نقداً للمستخدم');await viewUserWallet(userId)}catch(e){aibAlert(e.message||'تعذّر تنفيذ حركة المحفظة')}
 }
-async function openWalletRequest(movement){const title=movement==='deposit'?'طلب إيداع':'طلب سحب';const amount=prompt(title+' — أدخل المبلغ:');if(amount===null)return;const currency=(prompt('اختر العملة: USD أو SYP','USD')||'').trim().toUpperCase();const note=prompt('ملاحظة (اختياري):','')||'';try{await api('/my-wallet/requests',{method:'POST',body:{movement,amount:Number(amount),currency,note}});aibAlert('تم إرسال '+title+' إلى المالك للمراجعة.');renderPage('wallets')}catch(e){aibAlert(e.message||'تعذر إرسال الطلب')}}
+function openWalletRequest(movement){
+ const isDeposit=movement==='deposit',title=isDeposit?'طلب إيداع':'طلب سحب',accent=isDeposit?'#16845b':'#c34b45';
+ document.getElementById('modalTitle').textContent=title+' · المحفظة';
+ document.getElementById('modalBody').innerHTML=`
+ <style>
+ .wallet-request{direction:rtl;color:#24313b}
+ .wallet-request-hero{display:flex;align-items:center;gap:13px;padding:15px;border:1px solid #dce6ee;border-radius:15px;background:linear-gradient(135deg,#f7fafc,#edf4f8);margin-bottom:16px}
+ .wallet-request-icon{width:48px;height:48px;flex:0 0 48px;border-radius:14px;display:grid;place-items:center;background:${accent}18;color:${accent};font-size:25px;font-weight:900}
+ .wallet-request-hero strong{display:block;font-size:16px;color:#203244;margin-bottom:4px}
+ .wallet-request-hero small{color:#71808c;line-height:1.7}
+ .wallet-request .field{margin:13px 0}
+ .wallet-request .field label{display:block;color:#344657;font-size:13px;font-weight:800;margin-bottom:7px}
+ .wallet-request input,.wallet-request select,.wallet-request textarea{width:100%;padding:13px 14px;border:1px solid #d4dee6;border-radius:11px;background:#fff;color:#1e2b36;outline:none;font:inherit}
+ .wallet-request input:focus,.wallet-request select:focus,.wallet-request textarea:focus{border-color:#328fcf;box-shadow:0 0 0 3px #328fcf20}
+ .wallet-request .amount-wrap{position:relative}.wallet-request .amount-wrap input{font-size:22px;font-weight:800;direction:ltr;text-align:right;padding-left:58px}
+ .wallet-request .amount-wrap span{position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:12px;color:#71808c;font-weight:800}
+ .wallet-request .hint{font-size:11px;color:#7a8791;line-height:1.7;margin-top:6px}
+ .wallet-request-actions{display:flex;gap:9px;margin-top:18px}.wallet-request-actions button{flex:1}
+ @media(max-width:520px){.wallet-request-actions{flex-direction:column}.wallet-request-hero{align-items:flex-start}}
+ </style>
+ <form class="wallet-request" id="walletRequestForm">
+  <div class="wallet-request-hero"><div class="wallet-request-icon">${isDeposit?'＋':'−'}</div><div><strong>${title}</strong><small>${isDeposit?'أدخل قيمة المبلغ الذي ترغب بإيداعه في محفظتك.':'أدخل المبلغ الذي ترغب بطلب سحبه نقداً من رصيد محفظتك.'}<br>سيصل الطلب إلى المالك للمراجعة، ولن يتغير رصيدك قبل الموافقة.</small></div></div>
+  <div class="field"><label for="walletRequestAmount">المبلغ المطلوب</label><div class="amount-wrap"><input id="walletRequestAmount" name="amount" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="0.00" required><span>المبلغ</span></div></div>
+  <div class="field"><label for="walletRequestCurrency">العملة</label><select id="walletRequestCurrency" name="currency"><option value="USD">دولار أمريكي · USD</option><option value="SYP">ليرة سورية · SYP</option></select></div>
+  <div class="field"><label for="walletRequestNote">ملاحظة إضافية <span style="font-weight:400;color:#89949c">(اختياري)</span></label><textarea id="walletRequestNote" name="note" rows="3" maxlength="500" placeholder="اكتب أي تفاصيل تساعد المالك على مراجعة الطلب..."></textarea></div>
+  <div class="wallet-request-actions"><button class="btn" type="submit" style="background:${accent};border-color:${accent}">إرسال الطلب</button><button class="btn secondary" type="button" onclick="closeModal()">إلغاء</button></div>
+ </form>`;
+ document.getElementById('modal').classList.remove('hidden');
+ const form=document.getElementById('walletRequestForm');
+ form.addEventListener('submit',async e=>{
+  e.preventDefault();const fd=new FormData(form),amount=Number(fd.get('amount')),currency=String(fd.get('currency')),note=String(fd.get('note')||'').trim();
+  if(!Number.isFinite(amount)||amount<=0){aibAlert('يرجى إدخال مبلغ صحيح أكبر من صفر');return}
+  const submit=form.querySelector('button[type="submit"]');submit.disabled=true;submit.textContent='جارٍ إرسال الطلب...';
+  try{await api('/my-wallet/requests',{method:'POST',body:{movement,amount,currency,note}});closeModal();aibAlert('تم إرسال '+title+' إلى المالك للمراجعة.');await renderPage('wallets')}
+  catch(err){submit.disabled=false;submit.textContent='إرسال الطلب';aibAlert(err.message||'تعذر إرسال الطلب')}
+ });
+ setTimeout(()=>document.getElementById('walletRequestAmount')?.focus(),80);
+}
 async function reviewWalletRequest(id,decision){const label=decision==='approve'?'الموافقة وتنفيذ الطلب':'رفض الطلب';if(!confirm('هل تريد '+label+'؟'))return;const note=prompt('ملاحظة للمستخدم (اختياري):','')||'';try{await api('/wallet-requests/'+id+'/review',{method:'POST',body:{decision,note}});aibAlert('تمت معالجة الطلب.');renderPage('wallets')}catch(e){aibAlert(e.message||'تعذرت معالجة الطلب')}}
 async function viewUserWallet(userId){try{const data=await api('/users/'+userId+'/wallet');document.getElementById('modalTitle').textContent='محفظة '+(data.name||data.username);document.getElementById('modalBody').innerHTML=(data.wallets||[]).map(w=>'<section class="card"><h3>محفظة '+esc(w.currency)+' · الرصيد '+fmt(w.balance)+'</h3>'+(me?.role==='owner'?'<div class="actions" style="margin:10px 0;display:flex;gap:8px;flex-wrap:wrap"><button class="btn success" onclick="adjustUserWallet('+userId+',\''+esc(w.currency)+'\',\'deposit\')">＋ إيداع '+esc(w.currency)+'</button><button class="btn danger" onclick="adjustUserWallet('+userId+',\''+esc(w.currency)+'\',\'withdrawal\')">− سحب نقدي '+esc(w.currency)+'</button></div>':'')+walletTransactionsHtml(w.transactions,w.currency)+'</section>').join('')||'<div class="empty">لا توجد بيانات محفظة</div>';document.getElementById('modal').classList.remove('hidden')}catch(e){aibAlert(e.message||'تعذر تحميل المحفظة')}}
 function outsideStoreMineHtml(rows){if(!rows?.length)return '<section class="card"><h3>مبيعات منتجاتي</h3><div class="empty">لا توجد عمليات بيع خارج المتجر بعد.</div></section>';return '<section class="card"><h3>مبيعات منتجاتي ومستحقاتي في المحفظة</h3><div class="table-wrap"><table><thead><tr><th>الفاتورة</th><th>قيمة المنتجات</th><th>عمولة المالك 1.5٪</th><th>أضيف إلى محفظتي</th><th>العملة</th><th>الحالة</th><th>التاريخ</th></tr></thead><tbody>'+rows.map(x=>'<tr><td>'+esc(x.invoice_no)+'</td><td>'+fmt(x.commission?.base_amount||0)+'</td><td>'+fmt(x.commission?.amount||0)+'</td><td><b>'+fmt(x.commission?.seller_net||Math.max(0,(x.commission?.base_amount||0)-(x.commission?.amount||0)))+'</b></td><td>'+esc(x.currency)+'</td><td><span class="tag">أضيفت تلقائياً للمحفظة</span></td><td>'+new Date(x.created_at).toLocaleDateString()+'</td></tr>').join('')+'</tbody></table></div></section>'}
