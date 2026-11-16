@@ -241,6 +241,7 @@ class WalletRequest(Base):
     amount: Mapped[Any]=mapped_column(Numeric(18,2),nullable=False)
     currency: Mapped[str]=mapped_column(String(8),nullable=False)
     note: Mapped[str]=mapped_column(Text,default="")
+    review_note: Mapped[str]=mapped_column(Text,default="")
     status: Mapped[str]=mapped_column(String(16),default="pending",index=True)
     reviewed_by: Mapped[Optional[int]]=mapped_column(ForeignKey("users.id"),nullable=True)
     reviewed_at: Mapped[Optional[datetime]]=mapped_column(DateTime(timezone=True),nullable=True)
@@ -2087,7 +2088,7 @@ def create_wallet_request(p:WalletRequestPayload,request:Request,s:Session=Depen
 @app.get("/wallet-requests")
 def list_wallet_requests(s:Session=Depends(db),u:User=Depends(manager)):
     rows=s.scalars(select(WalletRequest).order_by(WalletRequest.id.desc()).limit(300)).all()
-    return [{"id":r.id,"user_id":r.user_id,"user_name":(s.get(User,r.user_id).full_name if s.get(User,r.user_id) else ""),"username":(s.get(User,r.user_id).username if s.get(User,r.user_id) else ""),"movement":r.movement,"amount":float(r.amount),"currency":r.currency,"note":r.note,"status":r.status,"created_at":r.created_at} for r in rows]
+    return [{"id":r.id,"user_id":r.user_id,"user_name":(s.get(User,r.user_id).full_name if s.get(User,r.user_id) else ""),"username":(s.get(User,r.user_id).username if s.get(User,r.user_id) else ""),"movement":r.movement,"amount":float(r.amount),"currency":r.currency,"note":r.note,"review_note":r.review_note,"status":r.status,"created_at":r.created_at} for r in rows]
 
 @app.post("/wallet-requests/{request_id}/review")
 def review_wallet_request(request_id:int,p:WalletRequestReviewPayload,request:Request,s:Session=Depends(db),u:User=Depends(manager)):
@@ -2112,7 +2113,7 @@ def review_wallet_request(request_id:int,p:WalletRequestReviewPayload,request:Re
         row.status="approved"
     else:
         row.status="rejected"
-    row.reviewed_by=u.id;row.reviewed_at=datetime.now(timezone.utc)
+    row.review_note=(p.note or "").strip()[:500];row.reviewed_by=u.id;row.reviewed_at=datetime.now(timezone.utc)
     audit(s,u,"wallet_request_"+row.status,"wallet_request",row.id,{"user_id":target.id,"movement":row.movement,"amount":float(row.amount),"currency":row.currency,"review_note":(p.note or "").strip()[:500]},request)
     s.commit()
     return {"ok":True,"status":row.status}
