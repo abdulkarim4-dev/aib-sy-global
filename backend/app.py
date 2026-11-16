@@ -2694,7 +2694,7 @@ def review_online_purchase_order(order_id:int,p:OnlineOrderReviewPayload,s:Sessi
             raise HTTPException(409,f"المخزون تغيّر منذ إرسال الطلب. المتاح من {product.name} حالياً {available:g}")
         from_owned=min(qty,owned)
         from_consigned=qty-from_owned
-        allocated_items.append({"sku":x["sku"],"description":x["description"],"model":x.get("model",""),"quantity":qty,"price":x["price"],"owned_quantity":from_owned,"consigned_quantity":from_consigned})
+        allocated_items.append({"sku":x["sku"],"description":x["description"],"model":x.get("model",""),"quantity":qty,"price":x["price"],"owned_quantity":from_owned,"consigned_quantity":from_consigned,"owner_user_id":product.owner_user_id if from_owned>0 else None,"user_owned_quantity":from_owned if product.owner_user_id else 0})
     data={"customer":order.customer_data["full_name"],"customer_phone":order.customer_data["full_phone"],"customer_address":order.customer_data["shipping_address"],"amount":float(order.total),"items":allocated_items,"notes":"طلب إلكتروني – تم التحقق من إثبات الدفع واعتماده"}
     identity=(order.customer_data or {}).get("contract_identity") or {}
     if identity:
@@ -2707,6 +2707,42 @@ def review_online_purchase_order(order_id:int,p:OnlineOrderReviewPayload,s:Sessi
     payment=InvoicePayment(record_id=record.id,amount=order.total,method="sham_cash",cash_box="شام كاش",created_by=u.id)
     s.add(payment)
     s.add(CashMove(box_name="شام كاش",movement="deposit",amount=order.total,currency=order.currency,description="قبض فاتورة طلب شراء إلكتروني "+record.invoice_no,created_by=u.id,record_id=record.id))
+    # Settle only the quantity drawn from a user's owned inventory. Owner stock and consigned stock do not earn an employee wallet credit.
+    seller_totals={}
+    for line in allocated_items:
+        seller_id=line.get("owner_user_id")
+        seller_qty=float(line.get("user_owned_quantity") or 0)
+        if not seller_id or seller_qty<=0: continue
+        gross=round(seller_qty*float(line.get("price") or 0),2)
+        if gross<=0: continue
+        commission=round(gross*0.015,2)
+        net=round(gross-commission,2)
+        bucket=seller_totals.setdefault(int(seller_id),{"gross":0.0,"commission":0.0,"net":0.0,"items":[]})
+        bucket["gross"]=round(bucket["gross"]+gross,2)
+        bucket["commission"]=round(bucket["commission"]+commission,2)
+        bucket["net"]=round(bucket["net"]+net,2)
+        bucket["items"].append({"sku":line["sku"],"quantity":seller_qty,"gross":gross,"commission":commission,"net":net})
+    total_owner_commission=0.0
+    for seller_id,amounts in seller_totals.items():
+        seller=s.get(User,seller_id)
+        if not seller or seller.deleted or seller.role=="owner":
+            raise HTTPException(409,"تعذر تحديد صاحب أحد منتجات المستخدمين؛ لم يتم اعتماد الطلب")
+        ensure_user_wallets(s,seller.id)
+        seller_wallet=s.scalar(select(UserWallet).where(UserWallet.user_id==seller.id,UserWallet.currency==order.currency).with_for_update())
+        if not seller_wallet: raise HTTPException(500,"تعذر تجهيز محفظة صاحب المنتج")
+        seller_wallet.balance=round(float(seller_wallet.balance or 0)+amounts["net"],2)
+        seller_wallet.updated_at=datetime.now(timezone.utc)
+        s.add(WalletTransaction(wallet_id=seller_wallet.id,user_id=seller.id,amount=amounts["net"],currency=order.currency,direction="in",reason=f"صافي بيع منتجاتك عبر المتجر · طلب #{order.id} · فاتورة {record.invoice_no}",reference_type="store_order_seller_net",reference_id=record.id,created_by=u.id))
+        total_owner_commission=round(total_owner_commission+amounts["commission"],2)
+    if total_owner_commission>0:
+        owner=s.scalar(select(User).where(User.role=="owner",User.deleted.is_(False)).order_by(User.id).limit(1))
+        if not owner: raise HTTPException(500,"تعذر العثور على حساب المالك لإضافة عمولة المتجر")
+        ensure_user_wallets(s,owner.id)
+        owner_wallet=s.scalar(select(UserWallet).where(UserWallet.user_id==owner.id,UserWallet.currency==order.currency).with_for_update())
+        if not owner_wallet: raise HTTPException(500,"تعذر تجهيز محفظة المالك")
+        owner_wallet.balance=round(float(owner_wallet.balance or 0)+total_owner_commission,2)
+        owner_wallet.updated_at=datetime.now(timezone.utc)
+        s.add(WalletTransaction(wallet_id=owner_wallet.id,user_id=owner.id,amount=total_owner_commission,currency=order.currency,direction="in",reason=f"عمولة 1.5٪ من بيع منتجات المستخدمين عبر المتجر · طلب #{order.id} · فاتورة {record.invoice_no}",reference_type="store_order_owner_commission",reference_id=record.id,created_by=u.id))
     order.status="approved";order.record_id=record.id;order.reviewed_by=u.id;order.reviewed_at=datetime.now(timezone.utc);order.review_note=p.note
     audit(s,u,"online_order_approved","online_purchase_order",order.id,{"record_id":record.id,"invoice_no":record.invoice_no,"payment_method":"sham_cash"},request=None)
     s.commit()
