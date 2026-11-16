@@ -288,7 +288,7 @@ class AuditEvent(Base):
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
 
 password_hash=PasswordHash.recommended()
-oauth=OAuth2PasswordBearer(tokenUrl="/auth/login")
+oauth=OAuth2PasswordBearer(tokenUrl="/auth/login",auto_error=False)
 app=FastAPI(title="AIB Accounting API", version="1.0.0")
 
 class _SensitiveQueryLogFilter(logging.Filter):
@@ -335,7 +335,9 @@ def token_for(user:User,email_otp_verified:bool=False):
     now=datetime.now(timezone.utc)
     claims={"sub":str(user.id),"iat":now,"exp":now+timedelta(minutes=settings.jwt_minutes),"email_otp_verified":bool(email_otp_verified)}
     return jwt.encode(claims,settings.jwt_secret,algorithm="HS256")
-def current_user(token:str=Depends(oauth), s:Session=Depends(db)):
+def current_user(token:Optional[str]=Depends(oauth), s:Session=Depends(db)):
+    if not token:
+        raise HTTPException(401,"جلسة الدخول غير صالحة أو انتهت")
     try:
         payload=jwt.decode(token,settings.jwt_secret,algorithms=["HS256"])
         if payload.get("typ")=="store_customer": raise ValueError("store token")
@@ -344,7 +346,11 @@ def current_user(token:str=Depends(oauth), s:Session=Depends(db)):
     u=s.get(User,uid)
     if not u or not u.active: raise HTTPException(401,"الحساب غير فعال")
     return u
-def current_store_customer(token:str=Depends(oauth), s:Session=Depends(db)):
+def current_store_customer(request:Request, s:Session=Depends(db)):
+    # Store sessions are accepted only from the HttpOnly cookie, never from browser-readable bearer storage.
+    token=request.cookies.get("aib_store_session","")
+    if not token:
+        raise HTTPException(401,"يرجى تسجيل الدخول إلى حساب المتجر")
     try:
         payload=jwt.decode(token,settings.jwt_secret,algorithms=["HS256"])
         if payload.get("typ")!="store_customer": raise ValueError("wrong token type")
@@ -1938,9 +1944,20 @@ class StoreCartPayload(BaseModel):
     items: list[StoreCartItemPayload] = Field(default_factory=list, max_length=100)
 
 def store_customer_token(customer:StoreCustomer):
-    # Customer sessions remain valid until the customer explicitly logs out or the account is disabled.
+    # Store sessions have a bounded lifetime and are held only in an HttpOnly cookie.
     now=datetime.now(timezone.utc)
-    return jwt.encode({"sub":str(customer.id),"typ":"store_customer","iat":now},settings.jwt_secret,algorithm="HS256")
+    return jwt.encode({"sub":str(customer.id),"typ":"store_customer","iat":now,"exp":now+timedelta(days=30)},settings.jwt_secret,algorithm="HS256")
+
+def set_store_session(response:Response, customer:StoreCustomer):
+    response.set_cookie(key="aib_store_session",value=store_customer_token(customer),max_age=30*24*60*60,httponly=True,secure=True,samesite="lax",path="/")
+
+def clear_store_session(response:Response):
+    response.delete_cookie("aib_store_session",path="/",secure=True,httponly=True,samesite="lax")
+
+@app.post("/store/auth/logout")
+def logout_store_customer(response:Response):
+    clear_store_session(response)
+    return {"ok":True}
 
 def store_product_category(name:str, model:str):
     value=(name+" "+(model or "")).lower()
@@ -2001,7 +2018,7 @@ class StoreEmailConfirmPayload(BaseModel):
     code: str = Field(min_length=6,max_length=6)
 
 @app.post("/store/auth/register/confirm")
-def confirm_store_registration(p:StoreEmailConfirmPayload, request:Request, s:Session=Depends(db)):
+def confirm_store_registration(p:StoreEmailConfirmPayload, request:Request, response:Response, s:Session=Depends(db)):
     email=p.email.strip().lower()
     customer=s.scalar(select(StoreCustomer).where(StoreCustomer.email==email,StoreCustomer.active.is_(False)))
     if not customer: raise HTTPException(400,"لا يوجد تسجيل معلّق لهذا البريد")
@@ -2015,7 +2032,8 @@ def confirm_store_registration(p:StoreEmailConfirmPayload, request:Request, s:Se
     customer.active=True
     s.query(StoreEmailVerification).filter(StoreEmailVerification.customer_id==customer.id).delete(synchronize_session=False)
     s.commit()
-    return {"access_token":store_customer_token(customer),"token_type":"bearer","customer":{"id":customer.id,"email":customer.email,"full_name":customer.full_name}}
+    set_store_session(response,customer)
+    return {"ok":True,"customer":{"id":customer.id,"email":customer.email,"full_name":customer.full_name}}
 
 @app.post("/store/auth/login")
 def store_login(p:StoreLoginPayload, request:Request, s:Session=Depends(db)):
@@ -2047,7 +2065,7 @@ def store_login(p:StoreLoginPayload, request:Request, s:Session=Depends(db)):
     return {"ok":True,"verification_required":True,"message":"أرسلنا رمز الدخول إلى بريدك الإلكتروني"}
 
 @app.post("/store/auth/login/verify")
-def verify_store_login(p:StoreEmailConfirmPayload, request:Request, s:Session=Depends(db)):
+def verify_store_login(p:StoreEmailConfirmPayload, request:Request, response:Response, s:Session=Depends(db)):
     email=p.email.strip().lower()
     customer=s.scalar(select(StoreCustomer).where(StoreCustomer.email==email,StoreCustomer.active.is_(True)))
     if not customer: raise HTTPException(400,"بيانات التحقق غير صحيحة")
@@ -2187,8 +2205,8 @@ def store_google_callback(request:Request, code:str="", state:str="", error:str=
         customer.failed_logins=0
         customer.locked_until=None
         s.commit()
-        access_token=store_customer_token(customer)
-        response=RedirectResponse("/shop#google_token="+access_token,303)
+        response=RedirectResponse("/shop",303)
+        set_store_session(response,customer)
         response.delete_cookie("aib_google_auth_nonce",path="/store/auth/google")
         return response
     except Exception as exc:
