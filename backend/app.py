@@ -2715,15 +2715,13 @@ def review_online_purchase_order(order_id:int,p:OnlineOrderReviewPayload,s:Sessi
         if not seller_id or seller_qty<=0: continue
         gross=round(seller_qty*float(line.get("price") or 0),2)
         if gross<=0: continue
-        commission=round(gross*0.015,2)
-        net=round(gross-commission,2)
-        bucket=seller_totals.setdefault(int(seller_id),{"gross":0.0,"commission":0.0,"net":0.0,"items":[]})
+        bucket=seller_totals.setdefault(int(seller_id),{"gross":0.0,"items":[]})
         bucket["gross"]=round(bucket["gross"]+gross,2)
-        bucket["commission"]=round(bucket["commission"]+commission,2)
-        bucket["net"]=round(bucket["net"]+net,2)
-        bucket["items"].append({"sku":line["sku"],"quantity":seller_qty,"gross":gross,"commission":commission,"net":net})
+        bucket["items"].append({"sku":line["sku"],"quantity":seller_qty,"gross":gross})
     total_owner_commission=0.0
     for seller_id,amounts in seller_totals.items():
+        amounts["commission"]=round(amounts["gross"]*0.015,2)
+        amounts["net"]=round(amounts["gross"]-amounts["commission"],2)
         seller=s.get(User,seller_id)
         if not seller or seller.deleted or seller.role=="owner":
             raise HTTPException(409,"تعذر تحديد صاحب أحد منتجات المستخدمين؛ لم يتم اعتماد الطلب")
