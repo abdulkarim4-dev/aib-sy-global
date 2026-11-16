@@ -182,6 +182,7 @@ class InventoryProduct(Base):
     opening_quantity: Mapped[Any]=mapped_column(Numeric(18,3), default=0, nullable=False)
     store_family: Mapped[Optional[str]]=mapped_column(String(40), nullable=True)
     store_category: Mapped[Optional[str]]=mapped_column(String(60), nullable=True)
+    vehicle_details: Mapped[dict]=mapped_column(JSON, default=dict, nullable=False)
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
 
 class InvoicePayment(Base):
@@ -438,6 +439,7 @@ def startup():
         conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS opening_quantity NUMERIC(18,3) NOT NULL DEFAULT 0"))
         conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS store_family VARCHAR(40)"))
         conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS store_category VARCHAR(60)"))
+        conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS vehicle_details JSONB NOT NULL DEFAULT '{}'::jsonb"))
         conn.execute(text("ALTER TABLE store_password_resets ADD COLUMN IF NOT EXISTS pending_password_hash VARCHAR(300)"))
         conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS first_name VARCHAR(80) NOT NULL DEFAULT ''"))
         conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS last_name VARCHAR(80) NOT NULL DEFAULT ''"))
@@ -1235,7 +1237,7 @@ def latest_store_catalog_data(s:Session)->tuple[dict,dict]:
                 family=str(item.get("store_family") or "").strip()
                 category=str(item.get("store_category") or "").strip()
                 if category in allowed.get(family,set()):
-                    latest_categories[sku]={"store_family":family,"store_category":category,"vehicle_details":{k:item.get(k) for k in ("vehicle_type","vehicle_make","vehicle_model","vehicle_generation","vehicle_year","vehicle_odometer","vehicle_fuel","vehicle_color","chassis") if item.get(k) not in (None,"")}}
+                    latest_categories[sku]={"store_family":family,"store_category":category,"vehicle_details":{k:item.get(k) for k in ("vehicle_name","vehicle_type","vehicle_make","vehicle_model","vehicle_generation","vehicle_year","vehicle_odometer","vehicle_fuel","vehicle_color","chassis") if item.get(k) not in (None,"")}}
     result=(latest_categories,latest_prices)
     _store_catalog_cache["value"]=result
     _store_catalog_cache["at"]=now
@@ -1254,6 +1256,7 @@ class InventoryProductCreate(BaseModel):
     quantity: float=Field(default=0,ge=0)
     store_family: str
     store_category: str
+    vehicle_details: Optional[dict]=None
 
 @app.post("/inventory/products")
 def create_inventory_product(p:InventoryProductCreate,request:Request,s:Session=Depends(db),u:User=Depends(require_permission("inventory","create"))):
@@ -1261,13 +1264,20 @@ def create_inventory_product(p:InventoryProductCreate,request:Request,s:Session=
     if p.condition not in {"new","used"}: raise HTTPException(400,"اختر حالة المنتج: جديد أو مستعمل")
     allowed={"car":{"cars","car_parts","car_engines","car_engine_parts"},"truck":{"trucks","truck_parts","truck_engines","truck_engine_parts"},"heavy":{"heavy","heavy_parts","heavy_engines","heavy_engine_parts"},"agri":{"agri","agri_parts","agri_engines","agri_engine_parts"},"special":{"generators","hydraulic_compressors","water_pumps","road_equipment","special_parts","special_engines"}}
     if p.store_category not in allowed.get(p.store_family,set()): raise HTTPException(400,"اختر قسم المتجر بشكل صحيح")
+    vehicle_categories={"car":"cars","truck":"trucks","heavy":"heavy","agri":"agri"}
+    is_complete_vehicle=p.store_category==vehicle_categories.get(p.store_family)
+    vehicle_details={str(k):str(v).strip() for k,v in (p.vehicle_details or {}).items() if k in {"vehicle_name","vehicle_type","vehicle_make","vehicle_model","vehicle_generation","vehicle_year","vehicle_odometer","vehicle_fuel","vehicle_color","chassis"} and v not in (None,"")}
+    if is_complete_vehicle and not vehicle_details.get("vehicle_name"):
+        raise HTTPException(400,"أدخل اسم السيارة أو المركبة")
+    if not is_complete_vehicle and vehicle_details:
+        raise HTTPException(400,"بيانات المركبة متاحة للأقسام الكاملة فقط")
     if u.role!="owner":
         scopes=set(u.business_scopes or [])
         if p.store_family not in scopes and p.store_category not in scopes: raise HTTPException(403,"هذا القسم خارج مجالات العمل المصرح بها لحسابك")
     sku=(p.sku or "").strip().upper() or next_inventory_sku(s)
     if s.scalar(select(InventoryProduct.id).where(func.upper(InventoryProduct.sku)==sku)):
         raise HTTPException(409,"رقم القطعة مستخدم مسبقاً")
-    product=InventoryProduct(sku=sku,name=p.name.strip(),model=p.model.strip(),owner_user_id=(None if u.role=="owner" else u.id),sale_price=p.sale_price,sale_currency=p.sale_currency,condition=p.condition,opening_quantity=p.quantity,store_family=p.store_family,store_category=p.store_category,owned_stock=p.quantity,consigned_stock=0,active=True)
+    product=InventoryProduct(sku=sku,name=p.name.strip(),model=p.model.strip(),owner_user_id=(None if u.role=="owner" else u.id),sale_price=p.sale_price,sale_currency=p.sale_currency,condition=p.condition,opening_quantity=p.quantity,store_family=p.store_family,store_category=p.store_category,vehicle_details=vehicle_details,owned_stock=p.quantity,consigned_stock=0,active=True)
     s.add(product);s.flush()
     audit(s,u,"inventory_product_created","inventory_product",product.id,{"sku":sku,"owner_user_id":product.owner_user_id,"sale_price":p.sale_price,"sale_currency":p.sale_currency,"condition":p.condition,"opening_quantity":p.quantity,"store_family":p.store_family,"store_category":p.store_category},request)
     s.commit()
@@ -1275,7 +1285,7 @@ def create_inventory_product(p:InventoryProductCreate,request:Request,s:Session=
     _store_catalog_cache["at"]=0
     _public_products_cache["value"].clear()
     _public_products_cache["at"].clear()
-    return {"id":product.id,"sku":product.sku,"name":product.name,"model":product.model,"owner_user_id":product.owner_user_id,"sale_price":float(product.sale_price) if product.sale_price is not None else None,"sale_currency":product.sale_currency,"condition":product.condition,"opening_quantity":float(product.opening_quantity or 0),"store_family":product.store_family,"store_category":product.store_category,"owned_stock":float(product.owned_stock or 0),"consigned_stock":0}
+    return {"id":product.id,"sku":product.sku,"name":product.name,"model":product.model,"owner_user_id":product.owner_user_id,"sale_price":float(product.sale_price) if product.sale_price is not None else None,"sale_currency":product.sale_currency,"condition":product.condition,"opening_quantity":float(product.opening_quantity or 0),"store_family":product.store_family,"store_category":product.store_category,"vehicle_details":product.vehicle_details or {},"owned_stock":float(product.owned_stock or 0),"consigned_stock":0}
 
 @app.get("/inventory/products")
 def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=Depends(require_permission("inventory","view"))):
@@ -1309,7 +1319,7 @@ def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=
     }
     rows=[p for p in rows if (u.role!="owner" and p.owner_user_id==u.id) or str(p.sku or "").strip().upper() in invoiced_skus]
     store_categories,latest_purchase=latest_store_catalog_data(s)
-    return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owner_user_id":p.owner_user_id,"condition":p.condition or "new","opening_quantity":float(p.opening_quantity or 0),"store_family":p.store_family,"store_category":p.store_category,"owned_stock":float(p.owned_stock or 0),**({"consigned_stock":float(p.consigned_stock or 0)} if u.role=="owner" else {}),"image_count":len(p.images or []),"shipping_included":bool(p.shipping_included),"video_url":p.video_url or "",**store_categories.get(p.sku,{}),**latest_purchase.get(p.sku,{"purchase_price":0,"sale_price":0,"currency":"—"}),"sale_price":float(p.sale_price) if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("sale_price"),"sale_currency":p.sale_currency if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("currency","")} for p in rows]
+    return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owner_user_id":p.owner_user_id,"condition":p.condition or "new","opening_quantity":float(p.opening_quantity or 0),"store_family":p.store_family,"store_category":p.store_category,"owned_stock":float(p.owned_stock or 0),**({"consigned_stock":float(p.consigned_stock or 0)} if u.role=="owner" else {}),"image_count":len(p.images or []),"shipping_included":bool(p.shipping_included),"video_url":p.video_url or "",**store_categories.get(p.sku,{}),"vehicle_details":(p.vehicle_details or store_categories.get(p.sku,{}).get("vehicle_details") or {}),**latest_purchase.get(p.sku,{"purchase_price":0,"sale_price":0,"currency":"—"}),"sale_price":float(p.sale_price) if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("sale_price"),"sale_currency":p.sale_currency if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("currency","")} for p in rows]
 
 class InventoryProductUpdate(BaseModel):
     name: str=Field(min_length=2,max_length=240)
@@ -1319,6 +1329,7 @@ class InventoryProductUpdate(BaseModel):
     condition: str="new"
     store_family: str
     store_category: str
+    vehicle_details: Optional[dict]=None
     owned_stock: Optional[float]=Field(default=None,ge=0)
     consigned_stock: Optional[float]=Field(default=None,ge=0)
 
@@ -1358,6 +1369,12 @@ def edit_inventory_product(product_id:int,p:InventoryProductUpdate,request:Reque
     product.condition=p.condition
     product.store_family=p.store_family
     product.store_category=p.store_category
+    vehicle_categories={"car":"cars","truck":"trucks","heavy":"heavy","agri":"agri"}
+    is_complete_vehicle=p.store_category==vehicle_categories.get(p.store_family)
+    if p.vehicle_details is not None:
+        product.vehicle_details={str(k):str(v).strip() for k,v in p.vehicle_details.items() if k in {"vehicle_name","vehicle_type","vehicle_make","vehicle_model","vehicle_generation","vehicle_year","vehicle_odometer","vehicle_fuel","vehicle_color","chassis"} and v not in (None,"")} if is_complete_vehicle else {}
+    elif not is_complete_vehicle:
+        product.vehicle_details={}
     audit(s,u,"inventory_product_updated","inventory_product",product.id,{"sku":product.sku,"before":before,"after":{"name":product.name,"model":product.model,"sale_price":p.sale_price,"sale_currency":p.sale_currency,"condition":p.condition,"store_family":p.store_family,"store_category":p.store_category,"owned_stock":new_owned,"consigned_stock":new_consigned},"stock_adjustment":stock_adjustment},request)
     if abs(stock_adjustment["owned_delta"])>0.0001 or abs(stock_adjustment["consigned_delta"])>0.0001:
         audit(s,u,"inventory_stock_adjustment","inventory_product",product.id,{"sku":product.sku,"stock_adjustment":stock_adjustment},request)
@@ -1366,7 +1383,7 @@ def edit_inventory_product(product_id:int,p:InventoryProductUpdate,request:Reque
     _store_catalog_cache["at"]=0
     _public_products_cache["value"].clear()
     _public_products_cache["at"].clear()
-    return {"ok":True,"id":product.id,"sku":product.sku,"name":product.name,"model":product.model,"sale_price":float(product.sale_price) if product.sale_price is not None else None,"sale_currency":product.sale_currency,"condition":product.condition,"store_family":product.store_family,"store_category":product.store_category}
+    return {"ok":True,"id":product.id,"sku":product.sku,"name":product.name,"model":product.model,"sale_price":float(product.sale_price) if product.sale_price is not None else None,"sale_currency":product.sale_currency,"condition":product.condition,"store_family":product.store_family,"store_category":product.store_category,"vehicle_details":product.vehicle_details or {}}
 
 @app.delete("/inventory/products/{product_id}")
 def delete_inventory_product(product_id:int,request:Request,s:Session=Depends(db),u:User=Depends(require_inventory_product_management())):
