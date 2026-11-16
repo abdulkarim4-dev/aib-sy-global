@@ -2728,9 +2728,14 @@ def review_online_purchase_order(order_id:int,p:OnlineOrderReviewPayload,s:Sessi
         ensure_user_wallets(s,seller.id)
         seller_wallet=s.scalar(select(UserWallet).where(UserWallet.user_id==seller.id,UserWallet.currency==order.currency).with_for_update())
         if not seller_wallet: raise HTTPException(500,"تعذر تجهيز محفظة صاحب المنتج")
-        seller_wallet.balance=round(float(seller_wallet.balance or 0)+amounts["net"],2)
+        # Credit the full product value first, then record the store commission as a separate wallet deduction.
+        seller_wallet.balance=round(float(seller_wallet.balance or 0)+amounts["gross"],2)
         seller_wallet.updated_at=datetime.now(timezone.utc)
-        s.add(WalletTransaction(wallet_id=seller_wallet.id,user_id=seller.id,amount=amounts["net"],currency=order.currency,direction="in",reason=f"صافي بيع منتجاتك عبر المتجر · طلب #{order.id} · فاتورة {record.invoice_no}",reference_type="store_order_seller_net",reference_id=record.id,created_by=u.id))
+        s.add(WalletTransaction(wallet_id=seller_wallet.id,user_id=seller.id,amount=amounts["gross"],currency=order.currency,direction="in",reason=f"إضافة كامل قيمة بيع منتجاتك عبر المتجر · طلب #{order.id} · فاتورة {record.invoice_no}",reference_type="store_order_seller_gross",reference_id=record.id,created_by=u.id))
+        if amounts["commission"]>0:
+            seller_wallet.balance=round(float(seller_wallet.balance or 0)-amounts["commission"],2)
+            seller_wallet.updated_at=datetime.now(timezone.utc)
+            s.add(WalletTransaction(wallet_id=seller_wallet.id,user_id=seller.id,amount=amounts["commission"],currency=order.currency,direction="out",reason=f"اقتطاع عمولة المتجر 1.5٪ · طلب #{order.id} · فاتورة {record.invoice_no}",reference_type="store_order_seller_commission",reference_id=record.id,created_by=u.id))
         total_owner_commission=round(total_owner_commission+amounts["commission"],2)
     if total_owner_commission>0:
         owner=s.scalar(select(User).where(User.role=="owner",User.deleted.is_(False)).order_by(User.id).limit(1))
