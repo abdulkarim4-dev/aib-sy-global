@@ -2702,18 +2702,27 @@ def list_online_purchase_orders(s:Session=Depends(db),u:User=Depends(current_use
     for o in rows:
         customer=dict(o.customer_data or {})
         order_items=list(o.items or [])
+        seller_total=float(o.total)
         if u.role!="owner":
-            # Sellers can see only orders containing their own inventory, and only their own sold lines.
+            # Seller views are limited to their own inventory quantities on paid orders.
+            record=s.get(Record,o.record_id) if o.record_id else None
+            approved_lines=(record.data or {}).get("items",[]) if record else []
             seller_lines=[]
-            for item in order_items:
-                product=s.scalar(select(InventoryProduct).where(InventoryProduct.sku==str(item.get("sku") or "").strip().upper()))
-                if product and product.owner_user_id==u.id:
-                    seller_lines.append(item)
+            for item in approved_lines:
+                if item.get("owner_user_id")!=u.id:
+                    continue
+                owned_qty=float(item.get("user_owned_quantity") or 0)
+                if owned_qty<=0:
+                    continue
+                seller_line=dict(item)
+                seller_line["quantity"]=owned_qty
+                seller_lines.append(seller_line)
             if not seller_lines or o.status not in {"approved","shipping","delivered"}:
                 continue
             order_items=seller_lines
+            seller_total=round(sum(float(x.get("quantity") or 0)*float(x.get("price") or 0) for x in seller_lines),2)
             customer={k:customer.get(k) for k in ("first_name","last_name","full_name","email","shipping_address","full_phone") if customer.get(k) is not None}
-        result.append({"id":o.id,"customer":customer,"owner_phone":owner_phone,"items":order_items,"total":float(o.total),"currency":o.currency,"payment_proof":o.payment_proof if u.role=="owner" else None,"proof_type":o.proof_type,"status":o.status,"record_id":o.record_id,"invoice_no":(s.get(Record,o.record_id).invoice_no if o.record_id and s.get(Record,o.record_id) else None),"review_note":o.review_note,"created_at":o.created_at})
+        result.append({"id":o.id,"customer":customer,"owner_phone":owner_phone,"items":order_items,"total":seller_total,"currency":o.currency,"payment_proof":o.payment_proof if u.role=="owner" else None,"proof_type":o.proof_type,"status":o.status,"record_id":o.record_id,"invoice_no":(s.get(Record,o.record_id).invoice_no if o.record_id and s.get(Record,o.record_id) else None),"review_note":o.review_note,"created_at":o.created_at})
     return result
 
 class OnlineOrderReviewPayload(BaseModel):
