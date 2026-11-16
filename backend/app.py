@@ -1622,6 +1622,8 @@ def update_invoice_payment(record_id:int,payment_id:int,p:PaymentUpdatePayload,r
 def delete_invoice_payment(record_id:int,payment_id:int,request:Request,s:Session=Depends(db),u:User=Depends(require_permission("invoices","delete"))):
     r=s.get(Record,record_id); x=s.get(InvoicePayment,payment_id)
     if not r or r.deleted or (u.role!="owner" and r.created_by!=u.id) or not x or x.record_id!=record_id: raise HTTPException(404,"الدفعة غير موجودة")
+    if u.role!="owner" and x.cash_box in {"صندوق الأمانة","صندوق مبيع الأمانة","صندوق قل أمانة","صندوق قُل أمانة"}:
+        raise HTTPException(403,"لا يمكن لحساب المستخدم حذف دفعة مرتبطة بصندوق الأمانة")
     reverse_payment_cash_move(s,r,x,u,"حذف")
     audit(s,u,"invoice_payment_deleted","invoice_payment",x.id,{"record_id":record_id,"amount":float(x.amount),"method":x.method,"cash_box":x.cash_box,"cash_adjustment":"automatic_reversal"},request)
     s.delete(x); s.commit()
@@ -2664,7 +2666,7 @@ class OnlineOrderReviewPayload(BaseModel):
 
 @app.post("/online-purchase-orders/{order_id}/review")
 def review_online_purchase_order(order_id:int,p:OnlineOrderReviewPayload,s:Session=Depends(db),u:User=Depends(manager)):
-    order=s.get(OnlinePurchaseOrder,order_id)
+    order=s.scalar(select(OnlinePurchaseOrder).where(OnlinePurchaseOrder.id==order_id).with_for_update())
     if not order: raise HTTPException(404,"الطلب غير موجود")
     if order.status!="pending": raise HTTPException(409,"تمت مراجعة الطلب")
     if p.action=="reject":
@@ -2677,7 +2679,7 @@ def review_online_purchase_order(order_id:int,p:OnlineOrderReviewPayload,s:Sessi
     if p.action!="approve": raise HTTPException(400,"إجراء غير صالح")
     allocated_items=[]
     for x in order.items:
-        product=s.scalar(select(InventoryProduct).where(InventoryProduct.sku==str(x["sku"]).strip().upper()))
+        product=s.scalar(select(InventoryProduct).where(InventoryProduct.sku==str(x["sku"]).strip().upper()).with_for_update())
         if not product or not product.active: raise HTTPException(409,f"المنتج {x.get('description') or x['sku']} لم يعد متاحاً")
         qty=float(x["quantity"])
         owned=float(product.owned_stock or 0)
