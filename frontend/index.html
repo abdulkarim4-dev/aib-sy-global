@@ -627,7 +627,36 @@ window.aibPurchaseGenerationOptions=async function(index){
 };
 window.renderItemRows=function(){
  const host=document.getElementById('itemRows');if(!host)return;
- const rows=window.draftItems||[],section=document.getElementById('sectionSel')?.value,isRepair=section==='repair';
+ const rows=window.draftItems||[];
+ if(window.aibOutsideStoreSale){
+  const products=(window.inventoryProducts||[]).filter(p=>Number(p.owned_stock||0)>0);
+  const families={car:'السيارات السياحية',truck:'الشاحنات',heavy:'الحفارات والمعدات الثقيلة',agri:'الآليات الزراعية',special:'المولدات والمضخات ومعدات الطرق والآليات الصناعية'};
+  const categories={cars:'سيارات كاملة',car_parts:'قطع غيار السيارات',car_engines:'محركات السيارات',car_engine_parts:'قطع محركات السيارات',trucks:'شاحنات كاملة',truck_parts:'قطع غيار الشاحنات',truck_engines:'محركات الشاحنات',truck_engine_parts:'قطع محركات الشاحنات',heavy:'معدات وحفارات كاملة',heavy_parts:'قطع غيار المعدات الثقيلة',heavy_engines:'محركات المعدات الثقيلة',heavy_engine_parts:'قطع محركات المعدات الثقيلة',agri:'معدات زراعية كاملة',agri_parts:'قطع غيار الآليات الزراعية',agri_engines:'محركات الآليات الزراعية',agri_engine_parts:'قطع محركات الآليات الزراعية',generators:'مولدات كهربائية',hydraulic_compressors:'ضواغط هيدروليكية',water_pumps:'مضخات مياه',road_equipment:'معدات طرق',special_parts:'قطع غيار الآليات الخاصة',special_engines:'محركات الآليات الخاصة'};
+  const readOnly=(label,value)=>'<div class="field outside-sale-readonly-field"><label>'+label+'</label><input type="text" value="'+esc(value!==undefined&&value!==null&&value!==''?String(value):'—')+'" readonly aria-readonly="true" tabindex="-1" autocomplete="off" class="readonly-value" style="min-height:40px;padding:10px 12px;border:1px solid var(--border,#555);border-radius:8px;background:#f7f8fa;color:#26323b;cursor:default;pointer-events:none"></div>';
+  const cards=rows.map((item,i)=>{
+   const p=products.find(x=>String(x.sku)===String(item.sku));if(!p)return '';
+   return '<div class="card outside-sale-product-card" style="grid-column:1/-1;margin:8px 0;padding:12px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><strong>المنتج '+(i+1)+'</strong><button type="button" class="btn danger" onclick="removeOutsideSaleProduct('+i+')">إزالة</button></div><div class="form-grid" style="margin-top:10px">'+readOnly('اسم القطعة',p.name)+readOnly('رقم SKU',p.sku)+readOnly('مكان عرض المنتج — القسم الرئيسي',families[p.store_family]||p.store_family)+readOnly('مكان عرض المنتج — القسم الفرعي',categories[p.store_category]||p.store_category)+readOnly('معلومات المنتج / الموديل',p.model)+readOnly('حالة المنتج',p.condition==='used'?'مستعمل':'جديد')+readOnly('سعر البيع المعتمد',Number(p.sale_price||0)+' '+(p.currency||p.sale_currency||''))+readOnly('الكمية المتاحة',Number(p.owned_stock||0))+'<div class="field"><label>كمية البيع</label><input type="number" min="1" max="'+Number(p.owned_stock||0)+'" step="1" value="'+Number(item.quantity||1)+'" data-outside-qty="'+i+'"></div></div></div>';
+  }).join('');
+  host.innerHTML='<div class="field" style="width:100%"><label>اختر اسم القطعة أو رقم SKU من المخزون</label><input id="outsideSaleSearch" list="outsideSaleProductOptions" autocomplete="off" placeholder="اكتب اسم القطعة أو رقم SKU للبحث"><datalist id="outsideSaleProductOptions">'+products.map(p=>'<option value="'+esc(p.name)+' · '+esc(p.sku)+'"></option><option value="'+esc(p.sku)+' · '+esc(p.name)+'"></option>').join('')+'</datalist><div class="small muted">يمكنك اختيار أكثر من منتج. تفاصيل كل منتج تظهر بعد اختياره وتكون للعرض فقط.</div><button type="button" class="btn primary" id="addOutsideSaleProduct" style="margin-top:8px">إضافة المنتج المحدد</button></div>'+(cards?'<div id="outsideSaleProductDetails" class="form-grid" style="margin-top:10px">'+cards+'</div>':'');
+  document.getElementById('addOutsideSaleProduct')?.addEventListener('click',()=>{
+   const input=document.getElementById('outsideSaleSearch'),value=(input?.value||'').trim();
+   const p=products.find(x=>value===String(x.name)+' · '+String(x.sku)||value===String(x.sku)+' · '+String(x.name)||value===String(x.sku)||value===String(x.name));
+   if(!p){aibAlert('اختر منتجاً صحيحاً من المخزون بالاسم أو رقم SKU.');return;}
+   if(rows.some(x=>String(x.sku)===String(p.sku))){aibAlert('هذا المنتج مضاف بالفعل إلى قائمة البيع.');return;}
+   window.draftItems=[...rows,{sku:p.sku,description:p.name,model:p.model||'',store_family:p.store_family||'',store_category:p.store_category||'',quantity:1,price:Number(p.sale_price||0),currency:p.currency||p.sale_currency||'USD'}];
+   const currencies=[...new Set(window.draftItems.map(x=>x.currency||'USD'))];
+   if(currencies.length>1){window.draftItems.pop();aibAlert('لا يمكن جمع منتجات بعملات مختلفة في فاتورة واحدة. اختر منتجات بالعملة نفسها.');return;}
+   const currency=document.querySelector('[name="currency"]');if(currency)currency.value=p.currency||p.sale_currency||'USD';
+   renderItemRows();updateInvoiceGrandTotal();
+  });
+  host.querySelectorAll('[data-outside-qty]').forEach(el=>el.addEventListener('input',()=>{
+   const i=Number(el.dataset.outsideQty),item=window.draftItems?.[i];if(!item)return;
+   item.quantity=Math.max(1,Math.min(Number(el.max)||1,Math.floor(Number(el.value)||1)));
+   el.value=item.quantity;updateInvoiceGrandTotal();
+  }));
+  updateInvoiceGrandTotal();return;
+ }
+ const rowsUnused=window.draftItems||[],section=document.getElementById('sectionSel')?.value,isRepair=section==='repair';
  document.getElementById('inventoryPickerWrap')?.classList.toggle('hidden',isRepair);
  const catalog=window.aibVehicleCatalog, years=Array.from({length:77},(_,i)=>String(2026-i));
  const makeOptions=(x)=>{
