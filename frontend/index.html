@@ -671,6 +671,7 @@ window.renderItemRows=function(){
   const products=(window.inventoryProducts||[]).filter(p=>Number(p.owned_stock||0)>0);
   const families={car:'السيارات السياحية',truck:'الشاحنات',heavy:'الحفارات والمعدات الثقيلة',agri:'الآليات الزراعية',special:'المولدات والمضخات ومعدات الطرق والآليات الصناعية'};
   const categories={cars:'سيارات كاملة',car_parts:'قطع غيار السيارات',car_engines:'محركات السيارات',car_engine_parts:'قطع محركات السيارات',trucks:'شاحنات كاملة',truck_parts:'قطع غيار الشاحنات',truck_engines:'محركات الشاحنات',truck_engine_parts:'قطع محركات الشاحنات',heavy:'معدات وحفارات كاملة',heavy_parts:'قطع غيار المعدات الثقيلة',heavy_engines:'محركات المعدات الثقيلة',heavy_engine_parts:'قطع محركات المعدات الثقيلة',agri:'معدات زراعية كاملة',agri_parts:'قطع غيار الآليات الزراعية',agri_engines:'محركات الآليات الزراعية',agri_engine_parts:'قطع محركات الآليات الزراعية',generators:'مولدات كهربائية',hydraulic_compressors:'ضواغط هيدروليكية',water_pumps:'مضخات مياه',road_equipment:'معدات طرق',special_parts:'قطع غيار الآليات الخاصة',special_engines:'محركات الآليات الخاصة'};
+  const outsideProductName=p=>String(p?.name??p?.product_name??p?.item_name??p?.product?.name??p?.inventory_product?.name??p?.item?.name??p?.data?.name??p?.details?.name??p?.description??p?.title??'').trim();
   const readOnly=(label,value)=>'<div class="field outside-sale-readonly-field"><label>'+label+'</label><input type="text" value="'+esc(value!==undefined&&value!==null&&value!==''?String(value):'—')+'" readonly aria-readonly="true" tabindex="-1" autocomplete="off" class="readonly-value" style="min-height:40px;padding:10px 12px;border:1px solid var(--border,#555);border-radius:8px;background:#f7f8fa;color:#26323b;cursor:default;pointer-events:none"></div>';
   const cards=rows.map((item,i)=>{
    const p=products.find(x=>String(x.sku)===String(item.sku));if(!p)return '';
@@ -678,12 +679,11 @@ window.renderItemRows=function(){
   }).join('');
   host.innerHTML='<div class="field outside-sale-picker" style="width:100%;position:relative"><label for="outsideSaleSearch">اختر اسم القطعة أو رقم SKU من المخزون</label><input id="outsideSaleSearch" type="text" autocomplete="off" placeholder="اضغط هنا لعرض المنتجات أو اكتب الاسم / SKU" aria-haspopup="listbox" aria-expanded="false"><div id="outsideSaleProductOptions" role="listbox" class="outside-sale-options hidden" style="position:absolute;z-index:30;top:100%;right:0;left:0;max-height:260px;overflow:auto;background:#202830;border:1px solid #53606c;border-radius:10px;box-shadow:0 12px 28px #0008;padding:6px"></div><div class="small muted">اضغط على الحقل لعرض المنتجات المتاحة، أو اكتب للبحث. يمكنك اختيار أكثر من منتج.</div><button type="button" class="btn primary" id="addOutsideSaleProduct" style="margin-top:8px">إضافة المنتج المحدد</button></div>'+(cards?'<div id="outsideSaleProductDetails" class="form-grid" style="margin-top:10px">'+cards+'</div>':'');
   const search=document.getElementById('outsideSaleSearch'),options=document.getElementById('outsideSaleProductOptions');
-  const outsideProductName=p=>String(p?.name??p?.product_name??p?.item_name??p?.product?.name??p?.inventory_product?.name??p?.item?.name??p?.data?.name??p?.details?.name??p?.description??p?.title??'').trim();
   const renderOptions=(query='')=>{
    const q=String(query||'').trim().toLocaleLowerCase();
    const matches=products.filter(p=>!q||outsideProductName(p).toLocaleLowerCase().includes(q)||String(p.sku||'').toLocaleLowerCase().includes(q));
    options.innerHTML=matches.length?matches.map((p,i)=>'<button type="button" role="option" data-product-index="'+i+'" style="display:block;width:100%;text-align:right;padding:11px 12px;margin:2px 0;border:0;border-radius:7px;background:transparent;color:#f3f5f6;cursor:pointer"><strong style="display:block">'+esc(outsideProductName(p)||'اسم المنتج غير مسجل')+' <span style="color:#b7c2cb;font-weight:400">— رقم القطعة: '+esc(p.sku||'—')+'</span></strong><span style="display:block;color:#b7c2cb;font-size:12px;margin-top:3px">الكمية المتاحة: '+Number(p.owned_stock||0)+'</span></button>').join(''):'<div class="small muted" style="padding:12px;text-align:center">لا توجد منتجات مطابقة في المخزون</div>';
-   options.querySelectorAll('[data-product-index]').forEach((button,index)=>button.addEventListener('click',()=>{const p=matches[index];search.value=outsideProductName(p)+' · '+String(p.sku);options.classList.add('hidden');search.setAttribute('aria-expanded','false');}));
+   options.querySelectorAll('[data-product-index]').forEach((button,index)=>button.addEventListener('click',()=>{const p=matches[index];search.value=outsideProductName(p)+' · '+String(p.sku);search.dataset.selectedSku=String(p.sku);options.classList.add('hidden');search.setAttribute('aria-expanded','false');}));
   };
   search.addEventListener('focus',()=>{renderOptions(search.value);options.classList.remove('hidden');search.setAttribute('aria-expanded','true');});
   search.addEventListener('click',()=>{renderOptions(search.value);options.classList.remove('hidden');search.setAttribute('aria-expanded','true');});
@@ -692,7 +692,8 @@ window.renderItemRows=function(){
 
   document.getElementById('addOutsideSaleProduct')?.addEventListener('click',()=>{
    const input=document.getElementById('outsideSaleSearch'),value=(input?.value||'').trim();
-   const p=products.find(x=>value===outsideProductName(x)+' · '+String(x.sku)||value===String(x.sku)+' · '+outsideProductName(x)||value===String(x.sku)||value===outsideProductName(x));
+   const selectedSku=String(input?.dataset.selectedSku||'');
+   const p=products.find(x=>(selectedSku&&String(x.sku)===selectedSku)||value===outsideProductName(x)+' · '+String(x.sku)||value===String(x.sku)+' · '+outsideProductName(x)||value===String(x.sku)||value===outsideProductName(x));
    if(!p){aibAlert('اختر منتجاً صحيحاً من المخزون بالاسم أو رقم SKU.');return;}
    if(rows.some(x=>String(x.sku)===String(p.sku))){aibAlert('هذا المنتج مضاف بالفعل إلى قائمة البيع.');return;}
    window.draftItems=[...rows.filter(x=>x.sku),{sku:p.sku,description:outsideProductName(p),model:p.model||'',store_family:p.store_family||'',store_category:p.store_category||'',quantity:1,price:Number(p.sale_price||0),currency:p.currency||p.sale_currency||'USD'}];
