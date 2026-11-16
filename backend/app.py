@@ -1095,6 +1095,14 @@ def recalculate_inventory(s:Session):
                 bucket="owned" if record.section in {"purchase","carPurchase","directSale"} else "consigned"
                 sign=-1 if record.section in {"directSale","consignSale"} else 1
                 totals[product.id][bucket]+=sign*qty
+    # Apply audited manual stock adjustments after invoice-derived movements.
+    for event in s.scalars(select(AuditEvent).where(AuditEvent.action=="inventory_stock_adjustment",AuditEvent.entity=="inventory_product")).all():
+        details=event.details if isinstance(event.details,dict) else {}
+        adjustment=details.get("stock_adjustment") if isinstance(details.get("stock_adjustment"),dict) else {}
+        product_id=event.entity_id
+        if product_id in totals:
+            totals[product_id]["owned"]+=float(adjustment.get("owned_delta") or 0)
+            totals[product_id]["consigned"]+=float(adjustment.get("consigned_delta") or 0)
     for product in s.scalars(select(InventoryProduct)).all():
         owned=round(totals[product.id]["owned"],3)
         consigned=round(totals[product.id]["consigned"],3)
@@ -1230,6 +1238,8 @@ class InventoryProductUpdate(BaseModel):
     condition: str="new"
     store_family: str
     store_category: str
+    owned_stock: Optional[float]=Field(default=None,ge=0)
+    consigned_stock: Optional[float]=Field(default=None,ge=0)
 
 @app.put("/inventory/products/{product_id}")
 def edit_inventory_product(product_id:int,p:InventoryProductUpdate,request:Request,s:Session=Depends(db),u:User=Depends(require_inventory_product_management())):
@@ -1247,7 +1257,16 @@ def edit_inventory_product(product_id:int,p:InventoryProductUpdate,request:Reque
         scopes=set(u.business_scopes or [])
         if p.store_family not in scopes and p.store_category not in scopes:
             raise HTTPException(403,"هذا القسم خارج مجالات العمل المصرح بها لحسابك")
-    before={"name":product.name,"model":product.model,"sale_price":float(product.sale_price) if product.sale_price is not None else None,"sale_currency":product.sale_currency,"condition":product.condition,"store_family":product.store_family,"store_category":product.store_category}
+    if p.owned_stock is not None or p.consigned_stock is not None:
+        recalculate_inventory(s)
+    old_owned=float(product.owned_stock or 0)
+    old_consigned=float(product.consigned_stock or 0)
+    new_owned=float(p.owned_stock) if p.owned_stock is not None else old_owned
+    new_consigned=float(p.consigned_stock) if p.consigned_stock is not None else old_consigned
+    stock_adjustment={"owned_delta":round(new_owned-old_owned,3),"consigned_delta":round(new_consigned-old_consigned,3)}
+    before={"name":product.name,"model":product.model,"sale_price":float(product.sale_price) if product.sale_price is not None else None,"sale_currency":product.sale_currency,"condition":product.condition,"store_family":product.store_family,"store_category":product.store_category,"owned_stock":old_owned,"consigned_stock":old_consigned}
+    product.owned_stock=new_owned
+    product.consigned_stock=new_consigned
     product.name=p.name.strip()
     product.model=p.model.strip()
     product.sale_price=p.sale_price
@@ -1255,7 +1274,9 @@ def edit_inventory_product(product_id:int,p:InventoryProductUpdate,request:Reque
     product.condition=p.condition
     product.store_family=p.store_family
     product.store_category=p.store_category
-    audit(s,u,"inventory_product_updated","inventory_product",product.id,{"sku":product.sku,"before":before,"after":{"name":product.name,"model":product.model,"sale_price":p.sale_price,"sale_currency":p.sale_currency,"condition":p.condition,"store_family":p.store_family,"store_category":p.store_category}},request)
+    audit(s,u,"inventory_product_updated","inventory_product",product.id,{"sku":product.sku,"before":before,"after":{"name":product.name,"model":product.model,"sale_price":p.sale_price,"sale_currency":p.sale_currency,"condition":p.condition,"store_family":p.store_family,"store_category":p.store_category,"owned_stock":new_owned,"consigned_stock":new_consigned},"stock_adjustment":stock_adjustment},request)
+    if abs(stock_adjustment["owned_delta"])>0.0001 or abs(stock_adjustment["consigned_delta"])>0.0001:
+        audit(s,u,"inventory_stock_adjustment","inventory_product",product.id,{"sku":product.sku,"stock_adjustment":stock_adjustment},request)
     s.commit()
     _store_catalog_cache["value"]=None
     _store_catalog_cache["at"]=0
