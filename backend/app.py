@@ -2837,7 +2837,7 @@ def review_online_purchase_order(order_id:int,p:OnlineOrderReviewPayload,s:Sessi
              ("إجمالي قيمة منتجاتك",f"{amounts['gross']:.2f} {html.escape(order.currency)}"),
              ("عمولة المتجر 1.5٪",f"{amounts['commission']:.2f} {html.escape(order.currency)}"),
              ("صافي المبلغ المضاف لمحفظتك",f"{amounts['net']:.2f} {html.escape(order.currency)}")],
-            accent="#168447",note="يمكنك مراجعة تفاصيل الطلب وطباعة إشعار البيع من صفحة طلبات الشراء عبر الإنترنت في تطبيق AIB.")
+            accent="#168447",note="يمكنك مراجعة تفاصيل الطلب وطباعة فاتورة الطلب من صفحة طلبات الشراء عبر الإنترنت في تطبيق AIB.")
         send_notification_email(seller.email,f"تم بيع منتج من مخزونك – طلب #{order.id} | AIB",seller_body,seller_html)
     return {"ok":True,"status":"approved","record_id":record.id,"invoice_no":record.invoice_no,"customer":order.customer_data}
 
