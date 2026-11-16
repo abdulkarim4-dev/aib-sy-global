@@ -294,25 +294,25 @@ app=FastAPI(title="AIB Accounting API", version="1.0.0")
 class _SensitiveQueryLogFilter(logging.Filter):
     """Redact authentication secrets from Uvicorn access-log request targets."""
     _sensitive_query = re.compile(
-        r"(?i)([?&](?:code|state|password_change_token)=)[^&\\s\"'<>]*"
+        r"(?i)([?&](?:code|state|password_change_token)=)[^&\s\"'<>]*"
     )
 
     def filter(self, record: logging.LogRecord) -> bool:
         try:
             if isinstance(record.args, tuple):
                 record.args = tuple(
-                    self._sensitive_query.sub(r"\\1[REDACTED]", value)
+                    self._sensitive_query.sub(r"\1[REDACTED]", value)
                     if isinstance(value, str) else value
                     for value in record.args
                 )
             elif isinstance(record.args, dict):
                 record.args = {
-                    key: self._sensitive_query.sub(r"\\1[REDACTED]", value)
+                    key: self._sensitive_query.sub(r"\1[REDACTED]", value)
                     if isinstance(value, str) else value
                     for key, value in record.args.items()
                 }
             if isinstance(record.msg, str):
-                record.msg = self._sensitive_query.sub(r"\\1[REDACTED]", record.msg)
+                record.msg = self._sensitive_query.sub(r"\1[REDACTED]", record.msg)
         except Exception:
             # Logging must never interfere with authentication or request handling.
             pass
