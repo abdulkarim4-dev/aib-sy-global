@@ -2039,6 +2039,46 @@ def get_user_wallet(user_id:int,s:Session=Depends(db),u:User=Depends(current_use
     s.commit()
     return {"user_id":target.id,"username":target.username,"name":target.full_name,"wallets":result}
 
+class WalletAdjustmentPayload(BaseModel):
+    amount: float
+    currency: str
+    movement: str
+    description: str = ""
+
+@app.post("/users/{user_id}/wallet/adjust")
+def adjust_user_wallet(user_id:int,p:WalletAdjustmentPayload,request:Request,s:Session=Depends(db),u:User=Depends(manager)):
+    if u.role!="owner":
+        raise HTTPException(403,"الإيداع والسحب من صلاحيات المالك حصراً")
+    target=s.get(User,user_id)
+    if not target or target.deleted or target.role=="owner":
+        raise HTTPException(404,"حساب المستخدم غير موجود")
+    amount=round(float(p.amount),2)
+    currency=str(p.currency or "").upper().strip()
+    movement=str(p.movement or "").strip()
+    if amount<=0 or amount!=amount or amount==float("inf"):
+        raise HTTPException(400,"أدخل مبلغاً صحيحاً أكبر من الصفر")
+    if currency not in {"USD","SYP"}:
+        raise HTTPException(400,"العملة غير مدعومة")
+    if movement not in {"deposit","withdrawal"}:
+        raise HTTPException(400,"نوع الحركة غير صحيح")
+    ensure_user_wallets(s,target.id)
+    wallet=s.scalar(select(UserWallet).where(UserWallet.user_id==target.id,UserWallet.currency==currency).with_for_update())
+    if not wallet:
+        raise HTTPException(500,"تعذر العثور على محفظة المستخدم")
+    before=round(float(wallet.balance or 0),2)
+    if movement=="withdrawal" and before<amount:
+        raise HTTPException(409,"رصيد المحفظة غير كافٍ لإتمام السحب")
+    direction="in" if movement=="deposit" else "out"
+    wallet.balance=round(before+amount if movement=="deposit" else before-amount,2)
+    wallet.updated_at=datetime.now(timezone.utc)
+    default_reason=("إيداع نقدي في محفظة المستخدم بواسطة المالك" if movement=="deposit" else "صرف نقدي للمستخدم مقابل خصم من رصيد محفظته بواسطة المالك")
+    reason=(p.description or "").strip()[:500] or default_reason
+    tx=WalletTransaction(wallet_id=wallet.id,user_id=target.id,amount=amount,currency=currency,direction=direction,reason=reason,reference_type="owner_wallet_adjustment",created_by=u.id)
+    s.add(tx);s.flush()
+    audit(s,u,"wallet_deposit" if movement=="deposit" else "wallet_cash_withdrawal","user_wallet",wallet.id,{"target_user_id":target.id,"amount":amount,"currency":currency,"balance_before":before,"balance_after":float(wallet.balance),"transaction_id":tx.id,"description":reason},request)
+    s.commit()
+    return {"ok":True,"user_id":target.id,"wallet_id":wallet.id,"amount":amount,"currency":currency,"movement":movement,"balance":float(wallet.balance),"transaction_id":tx.id}
+
 @app.get("/cash-summary")
 def cash_summary(s:Session=Depends(db),u:User=Depends(require_permission("cash","view"))):
     query=select(
