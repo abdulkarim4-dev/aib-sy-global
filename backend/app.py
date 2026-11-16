@@ -350,7 +350,10 @@ def require_store_same_origin(request:Request):
     # SameSite=Lax is reinforced with strict Origin validation for cookie-authenticated mutations.
     if request.method in {"POST","PUT","PATCH","DELETE"}:
         origin=request.headers.get("origin","").rstrip("/")
-        expected=f"{request.url.scheme}://{request.url.netloc}"
+        forwarded_proto=request.headers.get("x-forwarded-proto","").split(",")[0].strip()
+        scheme=forwarded_proto or request.url.scheme
+        host=request.headers.get("x-forwarded-host",request.url.netloc).split(",")[0].strip()
+        expected=f"{scheme}://{host}"
         if not origin or origin!=expected:
             raise HTTPException(403,"تم رفض الطلب لعدم تطابق مصدره")
 
