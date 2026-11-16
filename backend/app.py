@@ -454,6 +454,7 @@ def startup():
         conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS record_id INTEGER REFERENCES records(id)"))
         conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS voided_by INTEGER REFERENCES users(id)"))
         conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS voided_at TIMESTAMP WITH TIME ZONE"))
+        conn.execute(text("ALTER TABLE wallet_requests ADD COLUMN IF NOT EXISTS review_note TEXT NOT NULL DEFAULT ''"))
     with SessionLocal() as s:
         if not s.get(CompanyProfile,1):
             s.add(CompanyProfile(id=1,data={
