@@ -346,7 +346,16 @@ def current_user(token:Optional[str]=Depends(oauth), s:Session=Depends(db)):
     u=s.get(User,uid)
     if not u or not u.active: raise HTTPException(401,"الحساب غير فعال")
     return u
+def require_store_same_origin(request:Request):
+    # SameSite=Lax is reinforced with strict Origin validation for cookie-authenticated mutations.
+    if request.method in {"POST","PUT","PATCH","DELETE"}:
+        origin=request.headers.get("origin","").rstrip("/")
+        expected=f"{request.url.scheme}://{request.url.netloc}"
+        if not origin or origin!=expected:
+            raise HTTPException(403,"تم رفض الطلب لعدم تطابق مصدره")
+
 def current_store_customer(request:Request, s:Session=Depends(db)):
+    require_store_same_origin(request)
     # Store sessions are accepted only from the HttpOnly cookie, never from browser-readable bearer storage.
     token=request.cookies.get("aib_store_session","")
     if not token:
@@ -1955,7 +1964,8 @@ def clear_store_session(response:Response):
     response.delete_cookie("aib_store_session",path="/",secure=True,httponly=True,samesite="lax")
 
 @app.post("/store/auth/logout")
-def logout_store_customer(response:Response):
+def logout_store_customer(request:Request, response:Response):
+    require_store_same_origin(request)
     clear_store_session(response)
     return {"ok":True}
 
