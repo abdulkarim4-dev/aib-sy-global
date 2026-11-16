@@ -1463,7 +1463,7 @@ def create_record(p:RecordCreate, request:Request, s:Session=Depends(db), u:User
     r=Record(section=p.section,invoice_no=invoice_no,currency=p.currency,data=prepared_data,created_by=u.id)
     s.add(r); s.flush(); recalculate_inventory(s); audit(s,u,"record_created","record",r.id,{"section":r.section,"invoice_no":r.invoice_no},request); s.commit()
     # Invalidate shop catalog caches immediately after a stock-changing record.
-    if p.section in {"purchase","carPurchase","deposit"}:
+    if p.section in {"purchase","carPurchase","deposit","directSale","consignSale"}:
         _store_catalog_cache["value"]=None
         _store_catalog_cache["at"]=0
         _public_products_cache["value"].clear()
@@ -1879,7 +1879,7 @@ def update_record(record_id:int, p:RecordUpdate, request:Request, s:Session=Depe
     r.data=updated_data; r.invoice_no=p.invoice_no; r.currency=p.currency; r.updated_at=datetime.now(timezone.utc)
     recalculate_inventory(s)
     audit(s,u,"record_updated","record",r.id,{"section":r.section,"invoice_no":r.invoice_no},request); s.commit()
-    if r.section in {"purchase","carPurchase","deposit"}:
+    if r.section in {"purchase","carPurchase","deposit","directSale","consignSale"}:
         _store_catalog_cache["value"]=None
         _store_catalog_cache["at"]=0
         _public_products_cache["value"].clear()
@@ -1914,6 +1914,11 @@ def delete_record(record_id:int, request:Request, s:Session=Depends(db), u:User=
         s.delete(cash_move)
     audit(s,u,"record_deleted","record",r.id,{"section":r.section,"related_payments_and_cash_movements_deleted":True},request)
     s.commit()
+    if r.section in {"purchase","carPurchase","deposit","directSale","consignSale"}:
+        _store_catalog_cache["value"]=None
+        _store_catalog_cache["at"]=0
+        _public_products_cache["value"].clear()
+        _public_products_cache["at"].clear()
     return {"ok":True}
 
 @app.get("/my-change-requests")
