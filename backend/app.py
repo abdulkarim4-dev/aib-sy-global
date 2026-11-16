@@ -1493,7 +1493,7 @@ def create_record(p:RecordCreate, request:Request, s:Session=Depends(db), u:User
     r=Record(section=p.section,invoice_no=invoice_no,currency=p.currency,data=prepared_data,created_by=u.id)
     s.add(r); s.flush()
     recalculate_inventory(s)
-    audit(s,u,"record_created","record",r.id,{"section":r.section,"invoice_no":r.invoice_no,"seller_wallet_credit":seller_net if employee_sale else 0,"owner_commission":commission_amount if employee_sale else 0,"currency":p.currency},request)
+    audit(s,u,"record_created","record",r.id,{"section":r.section,"invoice_no":r.invoice_no,"seller_wallet_credit":0,"seller_wallet_credit_pending":seller_net if employee_sale else 0,"owner_commission":commission_amount if employee_sale else 0,"currency":p.currency},request)
     s.commit()
     # Invalidate shop catalog caches immediately after a stock-changing record.
     if p.section in {"purchase","carPurchase","deposit","directSale","consignSale"}:
@@ -1872,6 +1872,9 @@ def pending_outside_store_sales(s:Session=Depends(db),u:User=Depends(manager)):
 def submit_outside_store_payment(record_id:int,p:OutsideStorePaymentPayload,request:Request,s:Session=Depends(db),u:User=Depends(current_user)):
     if p.method not in {"baraka_bank","sham_cash","syriatel_cash"}:
         raise HTTPException(400,"طريقة الدفع غير مدعومة")
+    payment_reference=p.reference.strip()
+    if len(payment_reference)<3:
+        raise HTTPException(400,"مرجع التحويل غير صالح")
     record=s.scalar(select(Record).where(Record.id==record_id).with_for_update())
     if not record or record.deleted or record.created_by!=u.id or record.section!="directSale" or not (record.data or {}).get("outside_store_sale"):
         raise HTTPException(404,"عملية البيع خارج المتجر غير موجودة")
@@ -1881,11 +1884,11 @@ def submit_outside_store_payment(record_id:int,p:OutsideStorePaymentPayload,requ
         raise HTTPException(409,"تم تأكيد الدفع لهذه العملية مسبقاً")
     if commission.get("payment_status")=="submitted":
         raise HTTPException(409,"تم إرسال بيانات الدفع بالفعل، وهي بانتظار مراجعة المالك")
-    commission.update({"payment_status":"submitted","payment_method":p.method,"payment_reference":p.reference.strip(),"payment_submitted_at":datetime.now(timezone.utc).isoformat()})
+    commission.update({"payment_status":"submitted","payment_method":p.method,"payment_reference":payment_reference,"payment_submitted_at":datetime.now(timezone.utc).isoformat()})
     data["owner_commission"]=commission
     record.data=data
     record.updated_at=datetime.now(timezone.utc)
-    audit(s,u,"outside_store_commission_payment_submitted","record",record.id,{"invoice_no":record.invoice_no,"amount":commission.get("amount"),"currency":record.currency,"method":p.method,"reference":p.reference.strip()},request)
+    audit(s,u,"outside_store_commission_payment_submitted","record",record.id,{"invoice_no":record.invoice_no,"amount":commission.get("amount"),"currency":record.currency,"method":p.method,"reference":payment_reference},request)
     s.commit()
     return {"ok":True,"payment_status":"submitted"}
 
