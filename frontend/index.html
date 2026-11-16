@@ -676,7 +676,7 @@ window.renderItemRows=function(){
     const i=Number(el.dataset.outsideQty),item=window.draftItems?.[i];if(!item)return;
     const raw=String(el.value||'').trim();
     if(raw===''){item.quantity=1;updateInvoiceGrandTotal();return;}
-    if(!/^\\d+$/.test(raw))return;
+    if(!/^[0-9]+$/.test(raw))return;
     const entered=Number(raw);
     if(!Number.isSafeInteger(entered)||entered<1)return;
     item.quantity=Math.min(entered,available());
