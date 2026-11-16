@@ -1492,25 +1492,6 @@ def create_record(p:RecordCreate, request:Request, s:Session=Depends(db), u:User
     consume_operation_verification(s,u,"invoice_create",p.verification_token)
     r=Record(section=p.section,invoice_no=invoice_no,currency=p.currency,data=prepared_data,created_by=u.id)
     s.add(r); s.flush()
-    if employee_sale:
-        owner=s.scalar(select(User).where(User.role=="owner",User.deleted.is_(False)).order_by(User.id).limit(1))
-        if not owner: raise HTTPException(500,"تعذر العثور على حساب المالك لتسجيل عمولة البيع")
-        ensure_user_wallets(s,u.id)
-        ensure_user_wallets(s,owner.id)
-        seller_wallet=s.scalar(select(UserWallet).where(UserWallet.user_id==u.id,UserWallet.currency==p.currency).with_for_update())
-        owner_wallet=s.scalar(select(UserWallet).where(UserWallet.user_id==owner.id,UserWallet.currency==p.currency).with_for_update())
-        if not seller_wallet or not owner_wallet: raise HTTPException(500,"تعذر تجهيز محافظ البيع بالعملة المحددة")
-        now=datetime.now(timezone.utc)
-        seller_wallet.balance=float(seller_wallet.balance or 0)+seller_net
-        seller_wallet.updated_at=now
-        owner_wallet.balance=float(owner_wallet.balance or 0)+commission_amount
-        owner_wallet.updated_at=now
-        seller_tx=WalletTransaction(wallet_id=seller_wallet.id,user_id=u.id,amount=seller_net,currency=p.currency,direction="in",reason="صافي عائد بيع منتجات المخزون · "+str(r.invoice_no or r.id),reference_type="inventory_sale_net",reference_id=r.id,created_by=u.id)
-        owner_tx=WalletTransaction(wallet_id=owner_wallet.id,user_id=owner.id,amount=commission_amount,currency=p.currency,direction="in",reason="عمولة المالك 1.5٪ من بيع المستخدم · "+str(r.invoice_no or r.id),reference_type="inventory_sale_commission",reference_id=r.id,created_by=u.id)
-        s.add_all([seller_tx,owner_tx]); s.flush()
-        prepared_data["owner_commission"]["wallet_transaction_id"]=owner_tx.id
-        prepared_data["seller_wallet_credit"]={"amount":seller_net,"currency":p.currency,"wallet_transaction_id":seller_tx.id}
-        r.data=prepared_data
     recalculate_inventory(s)
     audit(s,u,"record_created","record",r.id,{"section":r.section,"invoice_no":r.invoice_no,"seller_wallet_credit":seller_net if employee_sale else 0,"owner_commission":commission_amount if employee_sale else 0,"currency":p.currency},request)
     s.commit()
