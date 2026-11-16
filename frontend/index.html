@@ -656,7 +656,7 @@ window.renderItemRows=function(){
    const p=products.find(x=>value===outsideProductName(x)+' · '+String(x.sku)||value===String(x.sku)+' · '+outsideProductName(x)||value===String(x.sku)||value===outsideProductName(x));
    if(!p){aibAlert('اختر منتجاً صحيحاً من المخزون بالاسم أو رقم SKU.');return;}
    if(rows.some(x=>String(x.sku)===String(p.sku))){aibAlert('هذا المنتج مضاف بالفعل إلى قائمة البيع.');return;}
-   window.draftItems=[...rows.filter(x=>x.sku),{sku:p.sku,description:p.name,model:p.model||'',store_family:p.store_family||'',store_category:p.store_category||'',quantity:1,price:Number(p.sale_price||0),currency:p.currency||p.sale_currency||'USD'}];
+   window.draftItems=[...rows.filter(x=>x.sku),{sku:p.sku,description:outsideProductName(p),model:p.model||'',store_family:p.store_family||'',store_category:p.store_category||'',quantity:1,price:Number(p.sale_price||0),currency:p.currency||p.sale_currency||'USD'}];
    const currencies=[...new Set(window.draftItems.map(x=>x.currency||'USD'))];
    if(currencies.length>1){window.draftItems.pop();aibAlert('لا يمكن جمع منتجات بعملات مختلفة في فاتورة واحدة. اختر منتجات بالعملة نفسها.');return;}
    const currency=document.querySelector('[name="currency"]');if(currency)currency.value=p.currency||p.sale_currency||'USD';
