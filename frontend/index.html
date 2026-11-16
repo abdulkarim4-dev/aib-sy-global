@@ -194,14 +194,14 @@ async function requestOperationVerification(action){
  const headers={'Content-Type':'application/json'};if(token)headers.Authorization='Bearer '+token;
  const startResponse=await fetch(API+'/operation-verifications/start',{method:'POST',headers,body:JSON.stringify({action})});
  let startData={};try{startData=await startResponse.json()}catch{}
- if(!startResponse.ok)throw new Error(startData.detail||'تعذر إرسال رمز تأكيد العملية');
+ if(!startResponse.ok)throw new Error(aibMessageText(startData.detail)||'تعذر إرسال رمز تأكيد العملية');
  if(!startData.required)return null;
  const code=await aibPrompt('أرسلنا رمز تأكيد من 6 أرقام إلى بريدك الإلكتروني '+(startData.email||'الموثق')+' أدخل الرمز لإتمام العملية. لن يتم حفظ العملية قبل التحقق.',{title:'تأكيد العملية عبر البريد الإلكتروني',placeholder:'أدخل رمز التحقق المكوّن من 6 أرقام'});
  if(code===null)throw new Error('تم إلغاء العملية قبل التأكيد');
  const clean=String(code).trim();if(!/^\d{6}$/.test(clean))throw new Error('أدخل رمز التحقق المكوّن من 6 أرقام');
  const verifyResponse=await fetch(API+'/operation-verifications/confirm',{method:'POST',headers,body:JSON.stringify({challenge_id:startData.challenge_id,code:clean})});
  let verifyData={};try{verifyData=await verifyResponse.json()}catch{}
- if(!verifyResponse.ok)throw new Error(verifyData.detail||'تعذر تأكيد رمز البريد الإلكتروني');
+ if(!verifyResponse.ok)throw new Error(aibMessageText(verifyData.detail)||'تعذر تأكيد رمز البريد الإلكتروني');
  return verifyData.verification_token;
 }
 function operationActionForRequest(path,method){
@@ -225,12 +225,12 @@ async function api(path,opts={}){
   h['Content-Type']='application/json';opts.body=JSON.stringify(body);
  }
  let r=await fetch(API+path,{...opts,headers:h});let data;try{data=await r.json()}catch{data={}}
- if(!r.ok)throw new Error(data.detail||('HTTP '+r.status));return data
+ if(!r.ok)throw new Error(aibMessageText(data.detail)||('HTTP '+r.status));return data
 }
 function togglePasswordVisibility(){const input=document.getElementById('password');const visible=input.type==='password';input.type=visible?'text':'password';document.getElementById('togglePassword').textContent=tr(visible?'hidePassword':'showPassword')}
 
 function completeAccountingLogin(d){token=d.access_token;me=d.user;sessionStorage.setItem('aib_session_token',token);if(document.getElementById('rememberMe')?.checked)localStorage.setItem('aib_remembered_token',token);else localStorage.removeItem('aib_remembered_token');showApp()}
-document.getElementById('loginForm').addEventListener('submit',async e=>{e.preventDefault();let msg=document.getElementById('loginMsg');msg.innerHTML='';let fd=new URLSearchParams();fd.set('username',document.getElementById('username').value.trim());fd.set('password',document.getElementById('password').value);try{let r=await fetch('/auth/login',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:fd});let d=await r.json();if(!r.ok)throw new Error(d.detail||tr('loginError'));if(!d.access_token||!d.user)throw new Error('استجابة تسجيل الدخول غير مكتملة');completeAccountingLogin(d)}catch(err){msg.innerHTML='<div class="notice error">'+esc(err.message)+'</div>'}});
+document.getElementById('loginForm').addEventListener('submit',async e=>{e.preventDefault();let msg=document.getElementById('loginMsg');msg.innerHTML='';let fd=new URLSearchParams();fd.set('username',document.getElementById('username').value.trim());fd.set('password',document.getElementById('password').value);try{let r=await fetch('/auth/login',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:fd});let d=await r.json();if(!r.ok)throw new Error(aibMessageText(d.detail)||tr('loginError'));if(!d.access_token||!d.user)throw new Error('استجابة تسجيل الدخول غير مكتملة');completeAccountingLogin(d)}catch(err){msg.innerHTML='<div class="notice error">'+esc(err.message)+'</div>'}});
 async function restoreRememberedSession(){const saved=sessionStorage.getItem('aib_session_token')||localStorage.getItem('aib_remembered_token');if(!saved){document.getElementById('login').classList.remove('hidden');return}token=saved;try{me=await api('/auth/me');document.getElementById('rememberMe').checked=!!localStorage.getItem('aib_remembered_token');showApp()}catch(err){token='';me=null;sessionStorage.removeItem('aib_session_token');localStorage.removeItem('aib_remembered_token');document.getElementById('app').classList.add('hidden');document.getElementById('login').classList.remove('hidden')}}
 restoreRememberedSession();
 function hasPerm(module,action){return me?.role==='owner'||!!me?.permissions?.[module]?.[action]}function showApp(){document.getElementById('login').classList.add('hidden');document.getElementById('app').classList.remove('hidden');document.getElementById('who').textContent=me.name+' · '+(me.role==='owner'?tr('owner'):tr('employee'));document.querySelectorAll('.owner-only').forEach(x=>x.classList.toggle('hidden',me.role!=='owner'));document.querySelector('[data-page="userProfile"]')?.classList.toggle('hidden',me.role!=='owner'&&!hasPerm('vehicles','sell'));document.querySelector('[data-page="inventory"]')?.classList.toggle('hidden',!hasPerm('inventory','view'));document.querySelector('[data-page="records"]')?.classList.toggle('hidden',me.role!=='owner');document.querySelector('[data-page="cash"]')?.classList.toggle('hidden',!hasPerm('cash','view'));const savedPage=sessionStorage.getItem('aib_current_page')||'dashboard';const validPages=['dashboard','records','inventory','cash','wallets','users','requests','audit','companyProfile','settings','onlineOrders','userProfile'];const allowed=page=>page==='dashboard'||page==='settings'||(page==='requests'&&me.role==='owner')||(page==='userProfile'&&(me.role==='owner'||hasPerm('vehicles','sell')))||(page==='records'&&me.role==='owner')||(page==='inventory'&&hasPerm('inventory','view'))||(page==='cash'&&hasPerm('cash','view'))||(page==='wallets')||page==='onlineOrders'||(me.role==='owner'&&['users','audit','companyProfile'].includes(page));const target=validPages.includes(savedPage)&&allowed(savedPage)?savedPage:'dashboard';go(target,document.querySelector('[data-page="'+target+'"]'));refreshRequestBadge();refreshOnlineOrderBadge()}
