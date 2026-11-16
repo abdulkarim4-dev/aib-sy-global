@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Any
-import os, secrets, json, base64, binascii, smtplib, hashlib, html
+import os, secrets, json, base64, binascii, smtplib, hashlib, html, logging, re
 from urllib.parse import urlencode
 from email.message import EmailMessage
 from urllib.request import Request as UrlRequest, urlopen
@@ -290,6 +290,39 @@ class AuditEvent(Base):
 password_hash=PasswordHash.recommended()
 oauth=OAuth2PasswordBearer(tokenUrl="/auth/login")
 app=FastAPI(title="AIB Accounting API", version="1.0.0")
+
+class _SensitiveQueryLogFilter(logging.Filter):
+    """Redact authentication secrets from Uvicorn access-log request targets."""
+    _sensitive_query = re.compile(
+        r"(?i)([?&](?:code|state|password_change_token)=)[^&\s\"'<>]*"
+    )
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            if isinstance(record.args, tuple):
+                record.args = tuple(
+                    self._sensitive_query.sub(r"\1[REDACTED]", value)
+                    if isinstance(value, str) else value
+                    for value in record.args
+                )
+            elif isinstance(record.args, dict):
+                record.args = {
+                    key: self._sensitive_query.sub(r"\1[REDACTED]", value)
+                    if isinstance(value, str) else value
+                    for key, value in record.args.items()
+                }
+            if isinstance(record.msg, str):
+                record.msg = self._sensitive_query.sub(r"\1[REDACTED]", record.msg)
+        except Exception:
+            # Logging must never interfere with authentication or request handling.
+            pass
+        return True
+
+
+_access_logger = logging.getLogger("uvicorn.access")
+_access_logger.addFilter(_SensitiveQueryLogFilter())
+for _access_handler in _access_logger.handlers:
+    _access_handler.addFilter(_SensitiveQueryLogFilter())
 app.add_middleware(GZipMiddleware, minimum_size=900, compresslevel=5)
 
 def db():
@@ -2262,7 +2295,7 @@ def request_store_password_change(p:StoreChangePasswordPayload, request:Request,
     token=secrets.token_urlsafe(36)
     row=StorePasswordReset(customer_id=customer.id,code_hash=hashlib.sha256(token.encode("utf-8")).hexdigest(),pending_password_hash=password_hash.hash(p.new_password),expires_at=now+timedelta(minutes=20))
     s.add(row);s.flush()
-    link="https://aib-sy-global.onrender.com/shop?password_change_token="+token
+    link="https://aib-sy-global.onrender.com/shop#password_change_token="+token
     try:
         send_aib_email(customer.email,"تأكيد تغيير كلمة مرور حساب AIB",
             f"مرحباً {customer.full_name}، لتأكيد تغيير كلمة المرور افتح الرابط التالي خلال 20 دقيقة:\n{link}\nإذا لم تطلب هذا التغيير فتجاهل الرسالة.",
