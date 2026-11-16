@@ -1123,6 +1123,9 @@ def prepare_record_inventory(s:Session, section:str, raw_data:dict, allow_legacy
     return data
 
 def recalculate_inventory(s:Session):
+    # Serialize every stock-ledger rebuild so concurrent purchases, sales, edits,
+    # deletions, and manual adjustments cannot overwrite one another's balances.
+    s.execute(text("SELECT pg_advisory_xact_lock(741920261116)"))
     totals={p.id:{"owned":float(p.opening_quantity or 0),"consigned":0.0} for p in s.scalars(select(InventoryProduct)).all()}
     for record in s.scalars(select(Record).where(Record.deleted.is_(False))).all():
         if record.section not in {"purchase","carPurchase","directSale","deposit","consignSale"}: continue
@@ -1557,7 +1560,7 @@ def invoice_cash_description(record:Record, action:str="دفعة فاتورة")-
 @app.post("/records/{record_id}/payments")
 def add_invoice_payment(record_id:int,p:PaymentPayload,request:Request,s:Session=Depends(db),u:User=Depends(require_permission("invoices","create"))):
     r=s.get(Record,record_id)
-    if not r or r.deleted or (u.role!="owner" and r.created_by!=u.id): raise HTTPException(404,"الفاتورة غير موجودة")
+    if not r or r.deleted or (u.role!="owner" and (r.created_by!=u.id or r.section in {"deposit","consignSale"})): raise HTTPException(404,"الفاتورة غير موجودة")
     if p.method not in {"cash","baraka_bank","sham_cash","syriatel_cash"}: raise HTTPException(400,"طريقة الدفع غير صالحة")
     total=float(r.data.get("amount",r.data.get("price",r.data.get("sale",0))) or 0)
     paid=float(s.scalar(select(func.coalesce(func.sum(InvoicePayment.amount),0)).where(InvoicePayment.record_id==record_id)) or 0)
@@ -1577,7 +1580,7 @@ def add_invoice_payment(record_id:int,p:PaymentPayload,request:Request,s:Session
 @app.get("/records/{record_id}/payments")
 def list_invoice_payments(record_id:int,s:Session=Depends(db),u:User=Depends(require_permission("invoices","view"))):
     r=s.get(Record,record_id)
-    if not r or r.deleted or (u.role!="owner" and r.created_by!=u.id): raise HTTPException(404,"الفاتورة غير موجودة")
+    if not r or r.deleted or (u.role!="owner" and (r.created_by!=u.id or r.section in {"deposit","consignSale"})): raise HTTPException(404,"الفاتورة غير موجودة")
     trust_boxes={"صندوق الأمانة","صندوق مبيع الأمانة","صندوق قل أمانة","صندوق قُل أمانة"}
     return [{"id":x.id,"amount":float(x.amount),"method":x.method,"cash_box":(x.cash_box if u.role=="owner" or x.cash_box not in trust_boxes else "صندوق المبيع"),"paid_at":x.paid_at} for x in s.scalars(select(InvoicePayment).where(InvoicePayment.record_id==record_id).order_by(InvoicePayment.id)).all()]
 
@@ -1596,7 +1599,7 @@ def reverse_payment_cash_move(s:Session, r:Record, payment:InvoicePayment, u:Use
 @app.put("/records/{record_id}/payments/{payment_id}")
 def update_invoice_payment(record_id:int,payment_id:int,p:PaymentUpdatePayload,request:Request,s:Session=Depends(db),u:User=Depends(require_permission("invoices","edit"))):
     r=s.get(Record,record_id); x=s.get(InvoicePayment,payment_id)
-    if not r or r.deleted or (u.role!="owner" and r.created_by!=u.id) or not x or x.record_id!=record_id: raise HTTPException(404,"الدفعة غير موجودة")
+    if not r or r.deleted or (u.role!="owner" and (r.created_by!=u.id or r.section in {"deposit","consignSale"})) or not x or x.record_id!=record_id: raise HTTPException(404,"الدفعة غير موجودة")
     if p.method not in {"cash","baraka_bank","sham_cash","syriatel_cash"}: raise HTTPException(400,"طريقة الدفع غير صالحة")
     if not p.cash_box.strip(): raise HTTPException(400,"اختر الصندوق")
     trust_boxes={"صندوق الأمانة","صندوق مبيع الأمانة","صندوق قل أمانة","صندوق قُل أمانة"}
@@ -1621,7 +1624,7 @@ def update_invoice_payment(record_id:int,payment_id:int,p:PaymentUpdatePayload,r
 @app.delete("/records/{record_id}/payments/{payment_id}")
 def delete_invoice_payment(record_id:int,payment_id:int,request:Request,s:Session=Depends(db),u:User=Depends(require_permission("invoices","delete"))):
     r=s.get(Record,record_id); x=s.get(InvoicePayment,payment_id)
-    if not r or r.deleted or (u.role!="owner" and r.created_by!=u.id) or not x or x.record_id!=record_id: raise HTTPException(404,"الدفعة غير موجودة")
+    if not r or r.deleted or (u.role!="owner" and (r.created_by!=u.id or r.section in {"deposit","consignSale"})) or not x or x.record_id!=record_id: raise HTTPException(404,"الدفعة غير موجودة")
     if u.role!="owner" and x.cash_box in {"صندوق الأمانة","صندوق مبيع الأمانة","صندوق قل أمانة","صندوق قُل أمانة"}:
         raise HTTPException(403,"لا يمكن لحساب المستخدم حذف دفعة مرتبطة بصندوق الأمانة")
     reverse_payment_cash_move(s,r,x,u,"حذف")
@@ -1636,7 +1639,7 @@ def request_change(record_id:int,p:ChangePayload,request:Request,s:Session=Depen
     needed="edit" if p.action=="update" else "delete"
     if not has_permission(u,"invoices",needed): raise HTTPException(403,"ليست لديك صلاحية طلب هذا الإجراء")
     record=s.get(Record,record_id)
-    if not record or record.deleted or (u.role!="owner" and record.created_by!=u.id): raise HTTPException(404,"السجل غير موجود")
+    if not record or record.deleted or (u.role!="owner" and (record.created_by!=u.id or record.section in {"deposit","consignSale"})): raise HTTPException(404,"السجل غير موجود")
     if p.action=="update" and p.proposed_data is None: raise HTTPException(400,"البيانات المقترحة مطلوبة")
     cr=ChangeRequest(record_id=record_id,requested_by=u.id,action=p.action,proposed_data=p.proposed_data,reason=p.reason)
     s.add(cr); s.flush(); audit(s,u,"change_requested","record",record_id,{"request_id":cr.id,"action":p.action},request); s.commit(); return {"request_id":cr.id,"status":"pending"}
