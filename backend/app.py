@@ -2089,7 +2089,11 @@ def create_wallet_request(p:WalletRequestPayload,request:Request,s:Session=Depen
     ensure_user_wallets(s,u.id)
     if movement=="withdrawal":
         wallet=s.scalar(select(UserWallet).where(UserWallet.user_id==u.id,UserWallet.currency==currency).with_for_update())
-        if not wallet or float(wallet.balance or 0)<amount: raise HTTPException(409,"رصيد محفظتك غير كافٍ لطلب هذا السحب")
+        balance=round(float(wallet.balance or 0),2) if wallet else 0.0
+        pending_withdrawals=float(s.scalar(select(func.coalesce(func.sum(WalletRequest.amount),0)).where(WalletRequest.user_id==u.id,WalletRequest.movement=="withdrawal",WalletRequest.currency==currency,WalletRequest.status=="pending")) or 0)
+        available=round(balance-pending_withdrawals,2)
+        if amount>available:
+            raise HTTPException(409,f"لا يمكن طلب سحب أكثر من رصيدك المتاح. رصيد المحفظة: {balance:.2f} {currency}، والمبلغ المحجوز لطلبات معلّقة: {pending_withdrawals:.2f} {currency}، والمتاح للسحب: {max(0,available):.2f} {currency}")
     pending=s.scalar(select(func.count(WalletRequest.id)).where(WalletRequest.user_id==u.id,WalletRequest.status=="pending",WalletRequest.movement==movement))
     if pending: raise HTTPException(409,"لديك طلب من هذا النوع قيد المراجعة بالفعل")
     row=WalletRequest(user_id=u.id,movement=movement,amount=amount,currency=currency,note=(p.note or "").strip()[:500],withdrawal_method=withdrawal_method)
