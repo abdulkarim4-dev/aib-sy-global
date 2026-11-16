@@ -1688,6 +1688,8 @@ def apply_approved_change(request_id:int,p:ApprovedChangeApplyPayload,request:Re
         rec.data=prepare_record_inventory(s,rec.section,p.data,allow_legacy=True); rec.currency=currency; rec.updated_at=datetime.now(timezone.utc)
         recalculate_inventory(s)
     elif cr.action=="delete":
+        if (rec.data or {}).get("outside_store_sale") and ((rec.data or {}).get("owner_commission") or {}).get("status")=="paid":
+            raise HTTPException(409,"لا يمكن حذف هذه الفاتورة لأن عمولة المالك سُدّدت وأُضيفت إلى محفظته")
         rec.deleted=True; rec.updated_at=datetime.now(timezone.utc)
         recalculate_inventory(s)
         for payment in s.scalars(select(InvoicePayment).where(InvoicePayment.record_id==rec.id)).all(): s.delete(payment)
