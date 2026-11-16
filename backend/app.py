@@ -1863,8 +1863,11 @@ def update_record(record_id:int, p:RecordUpdate, request:Request, s:Session=Depe
     r=s.get(Record,record_id)
     if not r or r.deleted or (u.role!="owner" and r.created_by!=u.id): raise HTTPException(404,"السجل غير موجود")
     if p.currency not in ("USD","SYP"): raise HTTPException(400,"عملة غير مدعومة")
-    if isinstance(r.data,dict) and r.data.get("outside_store_sale") and u.role!="owner":
-        raise HTTPException(403,"لا يمكن تعديل عملية البيع خارج المتجر بعد تسجيلها؛ راجع المالك")
+    if isinstance(r.data,dict) and r.data.get("outside_store_sale"):
+        if (r.data.get("owner_commission") or {}).get("status")=="paid":
+            raise HTTPException(409,"لا يمكن تعديل فاتورة بعد تسديد عمولة المالك وتسجيلها في محفظته")
+        if u.role!="owner":
+            raise HTTPException(403,"لا يمكن تعديل عملية البيع خارج المتجر بعد تسجيلها؛ راجع المالك")
     ensure_total_covers_payments(s,r.id,p.data)
     updated_data=prepare_record_inventory(s,r.section,p.data,allow_legacy=True,user=u)
     if isinstance(r.data,dict) and r.data.get("outside_store_sale"):
@@ -1896,8 +1899,11 @@ def sale_cash_moves_for_record(s:Session, record:Record):
 def delete_record(record_id:int, request:Request, s:Session=Depends(db), u:User=Depends(require_permission("invoices","delete"))):
     r=s.get(Record,record_id)
     if not r or r.deleted or (u.role!="owner" and r.created_by!=u.id): raise HTTPException(404,"السجل غير موجود")
-    if (r.data or {}).get("outside_store_sale") and u.role!="owner":
-        raise HTTPException(403,"لا يمكن حذف بيع خارج المتجر؛ راجع المالك لتسوية العملية")
+    if (r.data or {}).get("outside_store_sale"):
+        if ((r.data or {}).get("owner_commission") or {}).get("status")=="paid":
+            raise HTTPException(409,"لا يمكن حذف فاتورة بعد تسديد عمولة المالك وإضافتها إلى محفظته")
+        if u.role!="owner":
+            raise HTTPException(403,"لا يمكن حذف بيع خارج المتجر؛ راجع المالك لتسوية العملية")
     r.deleted=True; r.updated_at=datetime.now(timezone.utc)
     recalculate_inventory(s)
     for payment in s.scalars(select(InvoicePayment).where(InvoicePayment.record_id==r.id)).all():
