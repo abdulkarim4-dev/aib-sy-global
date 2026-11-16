@@ -1373,9 +1373,9 @@ def update_inventory_product_images(product_id:int, p:InventoryImagesPayload, re
         if header not in ("data:image/jpeg;base64","data:image/png;base64","data:image/webp;base64"): raise HTTPException(400,"يسمح فقط بصور JPG أو PNG أو WEBP")
         try: raw=base64.b64decode(encoded,validate=True)
         except (binascii.Error,ValueError): raise HTTPException(400,"بيانات إحدى الصور غير صالحة")
-        if not raw or len(raw)>1024*1024: raise HTTPException(413,"يجب ألا يتجاوز حجم الصورة الواحدة 1 ميغابايت بعد الضغط")
+        if not raw or len(raw)>4*1024*1024: raise HTTPException(413,"يجب ألا يتجاوز حجم الصورة الواحدة 4 ميغابايت بعد الضغط")
         total_bytes+=len(raw)
-    if total_bytes>8*1024*1024: raise HTTPException(413,"الحجم الإجمالي للصور يتجاوز 8 ميغابايت")
+    if total_bytes>80*1024*1024: raise HTTPException(413,"الحجم الإجمالي للصور يتجاوز 80 ميغابايت (20 صورة × 4 ميغابايت)")
     product.images=p.images
     audit(s,u,"inventory_images_updated","inventory_product",product.id,{"sku":product.sku,"image_count":len(p.images)},request)
     s.commit()
