@@ -1452,16 +1452,45 @@ def create_record(p:RecordCreate, request:Request, s:Session=Depends(db), u:User
     serial=int(s.scalar(select(func.count(Record.id)).where(Record.section==p.section)) or 0)+1
     invoice_no=f"{section_codes[p.section]}-{serial:05d}-B"
     prepared_data=prepare_record_inventory(s,p.section,p.data,user=u)
-    # Every employee direct sale is an outside-store sale and accrues a server-calculated 1.5% owner commission.
-    if u.role!="owner" and p.section=="directSale":
+    # Employee-owned inventory sales are settled immediately into separate seller/owner wallets.
+    employee_sale = u.role!="owner" and p.section=="directSale"
+    commission_base=0.0
+    commission_amount=0.0
+    seller_net=0.0
+    if employee_sale:
         items=prepared_data.get("items") if isinstance(prepared_data.get("items"),list) else []
         commission_base=round(sum(max(0.0,float(x.get("quantity") or 0))*max(0.0,float(x.get("price") or 0)) for x in items if isinstance(x,dict)),2)
         if commission_base<=0: raise HTTPException(400,"لا يمكن تسجيل بيع خارج المتجر دون منتجات مسعّرة من المخزون")
+        commission_amount=round(commission_base*0.015,2)
+        seller_net=round(commission_base-commission_amount,2)
+        if seller_net<0: raise HTTPException(400,"تعذر احتساب صافي مستحقات المستخدم")
         prepared_data["outside_store_sale"]=True
-        prepared_data["owner_commission"]={"rate":0.015,"base_amount":commission_base,"amount":round(commission_base*0.015,2),"currency":p.currency,"status":"pending","paid_at":None,"paid_by":None,"note":""}
+        prepared_data["owner_commission"]={"rate":0.015,"base_amount":commission_base,"amount":commission_amount,"seller_net":seller_net,"currency":p.currency,"status":"paid","paid_at":datetime.now(timezone.utc).isoformat(),"paid_by":None,"note":"اقتطاع تلقائي عند تسجيل البيع"}
     consume_operation_verification(s,u,"invoice_create",p.verification_token)
     r=Record(section=p.section,invoice_no=invoice_no,currency=p.currency,data=prepared_data,created_by=u.id)
-    s.add(r); s.flush(); recalculate_inventory(s); audit(s,u,"record_created","record",r.id,{"section":r.section,"invoice_no":r.invoice_no},request); s.commit()
+    s.add(r); s.flush()
+    if employee_sale:
+        owner=s.scalar(select(User).where(User.role=="owner",User.deleted.is_(False)).order_by(User.id).limit(1))
+        if not owner: raise HTTPException(500,"تعذر العثور على حساب المالك لتسجيل عمولة البيع")
+        ensure_user_wallets(s,u.id)
+        ensure_user_wallets(s,owner.id)
+        seller_wallet=s.scalar(select(UserWallet).where(UserWallet.user_id==u.id,UserWallet.currency==p.currency).with_for_update())
+        owner_wallet=s.scalar(select(UserWallet).where(UserWallet.user_id==owner.id,UserWallet.currency==p.currency).with_for_update())
+        if not seller_wallet or not owner_wallet: raise HTTPException(500,"تعذر تجهيز محافظ البيع بالعملة المحددة")
+        now=datetime.now(timezone.utc)
+        seller_wallet.balance=float(seller_wallet.balance or 0)+seller_net
+        seller_wallet.updated_at=now
+        owner_wallet.balance=float(owner_wallet.balance or 0)+commission_amount
+        owner_wallet.updated_at=now
+        seller_tx=WalletTransaction(wallet_id=seller_wallet.id,user_id=u.id,amount=seller_net,currency=p.currency,direction="in",reason="صافي عائد بيع منتجات المخزون · "+str(r.invoice_no or r.id),reference_type="inventory_sale_net",reference_id=r.id,created_by=u.id)
+        owner_tx=WalletTransaction(wallet_id=owner_wallet.id,user_id=owner.id,amount=commission_amount,currency=p.currency,direction="in",reason="عمولة المالك 1.5٪ من بيع المستخدم · "+str(r.invoice_no or r.id),reference_type="inventory_sale_commission",reference_id=r.id,created_by=u.id)
+        s.add_all([seller_tx,owner_tx]); s.flush()
+        prepared_data["owner_commission"]["wallet_transaction_id"]=owner_tx.id
+        prepared_data["seller_wallet_credit"]={"amount":seller_net,"currency":p.currency,"wallet_transaction_id":seller_tx.id}
+        r.data=prepared_data
+    recalculate_inventory(s)
+    audit(s,u,"record_created","record",r.id,{"section":r.section,"invoice_no":r.invoice_no,"seller_wallet_credit":seller_net if employee_sale else 0,"owner_commission":commission_amount if employee_sale else 0,"currency":p.currency},request)
+    s.commit()
     # Invalidate shop catalog caches immediately after a stock-changing record.
     if p.section in {"purchase","carPurchase","deposit","directSale","consignSale"}:
         _store_catalog_cache["value"]=None
