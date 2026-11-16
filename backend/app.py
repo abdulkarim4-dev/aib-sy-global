@@ -861,7 +861,7 @@ def get_user_inventory(user_id:int,s:Session=Depends(db),u:User=Depends(manager)
     target=s.get(User,user_id)
     if not target or target.deleted: raise HTTPException(404,"المستخدم غير موجود")
     products=s.scalars(select(InventoryProduct).where(InventoryProduct.owner_user_id==user_id).order_by(InventoryProduct.sku)).all()
-    return {"user_id":target.id,"username":target.username,"company_name":target.company_name or "","products":[{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owned_stock":float(p.owned_stock or 0),"consigned_stock":float(p.consigned_stock or 0),"sale_price":float(p.sale_price) if p.sale_price is not None else None,"sale_currency":p.sale_currency,"images":[f"/public/products/{p.id}/image/{i}?v={int(now*1000)}" for i in range(len(p.images or []))],"video_url":p.video_url or ""} for p in products]}
+    return {"user_id":target.id,"username":target.username,"company_name":target.company_name or "","products":[{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owned_stock":float(p.owned_stock or 0),"consigned_stock":float(p.consigned_stock or 0),"sale_price":float(p.sale_price) if p.sale_price is not None else None,"sale_currency":p.sale_currency,"images":p.images or [],"video_url":p.video_url or ""} for p in products]}
 
 class CompanyProfilePayload(BaseModel):
     data: dict
@@ -2667,7 +2667,7 @@ def public_products(q:Optional[str]=None, category:Optional[str]=None, s:Session
                 continue
         stock=float(p.owned_stock or 0)+float(p.consigned_stock or 0)
         price=latest_purchase.get(p.sku,{})
-        out.append({"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"category":cat,"stock":stock,"condition":p.condition or "new","images":p.images or [],"video_url":p.video_url or "","shipping_included":bool(p.shipping_included),"vehicle_details":store_categories.get(p.sku,{}).get("vehicle_details",{}),"sale_price":float(p.sale_price) if p.sale_price is not None else price.get("sale_price"),"currency":p.sale_currency if p.sale_price is not None else price.get("currency","")})
+        out.append({"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"category":cat,"stock":stock,"condition":p.condition or "new","images":[f"/public/products/{p.id}/image/{i}?v={int(now*1000)}" for i in range(len(p.images or []))],"video_url":p.video_url or "","shipping_included":bool(p.shipping_included),"vehicle_details":store_categories.get(p.sku,{}).get("vehicle_details",{}),"sale_price":float(p.sale_price) if p.sale_price is not None else price.get("sale_price"),"currency":p.sale_currency if p.sale_price is not None else price.get("currency","")})
     # Bound memory and retain only a short freshness window so stock/price edits appear quickly.
     if len(_public_products_cache["value"])>=_PUBLIC_PRODUCTS_CACHE_MAX:
         _public_products_cache["value"].clear();_public_products_cache["at"].clear()
