@@ -1563,6 +1563,8 @@ def add_invoice_payment(record_id:int,p:PaymentPayload,request:Request,s:Session
     paid=float(s.scalar(select(func.coalesce(func.sum(InvoicePayment.amount),0)).where(InvoicePayment.record_id==record_id)) or 0)
     if round(paid+p.amount,2)>round(total,2): raise HTTPException(400,"مجموع الدفعات يتجاوز إجمالي الفاتورة")
     if not p.cash_box.strip(): raise HTTPException(400,"اختر الصندوق الذي ستدخل إليه الدفعة")
+    if u.role!="owner" and p.cash_box.strip() in {"صندوق الأمانة","صندوق مبيع الأمانة","صندوق قل أمانة","صندوق قُل أمانة"}:
+        raise HTTPException(403,"لا يمكن لحساب المستخدم تسجيل دفعة في صندوق الأمانة")
     consume_operation_verification(s,u,"invoice_payment",p.verification_token)
     x=InvoicePayment(record_id=record_id,amount=p.amount,method=p.method,cash_box=p.cash_box,paid_at=p.paid_at or datetime.now(timezone.utc),created_by=u.id)
     s.add(x); s.flush()
@@ -1576,7 +1578,8 @@ def add_invoice_payment(record_id:int,p:PaymentPayload,request:Request,s:Session
 def list_invoice_payments(record_id:int,s:Session=Depends(db),u:User=Depends(require_permission("invoices","view"))):
     r=s.get(Record,record_id)
     if not r or r.deleted or (u.role!="owner" and r.created_by!=u.id): raise HTTPException(404,"الفاتورة غير موجودة")
-    return [{"id":x.id,"amount":float(x.amount),"method":x.method,"cash_box":x.cash_box,"paid_at":x.paid_at} for x in s.scalars(select(InvoicePayment).where(InvoicePayment.record_id==record_id).order_by(InvoicePayment.id)).all()]
+    trust_boxes={"صندوق الأمانة","صندوق مبيع الأمانة","صندوق قل أمانة","صندوق قُل أمانة"}
+    return [{"id":x.id,"amount":float(x.amount),"method":x.method,"cash_box":(x.cash_box if u.role=="owner" or x.cash_box not in trust_boxes else "صندوق المبيع"),"paid_at":x.paid_at} for x in s.scalars(select(InvoicePayment).where(InvoicePayment.record_id==record_id).order_by(InvoicePayment.id)).all()]
 
 class PaymentUpdatePayload(BaseModel):
     amount: float = Field(gt=0)
@@ -1596,6 +1599,9 @@ def update_invoice_payment(record_id:int,payment_id:int,p:PaymentUpdatePayload,r
     if not r or r.deleted or (u.role!="owner" and r.created_by!=u.id) or not x or x.record_id!=record_id: raise HTTPException(404,"الدفعة غير موجودة")
     if p.method not in {"cash","baraka_bank","sham_cash","syriatel_cash"}: raise HTTPException(400,"طريقة الدفع غير صالحة")
     if not p.cash_box.strip(): raise HTTPException(400,"اختر الصندوق")
+    trust_boxes={"صندوق الأمانة","صندوق مبيع الأمانة","صندوق قل أمانة","صندوق قُل أمانة"}
+    if u.role!="owner" and (p.cash_box.strip() in trust_boxes or x.cash_box in trust_boxes):
+        raise HTTPException(403,"لا يمكن لحساب المستخدم تعديل دفعة مرتبطة بصندوق الأمانة")
     paid=float(s.scalar(select(func.coalesce(func.sum(InvoicePayment.amount),0)).where(InvoicePayment.record_id==record_id)) or 0)
     total=float(r.data.get("amount",r.data.get("price",r.data.get("sale",0))) or 0)
     if round(paid-float(x.amount)+p.amount,2)>round(total,2): raise HTTPException(400,"مجموع الدفعات بعد التعديل يتجاوز إجمالي الفاتورة")
@@ -1802,6 +1808,8 @@ def cash_list(s:Session=Depends(db),u:User=Depends(require_permission("cash","vi
 def void_cash_movement(move_id:int,request:Request,s:Session=Depends(db),u:User=Depends(require_permission("cash","edit"))):
     move=s.get(CashMove,move_id)
     if not move: raise HTTPException(404,"حركة الصندوق غير موجودة")
+    if u.role!="owner" and move.box_name in {"صندوق الأمانة","صندوق مبيع الأمانة","صندوق قل أمانة","صندوق قُل أمانة"}:
+        raise HTTPException(403,"حركات صندوق الأمانة متاحة للمالك فقط")
     if is_sale_cash_move(s,move): raise HTTPException(403,"واردات المبيعات مرتبطة بالبيعة ولا يمكن إلغاؤها أو حذفها منفردة")
     if is_purchase_cash_move(s,move): raise HTTPException(403,"مبالغ الشراء مرتبطة بفاتورة الشراء ولا يمكن إلغاؤها من الصندوق منفردة")
     if move.voided: raise HTTPException(400,"هذه الحركة ملغاة مسبقاً")
@@ -1819,6 +1827,8 @@ def void_cash_movement(move_id:int,request:Request,s:Session=Depends(db),u:User=
 def delete_cash_movement(move_id:int,request:Request,s:Session=Depends(db),u:User=Depends(require_permission("cash","delete"))):
     move=s.get(CashMove,move_id)
     if not move: raise HTTPException(404,"حركة الصندوق غير موجودة")
+    if u.role!="owner" and move.box_name in {"صندوق الأمانة","صندوق مبيع الأمانة","صندوق قل أمانة","صندوق قُل أمانة"}:
+        raise HTTPException(403,"حركات صندوق الأمانة متاحة للمالك فقط")
     if is_sale_cash_move(s,move): raise HTTPException(403,"لا يمكن حذف واردات المبيعات منفردة؛ احذف البيعة كاملة")
     if is_purchase_cash_move(s,move): raise HTTPException(403,"مبالغ الشراء مرتبطة بفاتورة الشراء ولا يمكن حذفها من الصندوق منفردة")
     related=[move]
@@ -2024,16 +2034,17 @@ def get_user_wallet(user_id:int,s:Session=Depends(db),u:User=Depends(current_use
 
 @app.get("/cash-summary")
 def cash_summary(s:Session=Depends(db),u:User=Depends(require_permission("cash","view"))):
-    rows=s.execute(
-        select(
+    query=select(
             CashMove.box_name,
             CashMove.currency,
             func.sum(case(
                 (CashMove.movement.in_(("deposit","transfer_in")),CashMove.amount),
                 else_=-CashMove.amount
             )).label("balance")
-        ).where(CashMove.voided.is_(False)).group_by(CashMove.box_name,CashMove.currency)
-    ).all()
+        ).where(CashMove.voided.is_(False))
+    if u.role!="owner":
+        query=query.where(CashMove.box_name.not_in(["صندوق الأمانة","صندوق مبيع الأمانة","صندوق قل أمانة","صندوق قُل أمانة"]))
+    rows=s.execute(query.group_by(CashMove.box_name,CashMove.currency)).all()
     return [{"box_name":box_name,"currency":currency,"balance":float(balance or 0)} for box_name,currency,balance in rows]
 
 
