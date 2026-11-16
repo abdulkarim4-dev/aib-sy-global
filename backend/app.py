@@ -1289,7 +1289,7 @@ def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=
     }
     rows=[p for p in rows if (u.role!="owner" and p.owner_user_id==u.id) or str(p.sku or "").strip().upper() in invoiced_skus]
     store_categories,latest_purchase=latest_store_catalog_data(s)
-    return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owner_user_id":p.owner_user_id,"condition":p.condition or "new","opening_quantity":float(p.opening_quantity or 0),"store_family":p.store_family,"store_category":p.store_category,"owned_stock":float(p.owned_stock or 0),"consigned_stock":float(p.consigned_stock or 0),"image_count":len(p.images or []),"shipping_included":bool(p.shipping_included),"video_url":p.video_url or "",**store_categories.get(p.sku,{}),**latest_purchase.get(p.sku,{"purchase_price":0,"sale_price":0,"currency":"—"}),"sale_price":float(p.sale_price) if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("sale_price"),"sale_currency":p.sale_currency if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("currency","")} for p in rows]
+    return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owner_user_id":p.owner_user_id,"condition":p.condition or "new","opening_quantity":float(p.opening_quantity or 0),"store_family":p.store_family,"store_category":p.store_category,"owned_stock":float(p.owned_stock or 0),**({"consigned_stock":float(p.consigned_stock or 0)} if u.role=="owner" else {}),"image_count":len(p.images or []),"shipping_included":bool(p.shipping_included),"video_url":p.video_url or "",**store_categories.get(p.sku,{}),**latest_purchase.get(p.sku,{"purchase_price":0,"sale_price":0,"currency":"—"}),"sale_price":float(p.sale_price) if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("sale_price"),"sale_currency":p.sale_currency if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("currency","")} for p in rows]
 
 class InventoryProductUpdate(BaseModel):
     name: str=Field(min_length=2,max_length=240)
@@ -1318,12 +1318,15 @@ def edit_inventory_product(product_id:int,p:InventoryProductUpdate,request:Reque
         scopes=set(u.business_scopes or [])
         if p.store_family not in scopes and p.store_category not in scopes:
             raise HTTPException(403,"هذا القسم خارج مجالات العمل المصرح بها لحسابك")
-    if p.owned_stock is not None or p.consigned_stock is not None:
+    if u.role!="owner" and p.consigned_stock is not None:
+        raise HTTPException(403,"لا يمكن لحساب المستخدم تعديل بيانات مخزون الأمانة")
+    if p.owned_stock is not None or (u.role=="owner" and p.consigned_stock is not None):
         recalculate_inventory(s)
     old_owned=float(product.owned_stock or 0)
     old_consigned=float(product.consigned_stock or 0)
     new_owned=float(p.owned_stock) if p.owned_stock is not None else old_owned
-    new_consigned=0.0 if u.role!="owner" else (float(p.consigned_stock) if p.consigned_stock is not None else old_consigned)
+    # Employee edits must never reset or alter the owner-controlled consigned balance.
+    new_consigned=(float(p.consigned_stock) if p.consigned_stock is not None else old_consigned) if u.role=="owner" else old_consigned
     stock_adjustment={"owned_delta":round(new_owned-old_owned,3),"consigned_delta":round(new_consigned-old_consigned,3)}
     before={"name":product.name,"model":product.model,"sale_price":float(product.sale_price) if product.sale_price is not None else None,"sale_currency":product.sale_currency,"condition":product.condition,"store_family":product.store_family,"store_category":product.store_category,"owned_stock":old_owned,"consigned_stock":old_consigned}
     product.owned_stock=new_owned
@@ -1501,7 +1504,7 @@ def create_record(p:RecordCreate, request:Request, s:Session=Depends(db), u:User
 @app.get("/records")
 def list_records(section:Optional[str]=None, s:Session=Depends(db), u:User=Depends(require_permission("invoices","view"))):
     q=select(Record).where(Record.deleted==False)
-    if u.role!="owner": q=q.where(Record.created_by==u.id)
+    if u.role!="owner": q=q.where(Record.created_by==u.id,Record.section.not_in(["deposit","consignSale"]))
     if section: q=q.where(Record.section==section)
     rows=s.scalars(q.order_by(Record.id.desc())).all()
     if not rows: return []
@@ -1560,6 +1563,8 @@ def add_invoice_payment(record_id:int,p:PaymentPayload,request:Request,s:Session
     paid=float(s.scalar(select(func.coalesce(func.sum(InvoicePayment.amount),0)).where(InvoicePayment.record_id==record_id)) or 0)
     if round(paid+p.amount,2)>round(total,2): raise HTTPException(400,"مجموع الدفعات يتجاوز إجمالي الفاتورة")
     if not p.cash_box.strip(): raise HTTPException(400,"اختر الصندوق الذي ستدخل إليه الدفعة")
+    if u.role!="owner" and p.cash_box.strip() in {"صندوق الأمانة","صندوق مبيع الأمانة","صندوق قل أمانة","صندوق قُل أمانة"}:
+        raise HTTPException(403,"لا يمكن لحساب المستخدم تسجيل دفعة في صندوق الأمانة")
     consume_operation_verification(s,u,"invoice_payment",p.verification_token)
     x=InvoicePayment(record_id=record_id,amount=p.amount,method=p.method,cash_box=p.cash_box,paid_at=p.paid_at or datetime.now(timezone.utc),created_by=u.id)
     s.add(x); s.flush()
@@ -1573,7 +1578,8 @@ def add_invoice_payment(record_id:int,p:PaymentPayload,request:Request,s:Session
 def list_invoice_payments(record_id:int,s:Session=Depends(db),u:User=Depends(require_permission("invoices","view"))):
     r=s.get(Record,record_id)
     if not r or r.deleted or (u.role!="owner" and r.created_by!=u.id): raise HTTPException(404,"الفاتورة غير موجودة")
-    return [{"id":x.id,"amount":float(x.amount),"method":x.method,"cash_box":x.cash_box,"paid_at":x.paid_at} for x in s.scalars(select(InvoicePayment).where(InvoicePayment.record_id==record_id).order_by(InvoicePayment.id)).all()]
+    trust_boxes={"صندوق الأمانة","صندوق مبيع الأمانة","صندوق قل أمانة","صندوق قُل أمانة"}
+    return [{"id":x.id,"amount":float(x.amount),"method":x.method,"cash_box":(x.cash_box if u.role=="owner" or x.cash_box not in trust_boxes else "صندوق المبيع"),"paid_at":x.paid_at} for x in s.scalars(select(InvoicePayment).where(InvoicePayment.record_id==record_id).order_by(InvoicePayment.id)).all()]
 
 class PaymentUpdatePayload(BaseModel):
     amount: float = Field(gt=0)
@@ -1593,6 +1599,9 @@ def update_invoice_payment(record_id:int,payment_id:int,p:PaymentUpdatePayload,r
     if not r or r.deleted or (u.role!="owner" and r.created_by!=u.id) or not x or x.record_id!=record_id: raise HTTPException(404,"الدفعة غير موجودة")
     if p.method not in {"cash","baraka_bank","sham_cash","syriatel_cash"}: raise HTTPException(400,"طريقة الدفع غير صالحة")
     if not p.cash_box.strip(): raise HTTPException(400,"اختر الصندوق")
+    trust_boxes={"صندوق الأمانة","صندوق مبيع الأمانة","صندوق قل أمانة","صندوق قُل أمانة"}
+    if u.role!="owner" and (p.cash_box.strip() in trust_boxes or x.cash_box in trust_boxes):
+        raise HTTPException(403,"لا يمكن لحساب المستخدم تعديل دفعة مرتبطة بصندوق الأمانة")
     paid=float(s.scalar(select(func.coalesce(func.sum(InvoicePayment.amount),0)).where(InvoicePayment.record_id==record_id)) or 0)
     total=float(r.data.get("amount",r.data.get("price",r.data.get("sale",0))) or 0)
     if round(paid-float(x.amount)+p.amount,2)>round(total,2): raise HTTPException(400,"مجموع الدفعات بعد التعديل يتجاوز إجمالي الفاتورة")
@@ -1613,6 +1622,8 @@ def update_invoice_payment(record_id:int,payment_id:int,p:PaymentUpdatePayload,r
 def delete_invoice_payment(record_id:int,payment_id:int,request:Request,s:Session=Depends(db),u:User=Depends(require_permission("invoices","delete"))):
     r=s.get(Record,record_id); x=s.get(InvoicePayment,payment_id)
     if not r or r.deleted or (u.role!="owner" and r.created_by!=u.id) or not x or x.record_id!=record_id: raise HTTPException(404,"الدفعة غير موجودة")
+    if u.role!="owner" and x.cash_box in {"صندوق الأمانة","صندوق مبيع الأمانة","صندوق قل أمانة","صندوق قُل أمانة"}:
+        raise HTTPException(403,"لا يمكن لحساب المستخدم حذف دفعة مرتبطة بصندوق الأمانة")
     reverse_payment_cash_move(s,r,x,u,"حذف")
     audit(s,u,"invoice_payment_deleted","invoice_payment",x.id,{"record_id":record_id,"amount":float(x.amount),"method":x.method,"cash_box":x.cash_box,"cash_adjustment":"automatic_reversal"},request)
     s.delete(x); s.commit()
@@ -1746,6 +1757,8 @@ def ensure_cash_reversal_safe(s:Session, moves:list[CashMove]):
 
 @app.post("/cash-movements")
 def cash_move(p:CashPayload,request:Request,s:Session=Depends(db),u:User=Depends(require_permission("cash","create"))):
+    if u.role!="owner" and p.box_name.strip() in {"صندوق الأمانة","صندوق مبيع الأمانة","صندوق قل أمانة","صندوق قُل أمانة"}:
+        raise HTTPException(403,"صندوق الأمانة متاح للمالك فقط")
     if p.movement not in ("deposit","withdrawal"): raise HTTPException(400,"اختر إيداعاً أو سحباً؛ التحويل بين الصناديق له عملية مستقلة")
     if p.currency not in ("USD","SYP"): raise HTTPException(400,"عملة غير مدعومة")
     if p.movement=="withdrawal": ensure_cash_balance(s,p.box_name,p.currency,p.amount)
@@ -1753,6 +1766,9 @@ def cash_move(p:CashPayload,request:Request,s:Session=Depends(db),u:User=Depends
     m=CashMove(**p.model_dump(exclude={"verification_token"}),created_by=u.id); s.add(m); s.flush(); audit(s,u,"cash_movement_created","cash",m.id,{"box":p.box_name,"movement":p.movement,"amount":p.amount,"currency":p.currency},request); s.commit(); return {"id":m.id}
 @app.post("/cash-transfers")
 def cash_transfer(p:CashTransferPayload,request:Request,s:Session=Depends(db),u:User=Depends(require_permission("cash","create"))):
+    trust_boxes={"صندوق الأمانة","صندوق مبيع الأمانة","صندوق قل أمانة","صندوق قُل أمانة"}
+    if u.role!="owner" and ({p.source_box.strip(),p.destination_box.strip()} & trust_boxes):
+        raise HTTPException(403,"التحويل من صندوق الأمانة أو إليه متاح للمالك فقط")
     if p.source_box==p.destination_box: raise HTTPException(400,"يجب اختيار صندوقين مختلفين")
     if p.currency not in ("USD","SYP"): raise HTTPException(400,"عملة غير مدعومة")
     ensure_cash_balance(s,p.source_box,p.currency,p.amount)
@@ -1778,18 +1794,24 @@ def cash_move_display_description(s:Session, move:CashMove)->str:
 
 @app.get("/cash-boxes/{box_name}/movements")
 def cash_box_movements(box_name:str,s:Session=Depends(db),u:User=Depends(require_permission("cash","view"))):
+    if u.role!="owner" and box_name.strip() in {"صندوق الأمانة","صندوق مبيع الأمانة","صندوق قل أمانة","صندوق قُل أمانة"}:
+        raise HTTPException(403,"حركات صندوق الأمانة متاحة للمالك فقط")
     rows=s.scalars(select(CashMove).where(CashMove.box_name==box_name).order_by(CashMove.id.desc())).all()
     return [{"id":m.id,"box_name":m.box_name,"movement":m.movement,"amount":float(m.amount),"currency":m.currency,"description":cash_move_display_description(s,m),"created_by":m.created_by,"created_at":m.created_at,"transfer_group":m.transfer_group,"voided":m.voided,"voided_by":m.voided_by,"voided_at":m.voided_at,"sale_locked":is_sale_cash_move(s,m),"purchase_locked":is_purchase_cash_move(s,m)} for m in rows]
 
 @app.get("/cash-movements")
 def cash_list(s:Session=Depends(db),u:User=Depends(require_permission("cash","view"))):
-    rows=s.scalars(select(CashMove).order_by(CashMove.id.desc())).all()
+    query=select(CashMove)
+    if u.role!="owner": query=query.where(CashMove.box_name.not_in(["صندوق الأمانة","صندوق مبيع الأمانة","صندوق قل أمانة","صندوق قُل أمانة"]))
+    rows=s.scalars(query.order_by(CashMove.id.desc())).all()
     return [{"id":m.id,"box_name":m.box_name,"movement":m.movement,"amount":float(m.amount),"currency":m.currency,"description":cash_move_display_description(s,m),"created_by":m.created_by,"created_at":m.created_at,"transfer_group":m.transfer_group,"voided":m.voided,"voided_by":m.voided_by,"voided_at":m.voided_at,"sale_locked":is_sale_cash_move(s,m),"purchase_locked":is_purchase_cash_move(s,m)} for m in rows]
 
 @app.patch("/cash-movements/{move_id}/void")
 def void_cash_movement(move_id:int,request:Request,s:Session=Depends(db),u:User=Depends(require_permission("cash","edit"))):
     move=s.get(CashMove,move_id)
     if not move: raise HTTPException(404,"حركة الصندوق غير موجودة")
+    if u.role!="owner" and move.box_name in {"صندوق الأمانة","صندوق مبيع الأمانة","صندوق قل أمانة","صندوق قُل أمانة"}:
+        raise HTTPException(403,"حركات صندوق الأمانة متاحة للمالك فقط")
     if is_sale_cash_move(s,move): raise HTTPException(403,"واردات المبيعات مرتبطة بالبيعة ولا يمكن إلغاؤها أو حذفها منفردة")
     if is_purchase_cash_move(s,move): raise HTTPException(403,"مبالغ الشراء مرتبطة بفاتورة الشراء ولا يمكن إلغاؤها من الصندوق منفردة")
     if move.voided: raise HTTPException(400,"هذه الحركة ملغاة مسبقاً")
@@ -1807,6 +1829,8 @@ def void_cash_movement(move_id:int,request:Request,s:Session=Depends(db),u:User=
 def delete_cash_movement(move_id:int,request:Request,s:Session=Depends(db),u:User=Depends(require_permission("cash","delete"))):
     move=s.get(CashMove,move_id)
     if not move: raise HTTPException(404,"حركة الصندوق غير موجودة")
+    if u.role!="owner" and move.box_name in {"صندوق الأمانة","صندوق مبيع الأمانة","صندوق قل أمانة","صندوق قُل أمانة"}:
+        raise HTTPException(403,"حركات صندوق الأمانة متاحة للمالك فقط")
     if is_sale_cash_move(s,move): raise HTTPException(403,"لا يمكن حذف واردات المبيعات منفردة؛ احذف البيعة كاملة")
     if is_purchase_cash_move(s,move): raise HTTPException(403,"مبالغ الشراء مرتبطة بفاتورة الشراء ولا يمكن حذفها من الصندوق منفردة")
     related=[move]
@@ -2012,16 +2036,17 @@ def get_user_wallet(user_id:int,s:Session=Depends(db),u:User=Depends(current_use
 
 @app.get("/cash-summary")
 def cash_summary(s:Session=Depends(db),u:User=Depends(require_permission("cash","view"))):
-    rows=s.execute(
-        select(
+    query=select(
             CashMove.box_name,
             CashMove.currency,
             func.sum(case(
                 (CashMove.movement.in_(("deposit","transfer_in")),CashMove.amount),
                 else_=-CashMove.amount
             )).label("balance")
-        ).where(CashMove.voided.is_(False)).group_by(CashMove.box_name,CashMove.currency)
-    ).all()
+        ).where(CashMove.voided.is_(False))
+    if u.role!="owner":
+        query=query.where(CashMove.box_name.not_in(["صندوق الأمانة","صندوق مبيع الأمانة","صندوق قل أمانة","صندوق قُل أمانة"]))
+    rows=s.execute(query.group_by(CashMove.box_name,CashMove.currency)).all()
     return [{"box_name":box_name,"currency":currency,"balance":float(balance or 0)} for box_name,currency,balance in rows]
 
 
@@ -2615,13 +2640,15 @@ def count_online_purchase_orders(s:Session=Depends(db),u:User=Depends(manager)):
 def delete_online_purchase_order(order_id:int,s:Session=Depends(db),u:User=Depends(manager)):
     order=s.get(OnlinePurchaseOrder,order_id)
     if not order: raise HTTPException(404,"الطلب غير موجود")
+    if order.record_id is not None or order.status=="approved":
+        raise HTTPException(409,"لا يمكن حذف طلب تم اعتماده وربطه بفاتورة؛ احتفظ بسجل الطلب والفاتورة")
     audit(s,u,"online_order_deleted","online_purchase_order",order.id,{"status":order.status,"record_id":order.record_id},request=None)
     s.delete(order)
     s.commit()
     return {"ok":True,"deleted_order_id":order_id}
 
 @app.get("/online-purchase-orders")
-def list_online_purchase_orders(s:Session=Depends(db),u:User=Depends(current_user)):
+def list_online_purchase_orders(s:Session=Depends(db),u:User=Depends(manager)):
     owner_phone="+963 997 439 627"
     rows=s.scalars(select(OnlinePurchaseOrder).order_by(OnlinePurchaseOrder.id.desc())).all()
     result=[]
@@ -2639,7 +2666,7 @@ class OnlineOrderReviewPayload(BaseModel):
 
 @app.post("/online-purchase-orders/{order_id}/review")
 def review_online_purchase_order(order_id:int,p:OnlineOrderReviewPayload,s:Session=Depends(db),u:User=Depends(manager)):
-    order=s.get(OnlinePurchaseOrder,order_id)
+    order=s.scalar(select(OnlinePurchaseOrder).where(OnlinePurchaseOrder.id==order_id).with_for_update())
     if not order: raise HTTPException(404,"الطلب غير موجود")
     if order.status!="pending": raise HTTPException(409,"تمت مراجعة الطلب")
     if p.action=="reject":
@@ -2652,7 +2679,7 @@ def review_online_purchase_order(order_id:int,p:OnlineOrderReviewPayload,s:Sessi
     if p.action!="approve": raise HTTPException(400,"إجراء غير صالح")
     allocated_items=[]
     for x in order.items:
-        product=s.scalar(select(InventoryProduct).where(InventoryProduct.sku==str(x["sku"]).strip().upper()))
+        product=s.scalar(select(InventoryProduct).where(InventoryProduct.sku==str(x["sku"]).strip().upper()).with_for_update())
         if not product or not product.active: raise HTTPException(409,f"المنتج {x.get('description') or x['sku']} لم يعد متاحاً")
         qty=float(x["quantity"])
         owned=float(product.owned_stock or 0)
