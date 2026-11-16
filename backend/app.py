@@ -1275,6 +1275,8 @@ def edit_inventory_product(product_id:int,p:InventoryProductUpdate,request:Reque
     product.store_family=p.store_family
     product.store_category=p.store_category
     audit(s,u,"inventory_product_updated","inventory_product",product.id,{"sku":product.sku,"before":before,"after":{"name":product.name,"model":product.model,"sale_price":p.sale_price,"sale_currency":p.sale_currency,"condition":p.condition,"store_family":p.store_family,"store_category":p.store_category,"owned_stock":new_owned,"consigned_stock":new_consigned},"stock_adjustment":stock_adjustment},request)
+    if abs(stock_adjustment["owned_delta"])>0.0001 or abs(stock_adjustment["consigned_delta"])>0.0001:
+        audit(s,u,"inventory_stock_adjustment","inventory_product",product.id,{"sku":product.sku,"stock_adjustment":stock_adjustment},request)
     s.commit()
     _store_catalog_cache["value"]=None
     _store_catalog_cache["at"]=0
