@@ -1832,6 +1832,7 @@ def cash_list(s:Session=Depends(db),u:User=Depends(require_permission("cash","vi
 
 @app.patch("/cash-movements/{move_id}/void")
 def void_cash_movement(move_id:int,request:Request,s:Session=Depends(db),u:User=Depends(require_permission("cash","edit"))):
+    if u.role!="owner": raise HTTPException(403,"إلغاء حركات الصندوق متاح للمالك فقط")
     move=s.get(CashMove,move_id)
     if not move: raise HTTPException(404,"حركة الصندوق غير موجودة")
     if u.role!="owner" and move.box_name in {"صندوق الأمانة","صندوق مبيع الأمانة","صندوق قل أمانة","صندوق قُل أمانة"}:
@@ -1851,6 +1852,7 @@ def void_cash_movement(move_id:int,request:Request,s:Session=Depends(db),u:User=
 
 @app.delete("/cash-movements/{move_id}")
 def delete_cash_movement(move_id:int,request:Request,s:Session=Depends(db),u:User=Depends(require_permission("cash","delete"))):
+    if u.role!="owner": raise HTTPException(403,"حذف حركات الصندوق متاح للمالك فقط")
     move=s.get(CashMove,move_id)
     if not move: raise HTTPException(404,"حركة الصندوق غير موجودة")
     if u.role!="owner" and move.box_name in {"صندوق الأمانة","صندوق مبيع الأمانة","صندوق قل أمانة","صندوق قُل أمانة"}:
@@ -1977,6 +1979,7 @@ class RecordUpdate(BaseModel):
 
 @app.patch("/records/{record_id}")
 def update_record(record_id:int, p:RecordUpdate, request:Request, s:Session=Depends(db), u:User=Depends(require_permission("invoices","edit"))):
+    if u.role!="owner": raise HTTPException(403,"تعديل الفواتير مباشرة متاح للمالك فقط؛ أرسل طلب تعديل للموافقة")
     r=s.get(Record,record_id)
     if not r or r.deleted or (u.role!="owner" and (r.created_by!=u.id or r.section in {"deposit","consignSale"})): raise HTTPException(404,"السجل غير موجود")
     if p.currency not in ("USD","SYP"): raise HTTPException(400,"عملة غير مدعومة")
@@ -2016,6 +2019,7 @@ def sale_cash_moves_for_record(s:Session, record:Record):
 
 @app.delete("/records/{record_id}")
 def delete_record(record_id:int, request:Request, s:Session=Depends(db), u:User=Depends(require_permission("invoices","delete"))):
+    if u.role!="owner": raise HTTPException(403,"حذف الفواتير مباشرة متاح للمالك فقط؛ أرسل طلب حذف للموافقة")
     r=s.get(Record,record_id)
     if not r or r.deleted or (u.role!="owner" and (r.created_by!=u.id or r.section in {"deposit","consignSale"})): raise HTTPException(404,"السجل غير موجود")
     if (r.data or {}).get("outside_store_sale"):
