@@ -600,7 +600,34 @@ async function printRecord(id){
 #print .dochead{margin:2.8mm 0 2.2mm;padding:2.2mm 3mm;background:linear-gradient(100deg,#101e2b 0%,#244b64 72%,#315e72 100%);border-right:1.6mm solid #d9823c;border-radius:1.5mm;box-shadow:0 .6mm 1.2mm #173b5e18}
 #print .doctitle{font-size:17px;letter-spacing:.15px}
 #print .docno{background:linear-gradient(145deg,#f7f8f9,#dfe5e9);border:1px solid #aebbc4;color:#203748;box-shadow:inset 0 1px 0 #fff}
-@media print{#print .head>.brandblock,#print .head>.brandblock:before,#print .head>.brandblock:after{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}}#print .thanks{font-size:9px}`+'</style><main class="invoice-sheet" dir="'+(lang==='ar'?'rtl':'ltr')+'"><div class="accent"></div><div class="inner">'+
+@media print{#print .head>.brandblock,#print .head>.brandblock:before,#print .head>.brandblock:after{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}}#print .thanks{font-size:9px}
+/* Premium visual identity for user-account invoices only; owner invoice remains unchanged */
+#print .user-invoice{border:1px solid #aeb8c1!important;box-shadow:0 2mm 6mm #0e1b2818!important;background:#fff!important}
+#print .user-invoice .accent{height:4mm;background:linear-gradient(90deg,#101820 0%,#263b4b 28%,#9aa7b1 52%,#d9823c 76%,#172b3b 100%)!important}
+#print .user-invoice .head{border-bottom:1mm solid #263b4b!important;padding-bottom:3.5mm!important}
+#print .user-invoice .head>.brandblock{background:linear-gradient(145deg,#fff 0%,#edf1f4 55%,#dce3e8 100%)!important;border:1px solid #aeb9c2!important;border-top:1.5mm solid #263b4b!important;box-shadow:0 1.2mm 3mm #172b3b20!important}
+#print .user-invoice .brandlogo{width:46mm!important;height:25mm!important;max-height:25mm!important}
+#print .user-invoice .brandname{font-size:21px!important;color:#172b3b!important;letter-spacing:.2px}
+#print .user-invoice .tagline{font-size:10px!important;color:#596a77!important;font-weight:700}
+#print .user-invoice .contact{background:linear-gradient(145deg,#111c27 0%,#263f52 58%,#34566a 100%)!important;border-right:1.7mm solid #d9823c!important;box-shadow:0 1mm 2.5mm #172b3b24,inset 0 1px 0 #ffffff35!important}
+#print .user-invoice .dochead{background:linear-gradient(105deg,#111c27 0%,#263f52 72%,#3b5a6b 100%)!important;border-right:1.7mm solid #d9823c!important;padding:2.6mm 3.2mm!important}
+#print .user-invoice .doctitle{font-size:19px!important;letter-spacing:.3px}
+#print .user-invoice .docno{background:linear-gradient(145deg,#f7f8f9,#dce2e6)!important;border:1px solid #9ba8b1!important;color:#172b3b!important}
+#print .user-invoice .details{background:#f7f9fa!important;border:1px solid #c8d1d8!important}
+#print .user-invoice .details div{padding:1.5mm 1mm!important;border-bottom:1px solid #dce2e7!important}
+#print .user-invoice .details b{color:#263f52!important;font-weight:900}
+#print .user-invoice th{background:linear-gradient(100deg,#172b3b,#31566c)!important;border-color:#476779!important;padding:2mm 1.2mm!important}
+#print .user-invoice td{border-color:#d4dce2!important;padding:1.8mm 1.2mm!important}
+#print .user-invoice tbody tr:nth-child(even){background:#f0f4f6!important}
+#print .user-invoice .grand{background:linear-gradient(145deg,#172b3b,#31566c)!important;border-right:1.2mm solid #d9823c!important;padding:2.3mm 1.5mm!important;box-shadow:0 1mm 2mm #172b3b18}
+#print .user-invoice .grand:first-child{background:linear-gradient(145deg,#a85b2b,#d9823c)!important}
+#print .user-invoice .payment-card{border:1px solid #cbd5dc!important;border-top:1.1mm solid #31566c!important;background:linear-gradient(180deg,#fff,#f8fafb)!important}
+#print .user-invoice .payment-card h3{color:#213b4d!important}
+#print .user-invoice .notes{box-shadow:inset 0 0 0 1px #fff!important}
+#print .user-invoice .seal{border:1px solid #82919c!important;background:linear-gradient(145deg,#f5f7f8,#dfe5e9)!important;color:#243b4b!important}
+#print .user-invoice .footer{border-top:1px solid #b9c5cd!important;color:#536675!important}
+#print .user-invoice .thanks{color:#244b63!important;font-size:10px!important;padding-top:2mm!important}
+@media print{#print .user-invoice .accent,#print .user-invoice .contact,#print .user-invoice .dochead,#print .user-invoice th,#print .user-invoice .grand,#print .user-invoice .head>.brandblock{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}}`+'</style><main class="invoice-sheet '+(me?.role!=='owner'?'user-invoice':'owner-invoice')+'" dir="'+(lang==='ar'?'rtl':'ltr')+'"><div class="accent"></div><div class="inner">'+
  '<header class="head"><div class="contact"><div class="contact-title">'+I.contact+'</div><div class="contact-line"><span>'+I.phoneLabel+'</span><b dir="ltr">+963 997 439 627</b></div><div class="contact-line"><span>'+I.email+'</span><b dir="ltr">aibtradinggroup@gmail.com</b></div>'+(invoiceBrand==='default'?'<div class="contact-company">مجموعة AIB التجارية</div>':'')+'<div class="companydata"><div>'+I.commercial+': <b>96133/2025</b></div><div>'+I.addressLabel+': '+companyAddress+'</div></div></div><div class="brandblock"><div class="brandline"><img class="brandlogo" src="'+(invoiceBrand==='default'?'/aib-logo.png?v=20261113-aib2':invoiceCompanyLogo)+'" alt="'+(invoiceBrand==='default'?'مجموعة AIB التجارية':I.tagline)+'"></div></div></header>'+
  '<div class="dochead"><div class="doctitle">'+esc(({purchase:lang==='en'?'PURCHASE INVOICE':'فاتورة شراء',carPurchase:lang==='en'?'CAR PURCHASE INVOICE':'فاتورة شراء سيارة',directSale:lang==='en'?'SALES INVOICE':'فاتورة بيع',consignSale:lang==='en'?'TRUST SALE INVOICE':'فاتورة بيع الأمانة',carSale:lang==='en'?'CAR SALES INVOICE':'فاتورة بيع سيارة',deposit:lang==='en'?'TRUST DEPOSIT INVOICE':'فاتورة إيداع أمانة',repair:lang==='en'?'REPAIR INVOICE':'فاتورة صيانة'}[r.section]|| (lang==='en'?'INVOICE':'فاتورة'))+' — '+sectionName(r.section))+'</div><div class="docno"><b>'+I.invoiceNo+':</b> <span class="invoice-code-print">'+esc(invoiceNo)+'</span></div></div>'+
  '<section class="details">'+detailHtml+'</section>'+ 
