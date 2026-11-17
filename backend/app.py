@@ -1586,7 +1586,7 @@ def add_invoice_payment(record_id:int,p:PaymentPayload,request:Request,s:Session
     consume_operation_verification(s,u,"invoice_payment",p.verification_token)
     x=InvoicePayment(record_id=record_id,amount=p.amount,method=p.method,cash_box=p.cash_box,paid_at=p.paid_at or datetime.now(timezone.utc),created_by=u.id)
     s.add(x); s.flush()
-    movement="withdrawal" if r.section in {"purchase","carPurchase"} else "deposit"
+    movement="withdrawal" if r.section in {"purchase","carPurchase","deposit"} else "deposit"
     if movement=="withdrawal": ensure_cash_balance(s,p.cash_box,r.currency,p.amount)
     s.add(CashMove(box_name=p.cash_box,movement=movement,amount=p.amount,currency=r.currency,description=invoice_cash_description(r,"قبض" if movement=="deposit" else "صرف"),created_by=u.id,record_id=r.id))
     audit(s,u,"invoice_payment_created","invoice_payment",x.id,{"record_id":record_id,"amount":p.amount,"method":p.method,"cash_box":p.cash_box,"cash_movement":movement},request); s.commit()
@@ -1606,7 +1606,7 @@ class PaymentUpdatePayload(BaseModel):
     cash_box: str
 
 def reverse_payment_cash_move(s:Session, r:Record, payment:InvoicePayment, u:User, reason:str):
-    movement="withdrawal" if r.section in {"purchase","carPurchase"} else "deposit"
+    movement="withdrawal" if r.section in {"purchase","carPurchase","deposit"} else "deposit"
     reverse="deposit" if movement=="withdrawal" else "withdrawal"
     if reverse=="withdrawal": ensure_cash_balance(s,payment.cash_box,r.currency,float(payment.amount))
     s.add(CashMove(box_name=payment.cash_box,movement=reverse,amount=payment.amount,currency=r.currency,description=invoice_cash_description(r,f"تسوية عكسية للدفعة {payment.id} ({reason})"),created_by=u.id,record_id=r.id))
@@ -1626,7 +1626,7 @@ def update_invoice_payment(record_id:int,payment_id:int,p:PaymentUpdatePayload,r
     changed=(round(float(x.amount),2)!=round(p.amount,2) or x.method!=p.method or x.cash_box!=p.cash_box or (p.paid_at and x.paid_at!=p.paid_at))
     if not changed: return {"ok":True,"unchanged":True}
     reverse_payment_cash_move(s,r,x,u,"تعديل")
-    movement="withdrawal" if r.section in {"purchase","carPurchase"} else "deposit"
+    movement="withdrawal" if r.section in {"purchase","carPurchase","deposit"} else "deposit"
     if movement=="withdrawal": ensure_cash_balance(s,p.cash_box,r.currency,p.amount)
     s.add(CashMove(box_name=p.cash_box,movement=movement,amount=p.amount,currency=r.currency,description=invoice_cash_description(r,f"تسجيل بديل للدفعة {x.id}"),created_by=u.id,record_id=r.id))
     old={"amount":float(x.amount),"method":x.method,"cash_box":x.cash_box,"paid_at":str(x.paid_at)}
@@ -1699,12 +1699,16 @@ def apply_approved_change(request_id:int,p:ApprovedChangeApplyPayload,request:Re
         if p.data is None: raise HTTPException(400,"بيانات التعديل مطلوبة")
         currency=p.currency or rec.currency
         if currency not in {"USD","SYP"}: raise HTTPException(400,"عملة غير مدعومة")
+        if currency!=rec.currency and s.scalar(select(func.count(InvoicePayment.id)).where(InvoicePayment.record_id==rec.id)):
+            raise HTTPException(409,"لا يمكن تغيير عملة الفاتورة بعد تسجيل دفعات؛ احذف الدفعات أو سوّها أولاً")
         ensure_total_covers_payments(s,rec.id,p.data)
         rec.data=prepare_record_inventory(s,rec.section,p.data,allow_legacy=True); rec.currency=currency; rec.updated_at=datetime.now(timezone.utc)
         recalculate_inventory(s)
     elif cr.action=="delete":
         if (rec.data or {}).get("outside_store_sale") and ((rec.data or {}).get("owner_commission") or {}).get("status")=="paid":
             raise HTTPException(409,"لا يمكن حذف هذه الفاتورة لأن عمولة المالك سُدّدت وأُضيفت إلى محفظته")
+        related_cash_moves={m.id:m for m in (sale_cash_moves_for_record(s,rec)+s.scalars(select(CashMove).where(CashMove.record_id==rec.id)).all())}
+        ensure_cash_reversal_safe(s,list(related_cash_moves.values()))
         rec.deleted=True; rec.updated_at=datetime.now(timezone.utc)
         recalculate_inventory(s)
         for payment in s.scalars(select(InvoicePayment).where(InvoicePayment.record_id==rec.id)).all(): s.delete(payment)
@@ -1981,6 +1985,8 @@ def update_record(record_id:int, p:RecordUpdate, request:Request, s:Session=Depe
             raise HTTPException(409,"لا يمكن تعديل فاتورة بعد تسديد عمولة المالك وتسجيلها في محفظته")
         if u.role!="owner":
             raise HTTPException(403,"لا يمكن تعديل عملية البيع خارج المتجر بعد تسجيلها؛ راجع المالك")
+    if p.currency!=r.currency and s.scalar(select(func.count(InvoicePayment.id)).where(InvoicePayment.record_id==r.id)):
+        raise HTTPException(409,"لا يمكن تغيير عملة الفاتورة بعد تسجيل دفعات؛ احذف الدفعات أو سوّها أولاً")
     ensure_total_covers_payments(s,r.id,p.data)
     updated_data=prepare_record_inventory(s,r.section,p.data,allow_legacy=True,user=u)
     if isinstance(r.data,dict) and r.data.get("outside_store_sale"):
@@ -2017,6 +2023,8 @@ def delete_record(record_id:int, request:Request, s:Session=Depends(db), u:User=
             raise HTTPException(409,"لا يمكن حذف فاتورة بعد تسديد عمولة المالك وإضافتها إلى محفظته")
         if u.role!="owner":
             raise HTTPException(403,"لا يمكن حذف بيع خارج المتجر؛ راجع المالك لتسوية العملية")
+    related_cash_moves={m.id:m for m in (sale_cash_moves_for_record(s,r)+s.scalars(select(CashMove).where(CashMove.record_id==r.id)).all())}
+    ensure_cash_reversal_safe(s,list(related_cash_moves.values()))
     r.deleted=True; r.updated_at=datetime.now(timezone.utc)
     recalculate_inventory(s)
     for payment in s.scalars(select(InvoicePayment).where(InvoicePayment.record_id==r.id)).all():
