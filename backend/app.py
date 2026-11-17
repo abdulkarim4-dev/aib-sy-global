@@ -1237,7 +1237,7 @@ def latest_store_catalog_data(s:Session)->tuple[dict,dict]:
                 family=str(item.get("store_family") or "").strip()
                 category=str(item.get("store_category") or "").strip()
                 if category in allowed.get(family,set()):
-                    latest_categories[sku]={"store_family":family,"store_category":category,"vehicle_details":{k:item.get(k) for k in ("vehicle_name","vehicle_type","vehicle_make","vehicle_model","vehicle_generation","vehicle_year","vehicle_odometer","vehicle_fuel","vehicle_color","chassis") if item.get(k) not in (None,"")}}
+                    latest_categories[sku]={"store_family":family,"store_category":category,"vehicle_details":{k:item.get(k) for k in ("vehicle_name","vehicle_type","vehicle_make","vehicle_model","vehicle_class","vehicle_generation","vehicle_year","vehicle_odometer","vehicle_fuel","vehicle_color","chassis") if item.get(k) not in (None,"")}}
     result=(latest_categories,latest_prices)
     _store_catalog_cache["value"]=result
     _store_catalog_cache["at"]=now
@@ -1266,7 +1266,7 @@ def create_inventory_product(p:InventoryProductCreate,request:Request,s:Session=
     if p.store_category not in allowed.get(p.store_family,set()): raise HTTPException(400,"اختر قسم المتجر بشكل صحيح")
     vehicle_categories={"car":"cars","truck":"trucks","heavy":"heavy","agri":"agri"}
     is_complete_vehicle=p.store_category==vehicle_categories.get(p.store_family)
-    vehicle_details={str(k):str(v).strip() for k,v in (p.vehicle_details or {}).items() if k in {"vehicle_name","vehicle_type","vehicle_make","vehicle_model","vehicle_generation","vehicle_year","vehicle_odometer","vehicle_fuel","vehicle_color","chassis"} and v not in (None,"")}
+    vehicle_details={str(k):str(v).strip() for k,v in (p.vehicle_details or {}).items() if k in {"vehicle_name","vehicle_type","vehicle_make","vehicle_model","vehicle_class","vehicle_generation","vehicle_year","vehicle_odometer","vehicle_fuel","vehicle_color","chassis"} and v not in (None,"")}
     if is_complete_vehicle and not vehicle_details.get("vehicle_name"):
         raise HTTPException(400,"أدخل اسم السيارة أو المركبة")
     if not is_complete_vehicle and vehicle_details:
@@ -1372,7 +1372,7 @@ def edit_inventory_product(product_id:int,p:InventoryProductUpdate,request:Reque
     vehicle_categories={"car":"cars","truck":"trucks","heavy":"heavy","agri":"agri"}
     is_complete_vehicle=p.store_category==vehicle_categories.get(p.store_family)
     if p.vehicle_details is not None:
-        product.vehicle_details={str(k):str(v).strip() for k,v in p.vehicle_details.items() if k in {"vehicle_name","vehicle_type","vehicle_make","vehicle_model","vehicle_generation","vehicle_year","vehicle_odometer","vehicle_fuel","vehicle_color","chassis"} and v not in (None,"")} if is_complete_vehicle else {}
+        product.vehicle_details={str(k):str(v).strip() for k,v in p.vehicle_details.items() if k in {"vehicle_name","vehicle_type","vehicle_make","vehicle_model","vehicle_class","vehicle_generation","vehicle_year","vehicle_odometer","vehicle_fuel","vehicle_color","chassis"} and v not in (None,"")} if is_complete_vehicle else {}
     elif not is_complete_vehicle:
         product.vehicle_details={}
     audit(s,u,"inventory_product_updated","inventory_product",product.id,{"sku":product.sku,"before":before,"after":{"name":product.name,"model":product.model,"sale_price":p.sale_price,"sale_currency":p.sale_currency,"condition":p.condition,"store_family":p.store_family,"store_category":p.store_category,"owned_stock":new_owned,"consigned_stock":new_consigned},"stock_adjustment":stock_adjustment},request)
