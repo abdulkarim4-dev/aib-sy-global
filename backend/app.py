@@ -348,8 +348,10 @@ def db():
 def audit(s:Session, user:Optional[User], action:str, entity:str, entity_id:Optional[int], details:dict, request:Optional[Request]=None):
     s.add(AuditEvent(user_id=user.id if user else None, action=action, entity=entity, entity_id=entity_id, details=details, ip_address=request.client.host if request and request.client else ""))
 def token_for(user:User,email_otp_verified:bool=False):
+    # Accounting sessions remain valid across browser restarts and do not expire
+    # automatically; the user signs out explicitly from the accounting app.
     now=datetime.now(timezone.utc)
-    claims={"sub":str(user.id),"iat":now,"exp":now+timedelta(minutes=settings.jwt_minutes),"email_otp_verified":bool(email_otp_verified)}
+    claims={"sub":str(user.id),"iat":now,"email_otp_verified":bool(email_otp_verified)}
     return jwt.encode(claims,settings.jwt_secret,algorithm="HS256")
 def current_user(token:Optional[str]=Depends(oauth), s:Session=Depends(db)):
     if not token:
