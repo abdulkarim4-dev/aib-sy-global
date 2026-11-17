@@ -2193,6 +2193,35 @@ class WalletAdjustmentPayload(BaseModel):
     movement: str
     description: str = ""
 
+class OwnerWalletTransferPayload(BaseModel):
+    amount: float = Field(gt=0)
+    currency: str
+    description: str = ""
+    verification_token: Optional[str] = None
+
+@app.post("/owner-wallet/transfer-to-cashbox")
+def transfer_owner_wallet_to_cashbox(p:OwnerWalletTransferPayload,request:Request,s:Session=Depends(db),u:User=Depends(manager)):
+    if u.role!="owner": raise HTTPException(403,"تحويل محفظة المالك إلى الصندوق متاح للمالك فقط")
+    currency=str(p.currency or "").upper().strip()
+    amount=round(float(p.amount),2)
+    if currency not in {"USD","SYP"}: raise HTTPException(400,"العملة غير مدعومة")
+    if amount<=0 or amount!=amount or amount==float("inf"): raise HTTPException(400,"أدخل مبلغاً صحيحاً أكبر من الصفر")
+    ensure_user_wallets(s,u.id)
+    wallet=s.scalar(select(UserWallet).where(UserWallet.user_id==u.id,UserWallet.currency==currency).with_for_update())
+    if not wallet: raise HTTPException(500,"تعذر العثور على محفظة المالك")
+    before=round(float(wallet.balance or 0),2)
+    if before<amount: raise HTTPException(409,f"رصيد محفظة المالك غير كافٍ. المتاح: {before:.2f} {currency}")
+    consume_operation_verification(s,u,"cash_movement",p.verification_token)
+    wallet.balance=round(before-amount,2)
+    wallet.updated_at=datetime.now(timezone.utc)
+    reason=(p.description or "").strip()[:500] or "تحويل من محفظة المالك إلى صندوق الإيداع"
+    tx=WalletTransaction(wallet_id=wallet.id,user_id=u.id,amount=amount,currency=currency,direction="out",reason=reason,reference_type="owner_wallet_cashbox_transfer",created_by=u.id)
+    move=CashMove(box_name="صندوق الإيداع",movement="deposit",amount=amount,currency=currency,description=reason,created_by=u.id)
+    s.add_all([tx,move]);s.flush()
+    audit(s,u,"owner_wallet_transferred_to_cashbox","owner_wallet",wallet.id,{"amount":amount,"currency":currency,"cash_move_id":move.id,"wallet_transaction_id":tx.id,"balance_before":before,"balance_after":float(wallet.balance)},request)
+    s.commit()
+    return {"ok":True,"amount":amount,"currency":currency,"cash_box":"صندوق الإيداع","wallet_balance":float(wallet.balance),"cash_move_id":move.id}
+
 @app.post("/users/{user_id}/wallet/adjust")
 def adjust_user_wallet(user_id:int,p:WalletAdjustmentPayload,request:Request,s:Session=Depends(db),u:User=Depends(manager)):
     if u.role!="owner":
