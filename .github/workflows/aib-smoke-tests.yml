@@ -4,7 +4,11 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [fix/accounting-store-safety]
+    branches: [main, fix/accounting-store-safety]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   smoke:
@@ -49,7 +53,7 @@ jobs:
           scripts = re.findall(r"<script[^>]*>(.*?)</script>", html, re.I | re.S)
           if not scripts:
               raise SystemExit("No inline JavaScript found in frontend/index.html")
-          Path("/tmp/aib-frontend.js").write_text("\\n".join(scripts), encoding="utf-8")
+          Path("/tmp/aib-frontend.js").write_text("\n".join(scripts), encoding="utf-8")
           print(f"Extracted {len(scripts)} inline script block(s)")
           PY
           node --check /tmp/aib-frontend.js
