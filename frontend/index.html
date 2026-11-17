@@ -272,7 +272,7 @@ function updateNewInventoryVehicleSelectors(changed=''){
  const makes=(family==='car'||family==='truck')?(catalog.makes||[]).filter(m=>(m.kinds||[]).includes(kind)||(m.kinds||[]).includes('van')||(m.kinds||[]).includes('bus')).map(m=>m.name):(staticMakes[family]||[]);
  setOptions(makeEl,makes,changed==='type'?'':oldMake,'اختر الشركة المصنعة');
  const make=(catalog.makes||[]).find(m=>m.name===makeEl.value);
- let models=make?(make.models||[]).filter(m=>!m.kind||m.kind===kind||m.kind===family).map(m=>m.name):[];
+ let models=make?(make.models||[]).filter(m=>!m.kind||m.kind===kind||m.kind===family||m.kind==='van'||m.kind==='bus').map(m=>m.name):[];
  const extra={'Caterpillar':['320','336','D6','D8','950','966'],'Komatsu':['PC200','PC300','PC400','WA380','D65'],'JCB':['3CX','4CX','JS220'],'Volvo CE':['EC210','EC300','L120'],'Hitachi':['ZX200','ZX300'],'John Deere':['6M','7R','8R','S700'],'New Holland':['T6','T7','CR'],'Massey Ferguson':['MF 4700','MF 5700'],'Case IH':['Puma','Maxxum'],'Kubota':['M7','L Series'],'Claas':['Arion','Axion'],'Deutz-Fahr':['5 Series','6 Series'],'Fendt':['500 Vario','700 Vario']};
  if(!models.length)models=extra[makeEl.value]||[];
  setOptions(modelEl,models,changed==='type'||changed==='make'?'':oldModel,'اختر الطراز');
@@ -284,7 +284,7 @@ function updateNewInventoryVehicleSelectors(changed=''){
  const norm=v=>String(v||'').toLowerCase().replace(/[^a-z0-9]/g,''),all={};
  for(const source of [AIB_KNOWN_GENERATIONS,AIB_ADDITIONAL_GENERATIONS,AIB_GLOBAL_GENERATION_EXPANSIONS])for(const [brand,entries] of Object.entries(source))all[brand]={...(all[brand]||{}),...entries};
  const brandKey=Object.keys(all).find(k=>norm(k)===norm(makeEl.value)),modelKey=brandKey?Object.keys(all[brandKey]).find(k=>norm(k)===norm(modelEl.value)):null;
- setOptions(generationEl,modelKey?(all[brandKey][modelKey]||[]):[],changed==='model'||changed==='make'||changed==='type'?'':oldGeneration,'اختر الجيل');
+ setOptions(generationEl,modelKey?(all[brandKey][modelKey]||[]):['جيل غير مدرج / أخرى'],changed==='model'||changed==='make'||changed==='type'?'':oldGeneration,'اختر الجيل');
  const years=Array.from({length:77},(_,i)=>String(2026-i));
  setOptions(document.getElementById('newInventoryVehicleYear'),years,document.getElementById('newInventoryVehicleYear')?.value,'اختر سنة الصنع');
  setOptions(document.getElementById('newInventoryVehicleFuel'),['بنزين','ديزل','كهرباء','هجين','غاز طبيعي','غاز بترولي','أخرى'],document.getElementById('newInventoryVehicleFuel')?.value,'اختر نوع الوقود');
