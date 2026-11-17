@@ -2858,6 +2858,27 @@ def count_online_purchase_orders(s:Session=Depends(db),u:User=Depends(manager)):
     pending=int(s.scalar(select(func.count(OnlinePurchaseOrder.id)).where(OnlinePurchaseOrder.status=="pending")) or 0)
     return {"pending":pending}
 
+@app.get("/my-online-purchase-orders/count")
+def count_my_online_purchase_orders(s:Session=Depends(db),u:User=Depends(current_user)):
+    if u.role=="owner":
+        return {"total":0}
+    rows=s.scalars(select(OnlinePurchaseOrder).where(
+        OnlinePurchaseOrder.status.in_(("approved","shipping","delivered")),
+        OnlinePurchaseOrder.record_id.is_not(None)
+    )).all()
+    total=0
+    for order in rows:
+        record=s.get(Record,order.record_id)
+        if not record:
+            continue
+        lines=(record.data or {}).get("items",[])
+        if any(
+            item.get("owner_user_id")==u.id and float(item.get("user_owned_quantity") or 0)>0
+            for item in lines
+        ):
+            total+=1
+    return {"total":total}
+
 @app.delete("/online-purchase-orders/{order_id}")
 def delete_online_purchase_order(order_id:int,s:Session=Depends(db),u:User=Depends(manager)):
     order=s.get(OnlinePurchaseOrder,order_id)
