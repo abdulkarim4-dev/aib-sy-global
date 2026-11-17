@@ -2858,15 +2858,14 @@ def count_online_purchase_orders(s:Session=Depends(db),u:User=Depends(manager)):
     pending=int(s.scalar(select(func.count(OnlinePurchaseOrder.id)).where(OnlinePurchaseOrder.status=="pending")) or 0)
     return {"pending":pending}
 
-@app.get("/my-online-purchase-orders/count")
-def count_my_online_purchase_orders(s:Session=Depends(db),u:User=Depends(current_user)):
+def _seller_confirmed_order_ids(s:Session,u:User):
     if u.role=="owner":
-        return {"total":0}
+        return []
     rows=s.scalars(select(OnlinePurchaseOrder).where(
         OnlinePurchaseOrder.status.in_(("approved","shipping","delivered")),
         OnlinePurchaseOrder.record_id.is_not(None)
     )).all()
-    total=0
+    ids=[]
     for order in rows:
         record=s.get(Record,order.record_id)
         if not record:
@@ -2876,8 +2875,28 @@ def count_my_online_purchase_orders(s:Session=Depends(db),u:User=Depends(current
             item.get("owner_user_id")==u.id and float(item.get("user_owned_quantity") or 0)>0
             for item in lines
         ):
-            total+=1
-    return {"total":total}
+            ids.append(order.id)
+    return ids
+
+@app.get("/my-online-purchase-orders/count")
+def count_my_online_purchase_orders(s:Session=Depends(db),u:User=Depends(current_user)):
+    seen=set((u.profile_data or {}).get("online_order_seen_ids",[]))
+    unread=sum(1 for order_id in _seller_confirmed_order_ids(s,u) if order_id not in seen)
+    return {"total":unread}
+
+@app.post("/my-online-purchase-orders/mark-viewed")
+def mark_my_online_purchase_orders_viewed(s:Session=Depends(db),u:User=Depends(current_user)):
+    if u.role=="owner":
+        return {"ok":True,"marked":0}
+    profile=dict(u.profile_data or {})
+    seen=set(int(x) for x in profile.get("online_order_seen_ids",[]) if str(x).isdigit())
+    current=set(_seller_confirmed_order_ids(s,u))
+    new_ids=current-seen
+    if new_ids:
+        profile["online_order_seen_ids"]=sorted(seen|current)
+        u.profile_data=profile
+        s.commit()
+    return {"ok":True,"marked":len(new_ids)}
 
 @app.delete("/online-purchase-orders/{order_id}")
 def delete_online_purchase_order(order_id:int,s:Session=Depends(db),u:User=Depends(manager)):
