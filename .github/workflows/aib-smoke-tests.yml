@@ -66,6 +66,12 @@ jobs:
             if curl --fail --silent http://127.0.0.1:8000/health > /tmp/aib-health.json; then
               cat /tmp/aib-health.json
               grep -q '"status":"ok"' /tmp/aib-health.json
+              curl --fail --silent -D /tmp/aib-search-headers http://127.0.0.1:8000/public/products -o /tmp/aib-search-all.json
+              grep -q '^\\[' /tmp/aib-search-all.json
+              grep -qi '^server-timing:' /tmp/aib-search-headers
+              curl --fail --silent -D /tmp/aib-search-term-headers 'http://127.0.0.1:8000/public/products?q=smoke-test' -o /tmp/aib-search-term.json
+              grep -q '^\\[' /tmp/aib-search-term.json
+              grep -qi '^x-aib-search-cache:' /tmp/aib-search-term-headers
               exit 0
             fi
             if ! kill -0 "$API_PID" 2>/dev/null; then
