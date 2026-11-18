@@ -1318,7 +1318,6 @@ def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=
         term=f"%{q.strip()}%"
         query=query.where(or_(InventoryProduct.sku.ilike(term),InventoryProduct.name.ilike(term),InventoryProduct.model.ilike(term)))
     rows=s.scalars(query.order_by(InventoryProduct.sku).limit(300)).all()
-    query_ms=(time.perf_counter()-query_started)*1000
     # Only show products referenced by at least one non-deleted invoice record.
     # A product whose only invoice was deleted is hidden as well; no rows or
     # stock values are deleted or modified by this display filter.
@@ -3126,6 +3125,7 @@ def public_products(q:Optional[str]=None, category:Optional[str]=None, response:
         term=f"%{q.strip()}%"
         query=query.where(or_(InventoryProduct.sku.ilike(term),InventoryProduct.name.ilike(term),InventoryProduct.model.ilike(term)))
     rows=s.scalars(query.order_by(InventoryProduct.sku).limit(300)).all()
+    query_ms=(time.perf_counter()-query_started)*1000
     # Match the inventory page's visibility rule exactly: employee-owned products
     # belong to that employee's inventory; legacy/owner products are visible only
     # when referenced by a non-deleted invoice. This prevents stale/orphaned
