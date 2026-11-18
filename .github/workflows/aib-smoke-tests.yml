@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [fix/accounting-store-safety]
+    branches: [fix/accounting-store-safety, perf/aib-store-search-observability]
 
 jobs:
   smoke:
