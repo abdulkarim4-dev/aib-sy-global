@@ -4,7 +4,8 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [fix/accounting-store-safety, perf/aib-store-search-observability]
+    branches: [main, fix/accounting-store-safety, perf/aib-store-search-observability]
+  workflow_dispatch:
 
 jobs:
   smoke:
@@ -67,10 +68,10 @@ jobs:
               cat /tmp/aib-health.json
               grep -q '"status":"ok"' /tmp/aib-health.json
               if ! curl --fail --silent --show-error -D /tmp/aib-search-headers http://127.0.0.1:8000/public/products -o /tmp/aib-search-all.json; then cat /tmp/aib-api.log; exit 1; fi
-              grep -q '^\\[' /tmp/aib-search-all.json
+              python -c "import json; assert isinstance(json.load(open('/tmp/aib-search-all.json')), list)"
               grep -qi '^server-timing:' /tmp/aib-search-headers
               if ! curl --fail --silent --show-error -D /tmp/aib-search-term-headers 'http://127.0.0.1:8000/public/products?q=smoke-test' -o /tmp/aib-search-term.json; then cat /tmp/aib-api.log; exit 1; fi
-              grep -q '^\\[' /tmp/aib-search-term.json
+              python -c "import json; assert isinstance(json.load(open('/tmp/aib-search-term.json')), list)"
               grep -qi '^x-aib-search-cache:' /tmp/aib-search-term-headers
               exit 0
             fi
