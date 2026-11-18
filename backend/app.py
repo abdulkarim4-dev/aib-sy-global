@@ -455,6 +455,26 @@ def startup():
 
         conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS voided BOOLEAN NOT NULL DEFAULT FALSE"))
         conn.execute(text("CREATE INDEX IF NOT EXISTS ix_inventory_products_owner_user_id ON inventory_products(owner_user_id)"))
+        # PostgreSQL trigram indexes accelerate the storefront's leading-wildcard ILIKE search.
+        # Keep this optional so restricted database roles do not prevent the API from starting.
+        try:
+            with conn.begin_nested():
+                conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
+                conn.execute(text("""
+                    CREATE INDEX IF NOT EXISTS ix_inventory_products_name_trgm
+                    ON inventory_products USING GIN (name gin_trgm_ops)
+                    WHERE active IS TRUE
+                """))
+                conn.execute(text("""
+                    CREATE INDEX IF NOT EXISTS ix_inventory_products_model_trgm
+                    ON inventory_products USING GIN (model gin_trgm_ops)
+                    WHERE active IS TRUE
+                """))
+        except Exception:
+            logging.getLogger("aib.search").warning(
+                "Store search trigram indexes could not be ensured; continuing without them",
+                exc_info=True,
+            )
         conn.execute(text("CREATE INDEX IF NOT EXISTS ix_wallet_transactions_user_id ON wallet_transactions(user_id)"))
         conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS record_id INTEGER REFERENCES records(id)"))
         conn.execute(text("ALTER TABLE cash_moves ADD COLUMN IF NOT EXISTS voided_by INTEGER REFERENCES users(id)"))
@@ -1298,6 +1318,7 @@ def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=
         term=f"%{q.strip()}%"
         query=query.where(or_(InventoryProduct.sku.ilike(term),InventoryProduct.name.ilike(term),InventoryProduct.model.ilike(term)))
     rows=s.scalars(query.order_by(InventoryProduct.sku).limit(300)).all()
+    query_ms=(time.perf_counter()-query_started)*1000
     # Only show products referenced by at least one non-deleted invoice record.
     # A product whose only invoice was deleted is hidden as well; no rows or
     # stock values are deleted or modified by this display filter.
@@ -3083,13 +3104,23 @@ def update_online_purchase_order_status(order_id:int,p:OnlineOrderStatusPayload,
     return {"ok":True,"status":order.status}
 
 @app.get("/public/products")
-def public_products(q:Optional[str]=None, category:Optional[str]=None, s:Session=Depends(db)):
+def public_products(q:Optional[str]=None, category:Optional[str]=None, response:Response=None, s:Session=Depends(db)):
     import time
+    started=time.perf_counter()
     cache_key=((q or "").strip().casefold(),(category or "").strip().casefold())
     now=time.monotonic()
     cached=_public_products_cache["value"].get(cache_key)
     if cached is not None and now-_public_products_cache["at"].get(cache_key,0)<_PUBLIC_PRODUCTS_CACHE_TTL:
+        elapsed_ms=(time.perf_counter()-started)*1000
+        if response is not None:
+            response.headers["X-AIB-Search-Cache"]="HIT"
+            response.headers["Server-Timing"]=f"total;dur={elapsed_ms:.2f}"
+        logging.getLogger("aib.search").info(
+            "public_products_search cache=hit category=%s query_length=%d results=%d total_ms=%.2f",
+            (category or "")[:60],len((q or "").strip()),len(cached),elapsed_ms,
+        )
         return cached
+    query_started=time.perf_counter()
     query=select(InventoryProduct).where(InventoryProduct.active.is_(True))
     if q:
         term=f"%{q.strip()}%"
@@ -3120,7 +3151,10 @@ def public_products(q:Optional[str]=None, category:Optional[str]=None, s:Session
         if p.owner_user_id is not None
         or str(p.sku or "").strip().upper() in invoiced_skus
     ]
+    visibility_ms=(time.perf_counter()-query_started)*1000-query_ms
+    catalog_started=time.perf_counter()
     store_categories,latest_purchase=latest_store_catalog_data(s)
+    catalog_ms=(time.perf_counter()-catalog_started)*1000
     out=[]
     for p in rows:
         name=(p.name+" "+(p.model or "")).lower()
@@ -3179,6 +3213,20 @@ def public_products(q:Optional[str]=None, category:Optional[str]=None, s:Session
         _public_products_cache["value"].clear();_public_products_cache["at"].clear()
     _public_products_cache["value"][cache_key]=out
     _public_products_cache["at"][cache_key]=now
+    total_ms=(time.perf_counter()-started)*1000
+    if response is not None:
+        response.headers["X-AIB-Search-Cache"]="MISS"
+        response.headers["Server-Timing"]=(
+            f"products_db;dur={query_ms:.2f}, "
+            f"visibility;dur={visibility_ms:.2f}, "
+            f"catalog;dur={catalog_ms:.2f}, total;dur={total_ms:.2f}"
+        )
+    logging.getLogger("aib.search").info(
+        "public_products_search cache=miss category=%s query_length=%d results=%d "
+        "products_db_ms=%.2f visibility_ms=%.2f catalog_ms=%.2f total_ms=%.2f",
+        (category or "")[:60],len((q or "").strip()),len(out),
+        query_ms,visibility_ms,catalog_ms,total_ms,
+    )
     return out
 
 # Serve the connected responsive web app from the same origin as the API.
