@@ -4,7 +4,8 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [fix/accounting-store-safety]
+    branches: [main, fix/accounting-store-safety, perf/aib-store-search-observability]
+  workflow_dispatch:
 
 jobs:
   smoke:
@@ -45,14 +46,17 @@ jobs:
           python - <<'PY'
           import re
           from pathlib import Path
-          html = Path("frontend/index.html").read_text(encoding="utf-8")
-          scripts = re.findall(r"<script[^>]*>(.*?)</script>", html, re.I | re.S)
-          if not scripts:
-              raise SystemExit("No inline JavaScript found in frontend/index.html")
-          Path("/tmp/aib-frontend.js").write_text("\\n".join(scripts), encoding="utf-8")
-          print(f"Extracted {len(scripts)} inline script block(s)")
+          for page in ("frontend/index.html", "frontend/shop.html"):
+              html = Path(page).read_text(encoding="utf-8")
+              scripts = re.findall(r"<script[^>]*>(.*?)</script>", html, re.I | re.S)
+              if not scripts:
+                  raise SystemExit(f"No inline JavaScript found in {page}")
+              output = Path("/tmp") / (Path(page).stem + "-scripts.js")
+              output.write_text("\n".join(scripts), encoding="utf-8")
+              print(f"{page}: extracted {len(scripts)} inline script block(s)")
           PY
-          node --check /tmp/aib-frontend.js
+          node --check /tmp/index-scripts.js
+          node --check /tmp/shop-scripts.js
       - name: Start API and verify database-backed health endpoint
         run: |
           cd backend
@@ -63,6 +67,12 @@ jobs:
             if curl --fail --silent http://127.0.0.1:8000/health > /tmp/aib-health.json; then
               cat /tmp/aib-health.json
               grep -q '"status":"ok"' /tmp/aib-health.json
+              if ! curl --fail --silent --show-error -D /tmp/aib-search-headers http://127.0.0.1:8000/public/products -o /tmp/aib-search-all.json; then cat /tmp/aib-api.log; exit 1; fi
+              python -c "import json; assert isinstance(json.load(open('/tmp/aib-search-all.json')), list)"
+              grep -qi '^server-timing:' /tmp/aib-search-headers
+              if ! curl --fail --silent --show-error -D /tmp/aib-search-term-headers 'http://127.0.0.1:8000/public/products?q=smoke-test' -o /tmp/aib-search-term.json; then cat /tmp/aib-api.log; exit 1; fi
+              python -c "import json; assert isinstance(json.load(open('/tmp/aib-search-term.json')), list)"
+              grep -qi '^x-aib-search-cache:' /tmp/aib-search-term-headers
               exit 0
             fi
             if ! kill -0 "$API_PID" 2>/dev/null; then
