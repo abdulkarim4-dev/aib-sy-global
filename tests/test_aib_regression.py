@@ -14,14 +14,16 @@ import app as aib
 
 
 class AIBRegressionTests(unittest.TestCase):
-    def test_invoice_branding_keeps_owner_and_user_identities_separate(self):
+    def test_all_application_invoices_use_only_the_aib_issuer_identity(self):
         source = (ROOT / "frontend" / "index.html").read_text(encoding="utf-8")
+        self.assertIn("const invoiceBrand='default'", source)
+        self.assertIn("const invoiceCompanyLogo='/aib-logo.png?v=20261113-aib2'", source)
+        self.assertIn("companyProfile=await api('/company-profile')", source)
+        self.assertNotIn("userInvoiceProfile=await api('/my-profile')", source)
+        self.assertNotIn("invoiceBrand=me?.role==='owner'?", source)
         self.assertIn("me?.role!=='owner'?'user-invoice':'owner-invoice'", source)
-        self.assertIn('#print .head>.brandblock:before{content:"AIB  |  TRADING GROUP"', source)
-        self.assertIn("#print .user-invoice .head>.brandblock:before", source)
-        self.assertIn("#print .user-invoice .head>.brandblock:after", source)
-        self.assertIn("content:none!important", source)
-        self.assertIn("invoiceBrand=me?.role==='owner'?'default'", source)
+        self.assertIn("'/aib-logo.png?v=20261113-aib2'", source)
+        self.assertIn("مجموعة AIB التجارية", source)
 
     def test_invoice_logo_and_payment_qr_assets_are_real_png_files(self):
         assets = (
