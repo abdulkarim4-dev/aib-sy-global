@@ -2215,6 +2215,18 @@ def review_wallet_request(request_id:int,p:WalletRequestReviewPayload,request:Re
         reason=("إيداع وافق عليه المالك بناءً على طلب المستخدم" if row.movement=="deposit" else "سحب نقدي نفذه المالك بناءً على طلب المستخدم")
         tx=WalletTransaction(wallet_id=wallet.id,user_id=target.id,amount=row.amount,currency=row.currency,direction="in" if row.movement=="deposit" else "out",reason=(p.note or "").strip()[:500] or reason,reference_type="wallet_request",reference_id=row.id,created_by=u.id)
         s.add(tx)
+        # A cash payout is funded from the Sham Cash cashbox for online-sale
+        # wallet balances. Keep the cashbox ledger in sync with the wallet debit.
+        if row.movement=="withdrawal" and row.withdrawal_method=="cash":
+            ensure_cash_balance(s,"شام كاش",row.currency,float(row.amount))
+            s.add(CashMove(
+                box_name="شام كاش",
+                movement="withdrawal",
+                amount=row.amount,
+                currency=row.currency,
+                description=f"صرف نقدي للمستخدم {target.full_name or target.username} · طلب سحب محفظة #{row.id}",
+                created_by=u.id,
+            ))
         row.status="approved"
     else:
         row.status="rejected"
