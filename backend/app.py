@@ -1313,7 +1313,8 @@ def create_inventory_product(p:InventoryProductCreate,request:Request,s:Session=
 def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=Depends(require_permission("inventory","view"))):
     # Legacy products with no owner remain in the owner's inventory only.
     query=select(InventoryProduct).where(InventoryProduct.active.is_(True))
-    if u.role!="owner": query=query.where(InventoryProduct.owner_user_id==u.id)
+    if u.role=="owner": query=query.where(InventoryProduct.owner_user_id.is_(None))
+    else: query=query.where(InventoryProduct.owner_user_id==u.id)
     if q:
         term=f"%{q.strip()}%"
         query=query.where(or_(InventoryProduct.sku.ilike(term),InventoryProduct.name.ilike(term),InventoryProduct.model.ilike(term)))
@@ -1339,7 +1340,7 @@ def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=
               AND NULLIF(BTRIM(item->>'sku'),'') IS NOT NULL
         """)).scalars().all()
     }
-    rows=[p for p in rows if (u.role!="owner" and p.owner_user_id==u.id) or str(p.sku or "").strip().upper() in invoiced_skus]
+    rows=[p for p in rows if (u.role=="owner" and p.owner_user_id is None and str(p.sku or "").strip().upper() in invoiced_skus) or (u.role!="owner" and p.owner_user_id==u.id)]
     store_categories,latest_purchase=latest_store_catalog_data(s)
     return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owner_user_id":p.owner_user_id,"condition":p.condition or "new","opening_quantity":float(p.opening_quantity or 0),"store_family":p.store_family,"store_category":p.store_category,"owned_stock":float(p.owned_stock or 0),**({"consigned_stock":float(p.consigned_stock or 0)} if u.role=="owner" else {}),"image_count":len(p.images or []),"shipping_included":bool(p.shipping_included),"video_url":p.video_url or "",**store_categories.get(p.sku,{}),"vehicle_details":(p.vehicle_details or store_categories.get(p.sku,{}).get("vehicle_details") or {}),**latest_purchase.get(p.sku,{"purchase_price":0,"sale_price":0,"currency":"—"}),"sale_price":float(p.sale_price) if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("sale_price"),"sale_currency":p.sale_currency if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("currency","")} for p in rows]
 
