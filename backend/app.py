@@ -1965,9 +1965,18 @@ def submit_outside_store_payment(record_id:int,p:OutsideStorePaymentPayload,requ
     data["owner_commission"]=commission
     record.data=data
     record.updated_at=datetime.now(timezone.utc)
-    audit(s,u,"outside_store_commission_payment_submitted","record",record.id,{"invoice_no":record.invoice_no,"amount":commission.get("amount"),"currency":record.currency,"method":p.method,"reference":payment_reference,"proof_attached":bool(proof_image)},request)
+    audit(s,u,"outside_store_commission_payment_submitted","record",record.id,{"invoice_no":record.invoice_no,"amount":commission.get("amount"),"transfer_amount":transfer_amount,"payment_type":p.payment_type,"currency":record.currency,"method":p.method,"reference":payment_reference,"proof_attached":bool(proof_image)},request)
     s.commit()
-    return {"ok":True,"payment_status":"submitted"}
+    owners=s.scalars(select(User).where(User.role=="owner",User.deleted.is_(False),User.active.is_(True),User.email.is_not(None))).all()
+    seller_name=u.full_name or u.username
+    transfer_label="كامل سعر القطعة" if p.payment_type=="full_amount" else "عمولة البائع 1.5٪ فقط"
+    subject="AIB: طلب تأكيد تحويل خارج المتجر"
+    body="تم إرسال طلب تأكيد تحويل خارج المتجر.\nالمستخدم: "+str(seller_name)+"\nالفاتورة: "+str(record.invoice_no or record.id)+"\nنوع التحويل: "+transfer_label+"\nالمبلغ المحوّل: "+str(transfer_amount)+" "+str(record.currency)+"\nعمولة البائع: "+str(commission.get("amount"))+" "+str(record.currency)+"\nيرجى فتح صفحة المخزون في تطبيق AIB ومراجعة إثبات التحويل."
+    email_html=aib_email_html("طلب تأكيد تحويل خارج المتجر","أرسل أحد المستخدمين بيانات تحويل جديدة، وتحتاج إلى مراجعة الإثبات وتأكيد وصول المبلغ.",[("المستخدم",seller_name),("الفاتورة",record.invoice_no or record.id),("نوع التحويل",transfer_label),("المبلغ المحوّل",str(transfer_amount)+" "+str(record.currency)),("عمولة البائع 1.5٪",str(commission.get("amount"))+" "+str(record.currency))],accent="#d97706",note="يرجى التحقق من وصول المبلغ فعلياً قبل تأكيد العملية.")
+    for owner in owners:
+        if owner.email:
+            send_notification_email(owner.email,subject,body,email_html)
+    return {"ok":True,"payment_status":"submitted","owner_notifications_sent":len([o for o in owners if o.email])}
 
 @app.post("/outside-store-sales/{record_id}/confirm-commission")
 def confirm_outside_store_commission(record_id:int,p:OwnerCommissionConfirmPayload,request:Request,s:Session=Depends(db),u:User=Depends(manager)):
