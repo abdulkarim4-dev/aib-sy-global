@@ -1612,7 +1612,7 @@ def invoice_cash_description(record:Record, action:str="دفعة فاتورة")-
 def add_invoice_payment(record_id:int,p:PaymentPayload,request:Request,s:Session=Depends(db),u:User=Depends(require_permission("invoices","create"))):
     r=s.get(Record,record_id)
     if not r or r.deleted or (u.role!="owner" and (r.created_by!=u.id or r.section in {"deposit","consignSale"})): raise HTTPException(404,"الفاتورة غير موجودة")
-    if p.method not in {"cash","baraka_bank","sham_cash","syriatel_cash"}: raise HTTPException(400,"طريقة الدفع غير صالحة")
+    if p.method not in {"cash","baraka_bank","sham_cash","syria_gulf"}: raise HTTPException(400,"طريقة الدفع غير صالحة")
     total=float(r.data.get("amount",r.data.get("price",r.data.get("sale",0))) or 0)
     paid=float(s.scalar(select(func.coalesce(func.sum(InvoicePayment.amount),0)).where(InvoicePayment.record_id==record_id)) or 0)
     if round(paid+p.amount,2)>round(total,2): raise HTTPException(400,"مجموع الدفعات يتجاوز إجمالي الفاتورة")
@@ -1652,7 +1652,7 @@ def update_invoice_payment(record_id:int,payment_id:int,p:PaymentUpdatePayload,r
     if u.role!="owner": raise HTTPException(403,"تعديل الدفعات المسجلة متاح للمالك فقط")
     r=s.get(Record,record_id); x=s.get(InvoicePayment,payment_id)
     if not r or r.deleted or (u.role!="owner" and (r.created_by!=u.id or r.section in {"deposit","consignSale"})) or not x or x.record_id!=record_id: raise HTTPException(404,"الدفعة غير موجودة")
-    if p.method not in {"cash","baraka_bank","sham_cash","syriatel_cash"}: raise HTTPException(400,"طريقة الدفع غير صالحة")
+    if p.method not in {"cash","baraka_bank","sham_cash","syria_gulf"}: raise HTTPException(400,"طريقة الدفع غير صالحة")
     if not p.cash_box.strip(): raise HTTPException(400,"اختر الصندوق")
     trust_boxes={"صندوق الأمانة","صندوق مبيع الأمانة","صندوق قل أمانة","صندوق قُل أمانة"}
     if u.role!="owner" and (p.cash_box.strip() in trust_boxes or x.cash_box in trust_boxes):
@@ -1933,7 +1933,7 @@ def pending_outside_store_sales(s:Session=Depends(db),u:User=Depends(manager)):
 
 @app.post("/outside-store-sales/{record_id}/submit-payment")
 def submit_outside_store_payment(record_id:int,p:OutsideStorePaymentPayload,request:Request,s:Session=Depends(db),u:User=Depends(current_user)):
-    if p.method not in {"baraka_bank","sham_cash","syriatel_cash"}:
+    if p.method not in {"baraka_bank","sham_cash","syria_gulf"}:
         raise HTTPException(400,"طريقة الدفع غير مدعومة")
     payment_reference=p.reference.strip()
     proof_image=(p.proof_image or "").strip()
@@ -2423,6 +2423,7 @@ class OnlineOrderPayload(BaseModel):
     phone_number: str = Field(min_length=5,max_length=32)
     payment_proof: str = Field(min_length=40,max_length=7000000)
     proof_type: str = Field(min_length=3,max_length=80)
+    payment_method: str = Field(default="sham_cash",pattern="^(sham_cash|baraka_bank|syria_gulf)$")
     contract_identity: Optional[dict[str,str]] = None
     items: list[StoreCartItemPayload] = Field(min_length=1,max_length=100)
 
@@ -2908,7 +2909,7 @@ def create_online_order(p:OnlineOrderPayload,s:Session=Depends(db),customer:Stor
     previous_profile={"full_name":customer.full_name,"shipping_address":customer.shipping_address,"phone_country_code":customer.phone_country_code,"phone_number":customer.phone_number}
     customer.first_name=p.first_name.strip();customer.last_name=p.last_name.strip();customer.full_name=(customer.first_name+" "+customer.last_name).strip()
     customer.shipping_address=p.shipping_address.strip();customer.phone_country_code=p.phone_country_code;customer.phone_number=p.phone_number.strip()
-    data={"first_name":customer.first_name,"last_name":customer.last_name,"full_name":customer.full_name,"email":customer.email,"shipping_address":customer.shipping_address,"phone_country_code":customer.phone_country_code,"phone_number":customer.phone_number,"full_phone":customer.phone_country_code+customer.phone_number,"include_contract_identity":bool(contract_identity),"contract_identity":contract_identity}
+    data={"first_name":customer.first_name,"last_name":customer.last_name,"full_name":customer.full_name,"email":customer.email,"shipping_address":customer.shipping_address,"phone_country_code":customer.phone_country_code,"phone_number":customer.phone_number,"full_phone":customer.phone_country_code+customer.phone_number,"payment_method":p.payment_method,"include_contract_identity":bool(contract_identity),"contract_identity":contract_identity}
     order=OnlinePurchaseOrder(customer_id=customer.id,customer_data=data,items=lines,total=round(total,2),currency=currency or "USD",payment_proof=p.payment_proof,proof_type=p.proof_type,status="pending")
     s.add(order);s.commit();s.refresh(order)
     if any(previous_profile[k]!=(customer.full_name if k=="full_name" else customer.shipping_address if k=="shipping_address" else customer.phone_country_code if k=="phone_country_code" else customer.phone_number) for k in previous_profile):
