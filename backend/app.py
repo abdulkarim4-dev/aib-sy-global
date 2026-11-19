@@ -341,6 +341,17 @@ for _access_handler in _access_logger.handlers:
     _access_handler.addFilter(_SensitiveQueryLogFilter())
 app.add_middleware(GZipMiddleware, minimum_size=900, compresslevel=5)
 
+@app.middleware("http")
+async def log_public_products_exceptions(request: Request, call_next):
+    try:
+        return await call_next(request)
+    except Exception:
+        if request.url.path == "/public/products":
+            logging.getLogger("aib.search").exception(
+                "Unhandled public products request failure"
+            )
+        raise
+
 def db():
     s=SessionLocal()
     try: yield s
@@ -526,7 +537,9 @@ def startup():
                 s.add(User(username=settings.owner_username,full_name=settings.owner_name,password_hash=password_hash.hash(settings.owner_password),role="owner")); s.commit()
 
 @app.get("/health")
-def health(): return {"status":"ok","service":"AIB Accounting API"}
+def health(s:Session=Depends(db)):
+    s.execute(text("SELECT 1"))
+    return {"status":"ok","service":"AIB Accounting API","database":"ok"}
 class AccountingLoginConfirmPayload(BaseModel):
     challenge_id:int
     code:str=Field(min_length=6,max_length=6)
