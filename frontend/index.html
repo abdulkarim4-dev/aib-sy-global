@@ -308,15 +308,18 @@ function updateNewInventoryVehicleSelectors(changed=''){
  const oldType=typeEl.value,oldMake=makeEl.value,oldModel=modelEl.value,oldClass=classEl.value,oldGeneration=generationEl.value;
  setOptions(typeEl,typeSets[family]||[],changed==='family'?'':oldType,'اختر نوع المركبة');
  const kind=family==='car'?'car':family==='truck'?'truck':family;
- const makes=(family==='car'||family==='truck')?(catalog.makes||[]).filter(m=>(m.kinds||[]).includes(kind)||(m.kinds||[]).includes('van')||(m.kinds||[]).includes('bus')).map(m=>m.name):(staticMakes[family]||[]);
+ const catalogMakes=Array.isArray(catalog.makes)?catalog.makes:[];let eligibleMakes=catalogMakes.filter(m=>(m.kinds||[]).includes(kind)||(m.kinds||[]).includes('van')||(m.kinds||[]).includes('bus'));if(!eligibleMakes.length&&family==='car')eligibleMakes=catalogMakes.filter(m=>(m.models||[]).length);const makes=(family==='car'||family==='truck')?eligibleMakes.map(m=>m.name):(staticMakes[family]||[]);
  setOptions(makeEl,makes,changed==='type'?'':oldMake,'اختر الشركة المصنعة');
- const make=(catalog.makes||[]).find(m=>m.name===makeEl.value);
- let models=make?(make.models||[]).filter(m=>!m.kind||m.kind===kind||m.kind===family||m.kind==='van'||m.kind==='bus').map(m=>m.name):[];
+ const make=catalogMakes.find(m=>String(m.name).toLowerCase()===String(makeEl.value).toLowerCase());
+ let modelEntries=make?(make.models||[]).filter(m=>!m.kind||m.kind===kind||m.kind===family||m.kind==='van'||m.kind==='bus'):[];
+ if(make&&!modelEntries.length)modelEntries=make.models||[];
+ let models=modelEntries.map(m=>m.name);
  const extra={'Caterpillar':['320','336','D6','D8','950','966'],'Komatsu':['PC200','PC300','PC400','WA380','D65'],'JCB':['3CX','4CX','JS220'],'Volvo CE':['EC210','EC300','L120'],'Hitachi':['ZX200','ZX300'],'John Deere':['6M','7R','8R','S700'],'New Holland':['T6','T7','CR'],'Massey Ferguson':['MF 4700','MF 5700'],'Case IH':['Puma','Maxxum'],'Kubota':['M7','L Series'],'Claas':['Arion','Axion'],'Deutz-Fahr':['5 Series','6 Series'],'Fendt':['500 Vario','700 Vario']};
  if(!models.length)models=extra[makeEl.value]||[];
  setOptions(modelEl,models,changed==='type'||changed==='make'?'':oldModel,'اختر الطراز');
- const selectedModel=make?.models?.find(m=>m.name===modelEl.value),classMap={sedan:'سيدان',hatchback:'هاتشباك',coupe:'كوبيه',convertible:'مكشوفة',wagon:'ستيشن / عائلية',suv:'دفع رباعي SUV',pickup:'بيك أب',van:'فان',bus:'حافلة'};
- let classes=selectedModel?.body_type?[classMap[selectedModel.body_type]||selectedModel.body_type]:[];
+ const selectedModel=modelEntries.find(m=>m.name===modelEl.value),classMap={sedan:'سيدان',hatchback:'هاتشباك',coupe:'كوبيه',convertible:'مكشوفة',wagon:'ستيشن / عائلية',estate:'ستيشن / عائلية',suv:'دفع رباعي SUV',pickup:'بيك أب',van:'فان',bus:'حافلة',minivan:'ميني فان'};
+ let classes=family==='car'?['سيدان','هاتشباك','دفع رباعي SUV','كوبيه','مكشوفة','ستيشن / عائلية','بيك أب','فان','ميني فان']:family==='truck'?['شاحنة','قاطرة / رأس شاحنة','حافلة','فان']:[];
+ if(selectedModel?.body_type){const current=classMap[selectedModel.body_type]||selectedModel.body_type;if(!classes.includes(current))classes.unshift(current);}
  if(family==='heavy')classes=typeEl.value==='حفارة'?['حفارة جنزير','حفارة بعجلات']:typeEl.value==='لودر'?['لودر بعجلات','لودر جنزير']:['معدات ثقيلة'];
  if(family==='agri')classes=typeEl.value==='جرار زراعي'?['جرار بعجلتين','جرار بأربع عجلات']:typeEl.value==='حصادة'?['حصادة حبوب','حصادة أعلاف']:['معدات زراعية'];
  setOptions(classEl,classes,changed==='model'||changed==='make'||changed==='type'?'':oldClass,'اختر الفئة');
