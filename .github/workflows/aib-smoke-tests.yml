@@ -64,17 +64,19 @@ jobs:
       - name: Start API and verify database-backed health endpoint
         run: |
           cd backend
-          uvicorn app:app --host 127.0.0.1 --port 8000 > /tmp/aib-api.log 2>&1 &
+          uvicorn app:app --host 127.0.0.1 --port 8000 --log-level debug > /tmp/aib-api.log 2>&1 &
           API_PID=$!
           trap 'kill "$API_PID" 2>/dev/null || true' EXIT
           for attempt in $(seq 1 60); do
             if curl --fail --silent http://127.0.0.1:8000/health > /tmp/aib-health.json; then
               cat /tmp/aib-health.json
               grep -q '"status":"ok"' /tmp/aib-health.json
-              if ! curl --fail --silent --show-error -D /tmp/aib-search-headers http://127.0.0.1:8000/public/products -o /tmp/aib-search-all.json; then cat /tmp/aib-api.log; exit 1; fi
+              SEARCH_STATUS=$(curl --silent --show-error -D /tmp/aib-search-headers -o /tmp/aib-search-all.json -w "%{http_code}" http://127.0.0.1:8000/public/products || true)
+              if [ "$SEARCH_STATUS" != "200" ]; then echo "GET /public/products returned HTTP $SEARCH_STATUS"; echo "--- response body ---"; cat /tmp/aib-search-all.json; echo; echo "--- API traceback/log ---"; cat /tmp/aib-api.log; exit 1; fi
               python -c "import json; assert isinstance(json.load(open('/tmp/aib-search-all.json')), list)"
               grep -qi '^server-timing:' /tmp/aib-search-headers
-              if ! curl --fail --silent --show-error -D /tmp/aib-search-term-headers 'http://127.0.0.1:8000/public/products?q=smoke-test' -o /tmp/aib-search-term.json; then cat /tmp/aib-api.log; exit 1; fi
+              SEARCH_TERM_STATUS=$(curl --silent --show-error -D /tmp/aib-search-term-headers -o /tmp/aib-search-term.json -w "%{http_code}" "http://127.0.0.1:8000/public/products?q=smoke-test" || true)
+              if [ "$SEARCH_TERM_STATUS" != "200" ]; then echo "GET /public/products?q=smoke-test returned HTTP $SEARCH_TERM_STATUS"; echo "--- response body ---"; cat /tmp/aib-search-term.json; echo; echo "--- API traceback/log ---"; cat /tmp/aib-api.log; exit 1; fi
               python -c "import json; assert isinstance(json.load(open('/tmp/aib-search-term.json')), list)"
               grep -qi '^x-aib-search-cache:' /tmp/aib-search-term-headers
               exit 0
