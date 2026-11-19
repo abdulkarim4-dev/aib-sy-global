@@ -2201,7 +2201,7 @@ def create_wallet_request(p:WalletRequestPayload,request:Request,s:Session=Depen
     amount=round(float(p.amount),2)
     if movement not in {"deposit","withdrawal"}: raise HTTPException(400,"نوع الطلب غير صحيح")
     withdrawal_method=str(p.withdrawal_method or "").strip()
-    allowed_withdrawal_methods={"cash","sham_cash","al_baraka","syria_gulf"}
+    allowed_withdrawal_methods={"cash","sham_cash","baraka_bank","syria_gulf","al_baraka"}
     if movement=="withdrawal" and withdrawal_method not in allowed_withdrawal_methods: raise HTTPException(400,"يرجى اختيار طريقة السحب")
     if movement=="deposit": withdrawal_method=""
     if currency not in {"USD","SYP"}: raise HTTPException(400,"العملة غير مدعومة")
