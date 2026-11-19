@@ -1972,7 +1972,7 @@ def confirm_outside_store_commission(record_id:int,p:OwnerCommissionConfirmPaylo
     commission=dict(data.get("owner_commission") or {})
     if commission.get("status")=="paid":
         raise HTTPException(409,"تم تأكيد تسديد عمولة هذه الفاتورة مسبقاً")
-    if commission.get("payment_status")!="submitted" or not commission.get("payment_reference"):
+    if commission.get("payment_status")!="submitted" or not (commission.get("payment_reference") or commission.get("payment_proof")):
         raise HTTPException(409,"لا يمكن تأكيد الدفعة قبل أن يرسل المستخدم بيانات التحويل")
     amount=round(float(commission.get("amount") or 0),2)
     seller_net=round(float(commission.get("seller_net") or 0),2)
