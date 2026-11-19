@@ -172,6 +172,7 @@ class InventoryProduct(Base):
     owned_stock: Mapped[Any]=mapped_column(Numeric(18,3), default=0)
     consigned_stock: Mapped[Any]=mapped_column(Numeric(18,3), default=0)
     active: Mapped[bool]=mapped_column(Boolean, default=True)
+    is_store_visible: Mapped[bool]=mapped_column(Boolean, default=True, nullable=False)
     images: Mapped[list]=mapped_column(JSON, default=list, nullable=False)
     shipping_included: Mapped[bool]=mapped_column(Boolean, default=False, nullable=False)
     video_url: Mapped[Optional[str]]=mapped_column(Text, nullable=True)
@@ -445,6 +446,7 @@ def startup():
         conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_email_unique ON users (email) WHERE email IS NOT NULL"))
         conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS images JSONB NOT NULL DEFAULT '[]'::jsonb"))
         conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS shipping_included BOOLEAN NOT NULL DEFAULT FALSE"))
+        conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS is_store_visible BOOLEAN NOT NULL DEFAULT TRUE"))
         conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS owner_user_id INTEGER REFERENCES users(id)"))
         conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS sale_price NUMERIC(18,2)"))
         conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS sale_currency VARCHAR(8) NOT NULL DEFAULT 'USD'"))
@@ -1355,7 +1357,7 @@ def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=
     }
     rows=[p for p in rows if (u.role=="owner" and p.owner_user_id is None and str(p.sku or "").strip().upper() in invoiced_skus) or (u.role!="owner" and p.owner_user_id==u.id)]
     store_categories,latest_purchase=latest_store_catalog_data(s)
-    return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owner_user_id":p.owner_user_id,"condition":p.condition or "new","opening_quantity":float(p.opening_quantity or 0),"store_family":p.store_family,"store_category":p.store_category,"owned_stock":float(p.owned_stock or 0),**({"consigned_stock":float(p.consigned_stock or 0)} if u.role=="owner" else {}),"image_count":len(p.images or []),"shipping_included":bool(p.shipping_included),"video_url":p.video_url or "",**store_categories.get(p.sku,{}),"vehicle_details":(p.vehicle_details or store_categories.get(p.sku,{}).get("vehicle_details") or {}),**latest_purchase.get(p.sku,{"purchase_price":0,"sale_price":0,"currency":"—"}),"sale_price":float(p.sale_price) if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("sale_price"),"sale_currency":p.sale_currency if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("currency","")} for p in rows]
+    return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owner_user_id":p.owner_user_id,"condition":p.condition or "new","is_store_visible":bool(p.is_store_visible),"opening_quantity":float(p.opening_quantity or 0),"store_family":p.store_family,"store_category":p.store_category,"owned_stock":float(p.owned_stock or 0),**({"consigned_stock":float(p.consigned_stock or 0)} if u.role=="owner" else {}),"image_count":len(p.images or []),"shipping_included":bool(p.shipping_included),"video_url":p.video_url or "",**store_categories.get(p.sku,{}),"vehicle_details":(p.vehicle_details or store_categories.get(p.sku,{}).get("vehicle_details") or {}),**latest_purchase.get(p.sku,{"purchase_price":0,"sale_price":0,"currency":"—"}),"sale_price":float(p.sale_price) if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("sale_price"),"sale_currency":p.sale_currency if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("currency","")} for p in rows]
 
 class InventoryProductUpdate(BaseModel):
     name: str=Field(min_length=2,max_length=240)
@@ -1450,7 +1452,7 @@ def get_inventory_product_images(product_id:int, s:Session=Depends(db), u:User=D
 @app.get("/public/products/{product_id}/image/{image_index}")
 def get_public_product_image(product_id:int,image_index:int,s:Session=Depends(db)):
     product=s.get(InventoryProduct,product_id)
-    if not product or not product.active:
+    if not product or not product.active or not product.is_store_visible:
         raise HTTPException(404,"الصورة غير موجودة")
     images=product.images or []
     if image_index<0 or image_index>=len(images):
@@ -1473,6 +1475,23 @@ class InventoryShippingPayload(BaseModel):
 
 class InventoryVideoPayload(BaseModel):
     video_url: str = Field(default="", max_length=2000)
+
+class InventoryStoreVisibilityPayload(BaseModel):
+    visible: bool
+
+@app.put("/inventory/products/{product_id}/store-visibility")
+def update_inventory_product_store_visibility(product_id:int,p:InventoryStoreVisibilityPayload,request:Request,s:Session=Depends(db),u:User=Depends(current_user)):
+    if u.role!="owner":
+        raise HTTPException(403,"هذا الخيار متاح لحساب المالك فقط")
+    product=s.get(InventoryProduct,product_id)
+    if not product or not product.active or product.owner_user_id is not None:
+        raise HTTPException(404,"المنتج غير موجود في مخزون المالك")
+    product.is_store_visible=bool(p.visible)
+    audit(s,u,"inventory_store_visibility_updated","inventory_product",product.id,{"sku":product.sku,"is_store_visible":product.is_store_visible},request)
+    s.commit()
+    _public_products_cache["value"].clear()
+    _public_products_cache["at"].clear()
+    return {"ok":True,"id":product.id,"is_store_visible":product.is_store_visible}
 
 @app.put("/inventory/products/{product_id}/video")
 def update_inventory_product_video(product_id:int,p:InventoryVideoPayload,request:Request,s:Session=Depends(db),u:User=Depends(require_permission("inventory","edit"))):
@@ -2838,7 +2857,7 @@ def serialize_store_cart(s:Session, customer:StoreCustomer):
     for item in customer.cart or []:
         if not isinstance(item,dict): continue
         product=s.get(InventoryProduct,int(item.get("product_id") or 0))
-        if not product or not product.active: continue
+        if not product or not product.active or not product.is_store_visible: continue
         price=prices.get(product.sku,{})
         store_categories=latest_inventory_store_categories(s)
         explicit=store_categories.get(product.sku,{})
@@ -2860,7 +2879,7 @@ def save_store_cart(p:StoreCartPayload, request:Request, s:Session=Depends(db), 
         if item.product_id in seen: continue
         seen.add(item.product_id)
         product=s.get(InventoryProduct,item.product_id)
-        if not product or not product.active: raise HTTPException(404,"أحد المنتجات لم يعد متاحاً")
+        if not product or not product.active or not product.is_store_visible: raise HTTPException(404,"أحد المنتجات لم يعد متاحاً في المتجر")
         stock=float(product.owned_stock or 0)+float(product.consigned_stock or 0)
         if stock<=0: raise HTTPException(409,f"المنتج {product.name} غير متوفر حالياً")
         if item.quantity>stock: raise HTTPException(409,f"الكمية المطلوبة من {product.name} تتجاوز المخزون المتاح ({stock:g})")
@@ -2887,7 +2906,7 @@ def create_online_order(p:OnlineOrderPayload,s:Session=Depends(db),customer:Stor
     for entry in p.items:
         if entry.product_id in seen: continue
         seen.add(entry.product_id);product=s.get(InventoryProduct,entry.product_id)
-        if not product or not product.active: raise HTTPException(409,"أحد المنتجات غير متاح")
+        if not product or not product.active or not product.is_store_visible: raise HTTPException(409,"أحد المنتجات غير متاح في المتجر")
         qty=int(entry.quantity);stock=float(product.owned_stock or 0)+float(product.consigned_stock or 0)
         if qty>stock: raise HTTPException(409,f"الكمية المطلوبة من {product.name} تتجاوز المخزون المتاح ({stock:g})")
         price=prices.get(product.sku)
@@ -3179,7 +3198,7 @@ def public_products(q:Optional[str]=None, category:Optional[str]=None, response:
         )
         return cached
     query_started=time.perf_counter()
-    query=select(InventoryProduct).where(InventoryProduct.active.is_(True))
+    query=select(InventoryProduct).where(InventoryProduct.active.is_(True),InventoryProduct.is_store_visible.is_(True))
     if q:
         term=f"%{q.strip()}%"
         query=query.where(or_(InventoryProduct.sku.ilike(term),InventoryProduct.name.ilike(term),InventoryProduct.model.ilike(term)))
