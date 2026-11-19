@@ -41,14 +41,14 @@ class AIBRegressionTests(unittest.TestCase):
     def test_public_product_image_handler_decodes_supported_data_uri(self):
         raw = b"image-bytes-for-route-test"
         encoded = base64.b64encode(raw).decode("ascii")
-        product = SimpleNamespace(active=True, images=[f"data:image/png;base64,{encoded}"])
+        product = SimpleNamespace(active=True, is_store_visible=True, images=[f"data:image/png;base64,{encoded}"])
         fake_session = SimpleNamespace(get=lambda model, product_id: product)
         response = aib.get_public_product_image(101, 0, fake_session)
         self.assertEqual(response.media_type, "image/png")
         self.assertEqual(response.body, raw)
 
     def test_public_product_image_handler_rejects_invalid_index(self):
-        product = SimpleNamespace(active=True, images=["data:image/png;base64,aW1hZ2U="])
+        product = SimpleNamespace(active=True, is_store_visible=True, images=["data:image/png;base64,aW1hZ2U="])
         fake_session = SimpleNamespace(get=lambda model, product_id: product)
         with self.assertRaises(aib.HTTPException) as caught:
             aib.get_public_product_image(101, 1, fake_session)
