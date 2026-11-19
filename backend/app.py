@@ -1910,7 +1910,8 @@ class OwnerCommissionConfirmPayload(BaseModel):
 
 class OutsideStorePaymentPayload(BaseModel):
     method: str
-    reference: str = Field(min_length=3,max_length=160)
+    reference: str = Field(default="",max_length=160)
+    proof_image: str = Field(default="",max_length=4200000)
 
 @app.get("/outside-store-sales/mine")
 def my_outside_store_sales(s:Session=Depends(db),u:User=Depends(current_user)):
@@ -1934,8 +1935,17 @@ def submit_outside_store_payment(record_id:int,p:OutsideStorePaymentPayload,requ
     if p.method not in {"baraka_bank","sham_cash","syriatel_cash"}:
         raise HTTPException(400,"طريقة الدفع غير مدعومة")
     payment_reference=p.reference.strip()
-    if len(payment_reference)<3:
+    proof_image=(p.proof_image or "").strip()
+    if payment_reference and len(payment_reference)<3:
         raise HTTPException(400,"مرجع التحويل غير صالح")
+    if not payment_reference and not proof_image:
+        raise HTTPException(400,"أدخل رقم مرجع التحويل أو أرفق صورة إثبات الدفع")
+    if proof_image:
+        match=re.fullmatch(r"data:image/(png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})",proof_image)
+        if not match: raise HTTPException(400,"صيغة صورة الإثبات غير مدعومة")
+        try: image_bytes=base64.b64decode(match.group(2),validate=True)
+        except (ValueError,binascii.Error): raise HTTPException(400,"ملف صورة الإثبات غير صالح")
+        if not image_bytes or len(image_bytes)>3*1024*1024: raise HTTPException(400,"يجب ألا يتجاوز حجم صورة الإثبات 3 ميغابايت")
     record=s.scalar(select(Record).where(Record.id==record_id).with_for_update())
     if not record or record.deleted or record.created_by!=u.id or record.section!="directSale" or not (record.data or {}).get("outside_store_sale"):
         raise HTTPException(404,"عملية البيع خارج المتجر غير موجودة")
@@ -1945,11 +1955,11 @@ def submit_outside_store_payment(record_id:int,p:OutsideStorePaymentPayload,requ
         raise HTTPException(409,"تم تأكيد الدفع لهذه العملية مسبقاً")
     if commission.get("payment_status")=="submitted":
         raise HTTPException(409,"تم إرسال بيانات الدفع بالفعل، وهي بانتظار مراجعة المالك")
-    commission.update({"payment_status":"submitted","payment_method":p.method,"payment_reference":payment_reference,"payment_submitted_at":datetime.now(timezone.utc).isoformat()})
+    commission.update({"payment_status":"submitted","payment_method":p.method,"payment_reference":payment_reference or None,"payment_proof":proof_image or None,"payment_submitted_at":datetime.now(timezone.utc).isoformat()})
     data["owner_commission"]=commission
     record.data=data
     record.updated_at=datetime.now(timezone.utc)
-    audit(s,u,"outside_store_commission_payment_submitted","record",record.id,{"invoice_no":record.invoice_no,"amount":commission.get("amount"),"currency":record.currency,"method":p.method,"reference":payment_reference},request)
+    audit(s,u,"outside_store_commission_payment_submitted","record",record.id,{"invoice_no":record.invoice_no,"amount":commission.get("amount"),"currency":record.currency,"method":p.method,"reference":payment_reference,"proof_attached":bool(proof_image)},request)
     s.commit()
     return {"ok":True,"payment_status":"submitted"}
 
