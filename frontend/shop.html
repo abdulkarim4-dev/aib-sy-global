@@ -2793,4 +2793,56 @@ html body .category-zone button.cat[onclick*="generators"] .cat-icon{background:
 #trailerCategorySection .cats button.aib-other-trailers-category .cat-icon,#trailerCategorySection .cats button.aib-other-trailers-category>span:not(.cat-icon){position:relative!important;z-index:2!important;color:#fff!important;}
 @media(max-width:800px){#trailerCategorySection .cats button.aib-other-trailers-category{min-height:104px!important}}
 </style>
+<script id="AIB_IMAGE_BUTTONS_CAPTURE_FIX">
+(()=> {
+ const byId=id=>document.getElementById(id);
+ const openPanel=()=>{const panel=byId('aibGeminiStorePanel');if(panel){panel.classList.add('open');const input=byId('aibGeminiStoreInput');if(input)input.focus();}};
+ document.addEventListener('click',e=>{
+   const target=e.target&&e.target.closest?e.target.closest('#aibGeminiStoreFab,#aibGeminiStoreImageButton,#aibStoreImageSearchButton'):null;
+   if(!target)return;
+   e.preventDefault();e.stopImmediatePropagation();
+   if(target.id==='aibGeminiStoreFab'){openPanel();return;}
+   const picker=byId(target.id==='aibGeminiStoreImageButton'?'aibGeminiStoreImageFile':'aibStoreImageSearchFile');
+   if(picker)picker.click();
+ },true);
+ async function analyze(file,assistantMode){
+   if(!file)return;
+   const status=byId('aibGeminiVoiceStatus');
+   const button=byId(assistantMode?'aibGeminiStoreImageButton':'aibStoreImageSearchButton');
+   if(file.size>8*1024*1024){if(status)status.textContent='حجم الصورة يجب ألا يتجاوز 8 ميغابايت.';else alert('حجم الصورة يجب ألا يتجاوز 8 ميغابايت.');return;}
+   if(!/^image\/(jpeg|png|webp|gif)$/i.test(file.type||'')){if(status)status.textContent='اختر صورة JPG أو PNG أو WEBP.';return;}
+   const panel=byId('aibGeminiStorePanel'),messages=byId('aibGeminiStoreMessages');
+   if(assistantMode)openPanel();
+   if(button){button.disabled=true;button.textContent='جارٍ التحليل…';}
+   let wait=null;
+   if(assistantMode&&messages){wait=document.createElement('div');wait.className='aib-gemini-msg bot';wait.textContent='Gemini يحلل الصورة ويبحث في مخزون AIB…';messages.appendChild(wait);}
+   if(status)status.textContent='جارٍ إرسال الصورة إلى Gemini للتعرف عليها والبحث في المخزون…';
+   try{
+     const base64=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result||'').split(',')[1]||'');reader.onerror=()=>reject(new Error('تعذرت قراءة الصورة'));reader.readAsDataURL(file);});
+     const response=await fetch('/ai/store-image-search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image_base64:base64,mime_type:file.type||'image/jpeg',history:[]})});
+     const data=await response.json();if(!response.ok)throw new Error(data.detail||'تعذر البحث بالصورة');
+     if(assistantMode){
+       if(wait)wait.textContent=data.reply||data.description||'تم تحليل الصورة.';
+       if(messages&&Array.isArray(data.products)&&data.products.length){
+         const result=document.createElement('div');result.className='aib-gemini-msg bot';
+         result.textContent='تم العثور على '+data.products.length+' نتيجة محتملة: '+data.products.map(p=>p.name||p.title||p.sku||'منتج').join('، ');
+         messages.appendChild(result);
+       }
+       if(status)status.textContent='اكتمل تحليل الصورة والبحث في المخزون.';
+       if(messages)messages.scrollTop=messages.scrollHeight;
+     }else{
+       const q=byId('q');if(q)q.value=data.search_terms||data.description||'';
+       if(typeof window.openSearchPage==='function')window.openSearchPage();
+       else if(typeof window.load==='function')window.load();
+       if(status)status.textContent='تم التعرف على الصورة. عرض نتائج البحث.';
+     }
+   }catch(err){if(wait)wait.textContent=err.message||'تعذر تحليل الصورة.';if(status)status.textContent=err.message||'تعذر تحليل الصورة.';else alert(err.message||'تعذر تحليل الصورة.');}
+   finally{if(button){button.disabled=false;button.textContent=assistantMode?'📷':'📷 بحث بالصورة';}}
+ }
+ document.addEventListener('change',e=>{
+   const t=e.target;if(!t||!['aibGeminiStoreImageFile','aibStoreImageSearchFile'].includes(t.id))return;
+   e.stopImmediatePropagation();const file=t.files&&t.files[0];t.value='';if(file)analyze(file,t.id==='aibGeminiStoreImageFile');
+ },true);
+})();
+</script>
 </body></html>
