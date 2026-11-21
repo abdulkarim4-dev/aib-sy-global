@@ -178,6 +178,7 @@ class InventoryProduct(Base):
     video_url: Mapped[Optional[str]]=mapped_column(Text, nullable=True)
     owner_user_id: Mapped[Optional[int]]=mapped_column(ForeignKey("users.id"), nullable=True, index=True)
     sale_price: Mapped[Optional[Any]]=mapped_column(Numeric(18,2), nullable=True)
+    profit_margin: Mapped[Any]=mapped_column(Numeric(7,2), default=35, nullable=False)
     sale_currency: Mapped[str]=mapped_column(String(8), default="USD", nullable=False)
     condition: Mapped[str]=mapped_column(String(16), default="new", nullable=False)
     opening_quantity: Mapped[Any]=mapped_column(Numeric(18,3), default=0, nullable=False)
@@ -449,6 +450,7 @@ def startup():
         conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS is_store_visible BOOLEAN NOT NULL DEFAULT TRUE"))
         conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS owner_user_id INTEGER REFERENCES users(id)"))
         conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS sale_price NUMERIC(18,2)"))
+        conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS profit_margin NUMERIC(7,2) NOT NULL DEFAULT 35"))
         conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS sale_currency VARCHAR(8) NOT NULL DEFAULT 'USD'"))
         conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS condition VARCHAR(16) NOT NULL DEFAULT 'new'"))
         conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS opening_quantity NUMERIC(18,3) NOT NULL DEFAULT 0"))
@@ -1288,6 +1290,7 @@ class InventoryProductCreate(BaseModel):
     name: str=Field(min_length=2,max_length=240)
     model: str=Field(default="",max_length=160)
     sale_price: Optional[float]=Field(default=None,ge=0)
+    profit_margin: float=Field(default=35,ge=0,le=1000)
     sale_currency: str="USD"
     condition: str="new"
     quantity: float=Field(default=0,ge=0)
@@ -1357,12 +1360,13 @@ def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=
     }
     rows=[p for p in rows if (u.role=="owner" and p.owner_user_id is None and str(p.sku or "").strip().upper() in invoiced_skus) or (u.role!="owner" and p.owner_user_id==u.id)]
     store_categories,latest_purchase=latest_store_catalog_data(s)
-    return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owner_user_id":p.owner_user_id,"condition":p.condition or "new","is_store_visible":bool(p.is_store_visible),"opening_quantity":float(p.opening_quantity or 0),"store_family":p.store_family,"store_category":p.store_category,"owned_stock":float(p.owned_stock or 0),**({"consigned_stock":float(p.consigned_stock or 0)} if u.role=="owner" else {}),"image_count":len(p.images or []),"shipping_included":bool(p.shipping_included),"video_url":p.video_url or "",**store_categories.get(p.sku,{}),"vehicle_details":(p.vehicle_details or store_categories.get(p.sku,{}).get("vehicle_details") or {}),**latest_purchase.get(p.sku,{"purchase_price":0,"sale_price":0,"currency":"—"}),"sale_price":float(p.sale_price) if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("sale_price"),"sale_currency":p.sale_currency if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("currency","")} for p in rows]
+    return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owner_user_id":p.owner_user_id,"condition":p.condition or "new","is_store_visible":bool(p.is_store_visible),"opening_quantity":float(p.opening_quantity or 0),"store_family":p.store_family,"store_category":p.store_category,"owned_stock":float(p.owned_stock or 0),**({"consigned_stock":float(p.consigned_stock or 0)} if u.role=="owner" else {}),"image_count":len(p.images or []),"shipping_included":bool(p.shipping_included),"video_url":p.video_url or "",**store_categories.get(p.sku,{}),"vehicle_details":(p.vehicle_details or store_categories.get(p.sku,{}).get("vehicle_details") or {}),**latest_purchase.get(p.sku,{"purchase_price":0,"sale_price":0,"currency":"—"}),"sale_price":round(float(latest_purchase[p.sku]["purchase_price"])*(1+float(p.profit_margin or 35)/100),2) if p.sku in latest_purchase and latest_purchase[p.sku].get("purchase_price") else (float(p.sale_price) if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("sale_price")),"profit_margin":float(p.profit_margin or 35),"sale_currency":p.sale_currency if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("currency","")} for p in rows]
 
 class InventoryProductUpdate(BaseModel):
     name: str=Field(min_length=2,max_length=240)
     model: str=Field(default="",max_length=160)
     sale_price: Optional[float]=Field(default=None,ge=0)
+    profit_margin: Optional[float]=Field(default=None,ge=0,le=1000)
     sale_currency: str="USD"
     condition: str="new"
     store_family: str
@@ -1403,6 +1407,8 @@ def edit_inventory_product(product_id:int,p:InventoryProductUpdate,request:Reque
     product.name=p.name.strip()
     product.model=p.model.strip()
     product.sale_price=p.sale_price
+    if p.profit_margin is not None:
+        product.profit_margin=p.profit_margin
     product.sale_currency=p.sale_currency
     product.condition=p.condition
     product.store_family=p.store_family
