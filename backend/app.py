@@ -50,6 +50,7 @@ class User(Base):
     email_verified: Mapped[bool]=mapped_column(Boolean, default=False, nullable=False)
     password_hash: Mapped[str]=mapped_column(String(300))
     role: Mapped[str]=mapped_column(String(20), default="employee")
+    owner_commission_rate: Mapped[Any]=mapped_column(Numeric(7,3), default=1.5, nullable=False)
     company_name: Mapped[str]=mapped_column(String(200), default="", nullable=False)
     company_logo: Mapped[Optional[str]]=mapped_column(Text, nullable=True)
     business_scopes: Mapped[list]=mapped_column(JSON, default=list, nullable=False)
@@ -443,6 +444,7 @@ def startup():
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_data JSONB NOT NULL DEFAULT '{}'::jsonb"))
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(254)"))
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT FALSE"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS owner_commission_rate NUMERIC(7,3) NOT NULL DEFAULT 1.5"))
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted BOOLEAN NOT NULL DEFAULT FALSE"))
         conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_email_unique ON users (email) WHERE email IS NOT NULL"))
         conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS images JSONB NOT NULL DEFAULT '[]'::jsonb"))
@@ -864,6 +866,7 @@ class UserCreate(BaseModel):
     role:str="employee"
     company_name:str=Field(default="",max_length=200)
     business_scopes:list[str]=Field(default_factory=list)
+    owner_commission_rate:float=Field(default=1.5,ge=0,le=100)
 
 class UserProfilePayload(BaseModel):
     company_name:str=Field(min_length=2,max_length=200)
@@ -970,7 +973,7 @@ def update_public_site_settings(p:PublicSiteSettingsPayload, request:Request, s:
 
 @app.get("/users")
 def list_users(s:Session=Depends(db), _:User=Depends(manager)):
-    return [{"id":u.id,"username":u.username,"name":u.full_name,"email":u.email,"role":u.role,"active":u.active,"permissions":u.permissions or {},"company_name":u.company_name or "","business_scopes":u.business_scopes or []} for u in s.scalars(select(User).where(User.deleted.is_(False))).all()]
+    return [{"id":u.id,"username":u.username,"name":u.full_name,"email":u.email,"role":u.role,"active":u.active,"permissions":u.permissions or {},"company_name":u.company_name or "","business_scopes":u.business_scopes or [],"owner_commission_rate":float(u.owner_commission_rate if u.owner_commission_rate is not None else 1.5)} for u in s.scalars(select(User).where(User.deleted.is_(False))).all()]
 @app.post("/users")
 def add_user(payload:UserCreate, request:Request, s:Session=Depends(db), u:User=Depends(manager)):
     if payload.role not in ("employee","owner"): raise HTTPException(400,"دور غير صالح")
@@ -985,7 +988,7 @@ def add_user(payload:UserCreate, request:Request, s:Session=Depends(db), u:User=
     for archived in s.scalars(select(User).where(User.email==email,User.deleted.is_(True))).all():
         archived.email=None
         archived.email_verified=False
-    nu=User(username=payload.username,full_name=payload.full_name,email=email,email_verified=False,password_hash=password_hash.hash(payload.password),role="employee",company_name=payload.company_name.strip(),business_scopes=sorted(set(payload.business_scopes or [])),profile_data={})
+    nu=User(username=payload.username,full_name=payload.full_name,email=email,email_verified=False,password_hash=password_hash.hash(payload.password),role="employee",company_name=payload.company_name.strip(),business_scopes=sorted(set(payload.business_scopes or [])),owner_commission_rate=payload.owner_commission_rate,profile_data={})
     nu.permissions={}; s.add(nu); s.flush()
     for wallet_currency in ("USD","SYP"):
         s.add(UserWallet(user_id=nu.id,currency=wallet_currency,balance=0))
@@ -1019,6 +1022,18 @@ def approve_employee_email(user_id:int,p:EmployeeEmailApprovalPayload,request:Re
     row.used_at=now;target.email_verified=True
     audit(s,u,"employee_email_confirmed_by_owner","user",target.id,{"email":target.email},request);s.commit()
     return {"ok":True,"email_verified":True,"username":target.username}
+
+class UserCommissionPayload(BaseModel):
+    rate:float=Field(ge=0,le=100)
+
+@app.patch("/users/{user_id}/commission")
+def update_user_commission(user_id:int,p:UserCommissionPayload,request:Request,s:Session=Depends(db),u:User=Depends(manager)):
+    target=s.get(User,user_id)
+    if not target or target.deleted or target.role=="owner": raise HTTPException(404,"المستخدم غير موجود")
+    target.owner_commission_rate=round(float(p.rate),3)
+    audit(s,u,"user_commission_rate_updated","user",target.id,{"owner_commission_rate":float(target.owner_commission_rate)},request)
+    s.commit()
+    return {"ok":True,"user_id":target.id,"owner_commission_rate":float(target.owner_commission_rate)}
 
 class UserPermissionsPayload(BaseModel):
     permissions: dict
@@ -1567,16 +1582,34 @@ def create_record(p:RecordCreate, request:Request, s:Session=Depends(db), u:User
         items=prepared_data.get("items") if isinstance(prepared_data.get("items"),list) else []
         commission_base=round(sum(max(0.0,float(x.get("quantity") or 0))*max(0.0,float(x.get("price") or 0)) for x in items if isinstance(x,dict)),2)
         if commission_base<=0: raise HTTPException(400,"لا يمكن تسجيل بيع خارج المتجر دون منتجات مسعّرة من المخزون")
-        commission_amount=round(commission_base*0.015,2)
+        commission_rate=round(float(u.owner_commission_rate if u.owner_commission_rate is not None else 1.5),3)
+        commission_amount=round(commission_base*commission_rate/100,2)
         seller_net=round(commission_base-commission_amount,2)
         if seller_net<0: raise HTTPException(400,"تعذر احتساب صافي مستحقات المستخدم")
         prepared_data["outside_store_sale"]=True
-        prepared_data["owner_commission"]={"rate":0.015,"base_amount":commission_base,"amount":commission_amount,"seller_net":seller_net,"currency":p.currency,"status":"pending","payment_status":"awaiting_payment","payment_method":None,"payment_reference":None,"payment_submitted_at":None,"paid_at":None,"paid_by":None,"note":"بانتظار تحويل عمولة المالك وتأكيد الاستلام"}
+        prepared_data["owner_commission"]={"rate":commission_rate/100,"rate_percent":commission_rate,"base_amount":commission_base,"amount":commission_amount,"seller_net":seller_net,"currency":p.currency,"status":"auto_deducted","payment_status":"auto_deducted","payment_method":"wallet","payment_reference":None,"payment_submitted_at":None,"paid_at":datetime.now(timezone.utc).isoformat(),"paid_by":u.id,"note":"تم اقتطاع عمولة المالك تلقائياً من محفظة المستخدم"}
     consume_operation_verification(s,u,"invoice_create",p.verification_token)
     r=Record(section=p.section,invoice_no=invoice_no,currency=p.currency,data=prepared_data,created_by=u.id)
     s.add(r); s.flush()
+    if employee_sale:
+        ensure_user_wallets(s,u.id)
+        seller_wallet=s.scalar(select(UserWallet).where(UserWallet.user_id==u.id,UserWallet.currency==p.currency).with_for_update())
+        owner=s.scalar(select(User).where(User.role=="owner",User.deleted.is_(False)).order_by(User.id).limit(1))
+        if not seller_wallet or not owner: raise HTTPException(500,"تعذر تجهيز محافظ المستخدم والمالك لاقتطاع العمولة")
+        seller_wallet.balance=round(float(seller_wallet.balance or 0)+commission_base,2)
+        seller_wallet.updated_at=datetime.now(timezone.utc)
+        s.add(WalletTransaction(wallet_id=seller_wallet.id,user_id=u.id,amount=commission_base,currency=p.currency,direction="in",reason=f"قيمة فاتورة المبيع {invoice_no} قبل اقتطاع العمولة",reference_type="invoice_sale_gross",reference_id=r.id,created_by=u.id))
+        if commission_amount>0:
+            seller_wallet.balance=round(float(seller_wallet.balance or 0)-commission_amount,2)
+            s.add(WalletTransaction(wallet_id=seller_wallet.id,user_id=u.id,amount=commission_amount,currency=p.currency,direction="out",reason=f"اقتطاع عمولة المالك {commission_rate:g}% من فاتورة المبيع {invoice_no}",reference_type="invoice_sale_commission",reference_id=r.id,created_by=u.id))
+            ensure_user_wallets(s,owner.id)
+            owner_wallet=s.scalar(select(UserWallet).where(UserWallet.user_id==owner.id,UserWallet.currency==p.currency).with_for_update())
+            if not owner_wallet: raise HTTPException(500,"تعذر تجهيز محفظة المالك")
+            owner_wallet.balance=round(float(owner_wallet.balance or 0)+commission_amount,2)
+            owner_wallet.updated_at=datetime.now(timezone.utc)
+            s.add(WalletTransaction(wallet_id=owner_wallet.id,user_id=owner.id,amount=commission_amount,currency=p.currency,direction="in",reason=f"عمولة {commission_rate:g}% من فاتورة الموظف {invoice_no}",reference_type="invoice_owner_commission",reference_id=r.id,created_by=u.id))
     recalculate_inventory(s)
-    audit(s,u,"record_created","record",r.id,{"section":r.section,"invoice_no":r.invoice_no,"seller_wallet_credit":0,"seller_wallet_credit_pending":seller_net if employee_sale else 0,"owner_commission":commission_amount if employee_sale else 0,"currency":p.currency},request)
+    audit(s,u,"record_created","record",r.id,{"section":r.section,"invoice_no":r.invoice_no,"seller_wallet_credit":seller_net if employee_sale else 0,"seller_wallet_credit_pending":0,"owner_commission":commission_amount if employee_sale else 0,"commission_rate_percent":commission_rate if employee_sale else 0,"currency":p.currency},request)
     s.commit()
     # Invalidate shop catalog caches immediately after a stock-changing record.
     if p.section in {"purchase","carPurchase","deposit","directSale","consignSale"}:
