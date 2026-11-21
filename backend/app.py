@@ -3464,6 +3464,11 @@ class GeminiChatPayload(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
     history: list[dict[str, str]] = Field(default_factory=list, max_length=12)
 
+class GeminiVoicePayload(BaseModel):
+    audio_base64: str = Field(min_length=1, max_length=12000000)
+    mime_type: str = Field(default="audio/webm", max_length=100)
+    history: list[dict[str, str]] = Field(default_factory=list, max_length=12)
+
 _gemini_rate_limits = {}
 
 def _gemini_reply(message: str, history: list[dict[str, str]], system_prompt: str) -> str:
@@ -3606,6 +3611,92 @@ def _store_inventory_search(s: Session, message: str) -> list[dict]:
             "shipping_included":bool(p.shipping_included)
         })
     return results
+
+def _gemini_transcribe_audio(audio_base64: str, mime_type: str) -> dict:
+    if not settings.gemini_api_key:
+        raise HTTPException(503, "مساعد Gemini غير مفعّل. تحقق من إعداد GEMINI_API_KEY.")
+    try:
+        audio_bytes = base64.b64decode(audio_base64, validate=True)
+    except (binascii.Error, ValueError):
+        raise HTTPException(400, "ملف التسجيل الصوتي غير صالح.")
+    if not audio_bytes or len(audio_bytes) > 8 * 1024 * 1024:
+        raise HTTPException(413, "حجم التسجيل الصوتي غير مناسب. اختصر التسجيل وحاول مجدداً.")
+    if not mime_type.startswith("audio/"):
+        raise HTTPException(400, "صيغة التسجيل الصوتي غير مدعومة.")
+    now = datetime.now(timezone.utc).timestamp()
+    recent = [stamp for stamp in _gemini_rate_limits.get("global", []) if now - stamp < 60]
+    if len(recent) >= 50:
+        raise HTTPException(429, "تم تجاوز عدد الطلبات مؤقتاً. حاول بعد دقيقة.")
+    recent.append(now)
+    _gemini_rate_limits["global"] = recent
+    payload = {
+        "contents": [{
+            "role": "user",
+            "parts": [
+                {"text": "استمع إلى التسجيل الصوتي واكتشف لغة المتحدث بنفسك دون الاعتماد على لغة الجهاز أو المتجر. اللغات المتوقعة هي العربية أو الإنجليزية أو التركية أو الألمانية أو الفرنسية أو الروسية، لكن لا تفترض أياً منها. أعد النتيجة حصراً بصيغة JSON صحيحة بهذا الشكل: {\\"language\\":\\"اسم اللغة بالعربية\\",\\"transcript\\":\\"الكلام كما نطق به المتحدث وبنفس لغته\\\"}. لا تترجم الكلام ولا تضف شرحاً. إذا لم يوجد كلام مفهوم أعد transcript فارغاً."},
+                {"inline_data": {"mime_type": mime_type, "data": base64.b64encode(audio_bytes).decode("ascii")}}
+            ]
+        }],
+        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 500, "responseMimeType": "application/json"}
+    }
+    req = UrlRequest(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent",
+        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        headers={"Content-Type": "application/json", "x-goog-api-key": settings.gemini_api_key},
+        method="POST"
+    )
+    try:
+        with urlopen(req, timeout=60) as response:
+            result = json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        if exc.code == 429:
+            raise HTTPException(429, "وصلنا إلى حد الاستخدام المؤقت لدى Google. حاول لاحقاً.")
+        if exc.code in (401, 403):
+            raise HTTPException(502, "تعذر التحقق من مفتاح Gemini.")
+        if exc.code >= 500:
+            raise HTTPException(503, "خدمة Gemini مشغولة حالياً. حاول بعد قليل.")
+        raise HTTPException(502, "تعذر تحليل التسجيل الصوتي.")
+    except (URLError, TimeoutError):
+        raise HTTPException(504, "انتهت مهلة تحليل التسجيل الصوتي.")
+    except Exception:
+        raise HTTPException(502, "حدث خطأ أثناء تحليل التسجيل الصوتي.")
+    candidates = result.get("candidates") or []
+    parts = ((candidates[0].get("content") or {}).get("parts") or []) if candidates else []
+    raw = "\n".join(str(part.get("text", "")) for part in parts if part.get("text")).strip()
+    try:
+        parsed = json.loads(raw)
+    except (ValueError, TypeError):
+        raise HTTPException(502, "لم يتمكن Gemini من تحديد الكلام في التسجيل. حاول مرة أخرى.")
+    transcript = str(parsed.get("transcript", "")).strip()[:4000]
+    language = str(parsed.get("language", "لغة غير محددة")).strip()[:40]
+    if not transcript:
+        raise HTTPException(422, "لم أسمع كلاماً واضحاً. تحدث بوضوح وحاول مرة أخرى.")
+    return {"transcript": transcript, "language": language}
+
+
+@app.post("/ai/store-voice")
+def gemini_store_voice(payload: GeminiVoicePayload, s: Session = Depends(db)):
+    detected = _gemini_transcribe_audio(payload.audio_base64, payload.mime_type)
+    transcript = detected["transcript"]
+    products = _store_inventory_search(s, transcript)
+    product_context = json.dumps(products, ensure_ascii=False)
+    system_prompt = (
+        "أنت مساعد خدمة العملاء لمتجر مجموعة AIB التجارية. أجب بنفس لغة العميل المكتشفة في رسالته، وهي " + detected["language"] + ". "
+        "افهم المقصود من البحث الصوتي والكلمات المنطوقة كما هي. نتائج البحث المباشر من مخزون المتجر: " + product_context + ". "
+        "إذا وجدت منتجات فاعرضها ووجّه العميل إلى البطاقات الظاهرة أسفل الرد. اذكر السعر والكمية فقط إذا كانت متاحة. "
+        "إذا لم توجد نتائج فاطلب معلومة إضافية قصيرة. لا تخترع سعراً أو كمية أو مواصفة، ولا تكشف بيانات العملاء."
+    )
+    try:
+        reply = _gemini_reply(transcript, payload.history, system_prompt)
+    except HTTPException as exc:
+        if products:
+            reply = "تم التعرف على كلامك والبحث في مخزون AIB. أدرجت المنتجات المطابقة أدناه."
+        elif exc.status_code in (429, 502, 503, 504):
+            reply = "تم التعرف على كلامك، لكن تعذر رد Gemini مؤقتاً ولم تظهر نتائج مطابقة في المخزون."
+        else:
+            raise
+    return {"transcript": transcript, "language": detected["language"], "reply": reply, "products": products}
+
 
 @app.post("/ai/store-chat")
 def gemini_store_chat(payload: GeminiChatPayload, s: Session = Depends(db)):
