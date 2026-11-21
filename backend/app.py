@@ -170,6 +170,7 @@ class InventoryProduct(Base):
     sku: Mapped[str]=mapped_column(String(80), unique=True, index=True)
     name: Mapped[str]=mapped_column(String(240))
     model: Mapped[str]=mapped_column(String(160), default="")
+    description: Mapped[str]=mapped_column(Text, default="", nullable=False)
     owned_stock: Mapped[Any]=mapped_column(Numeric(18,3), default=0)
     consigned_stock: Mapped[Any]=mapped_column(Numeric(18,3), default=0)
     active: Mapped[bool]=mapped_column(Boolean, default=True)
@@ -447,6 +448,7 @@ def startup():
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS owner_commission_rate NUMERIC(7,3) NOT NULL DEFAULT 1.5"))
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted BOOLEAN NOT NULL DEFAULT FALSE"))
         conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_email_unique ON users (email) WHERE email IS NOT NULL"))
+        conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS description TEXT NOT NULL DEFAULT ''"))
         conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS images JSONB NOT NULL DEFAULT '[]'::jsonb"))
         conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS shipping_included BOOLEAN NOT NULL DEFAULT FALSE"))
         conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS is_store_visible BOOLEAN NOT NULL DEFAULT TRUE"))
@@ -922,7 +924,7 @@ def get_user_inventory(user_id:int,s:Session=Depends(db),u:User=Depends(manager)
     target=s.get(User,user_id)
     if not target or target.deleted: raise HTTPException(404,"المستخدم غير موجود")
     products=s.scalars(select(InventoryProduct).where(InventoryProduct.owner_user_id==user_id).order_by(InventoryProduct.sku)).all()
-    return {"user_id":target.id,"username":target.username,"company_name":target.company_name or "","products":[{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owned_stock":float(p.owned_stock or 0),"consigned_stock":float(p.consigned_stock or 0),"sale_price":float(p.sale_price) if p.sale_price is not None else None,"sale_currency":p.sale_currency,"images":p.images or [],"video_url":p.video_url or ""} for p in products]}
+    return {"user_id":target.id,"username":target.username,"company_name":target.company_name or "","products":[{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"description":p.description or "","owned_stock":float(p.owned_stock or 0),"consigned_stock":float(p.consigned_stock or 0),"sale_price":float(p.sale_price) if p.sale_price is not None else None,"sale_currency":p.sale_currency,"images":p.images or [],"video_url":p.video_url or ""} for p in products]}
 
 class CompanyProfilePayload(BaseModel):
     data: dict
@@ -1304,6 +1306,7 @@ class InventoryProductCreate(BaseModel):
     sku: Optional[str]=Field(default=None,max_length=80)
     name: str=Field(min_length=2,max_length=240)
     model: str=Field(default="",max_length=160)
+    description: str=Field(default="",max_length=5000)
     sale_price: Optional[float]=Field(default=None,ge=0)
     profit_margin: float=Field(default=35,ge=0,le=1000)
     sale_currency: str="USD"
@@ -1332,7 +1335,7 @@ def create_inventory_product(p:InventoryProductCreate,request:Request,s:Session=
     sku=(p.sku or "").strip().upper() or next_inventory_sku(s)
     if s.scalar(select(InventoryProduct.id).where(func.upper(InventoryProduct.sku)==sku)):
         raise HTTPException(409,"رقم القطعة مستخدم مسبقاً")
-    product=InventoryProduct(sku=sku,name=p.name.strip(),model=p.model.strip(),owner_user_id=(None if u.role=="owner" else u.id),sale_price=p.sale_price,profit_margin=p.profit_margin,sale_currency=p.sale_currency,condition=p.condition,opening_quantity=p.quantity,store_family=p.store_family,store_category=p.store_category,vehicle_details=vehicle_details,owned_stock=p.quantity,consigned_stock=0,active=True)
+    product=InventoryProduct(sku=sku,name=p.name.strip(),model=p.model.strip(),description=p.description.strip(),owner_user_id=(None if u.role=="owner" else u.id),sale_price=p.sale_price,profit_margin=p.profit_margin,sale_currency=p.sale_currency,condition=p.condition,opening_quantity=p.quantity,store_family=p.store_family,store_category=p.store_category,vehicle_details=vehicle_details,owned_stock=p.quantity,consigned_stock=0,active=True)
     s.add(product);s.flush()
     audit(s,u,"inventory_product_created","inventory_product",product.id,{"sku":sku,"owner_user_id":product.owner_user_id,"sale_price":p.sale_price,"sale_currency":p.sale_currency,"condition":p.condition,"opening_quantity":p.quantity,"store_family":p.store_family,"store_category":p.store_category},request)
     s.commit()
@@ -1340,7 +1343,7 @@ def create_inventory_product(p:InventoryProductCreate,request:Request,s:Session=
     _store_catalog_cache["at"]=0
     _public_products_cache["value"].clear()
     _public_products_cache["at"].clear()
-    return {"id":product.id,"sku":product.sku,"name":product.name,"model":product.model,"owner_user_id":product.owner_user_id,"sale_price":float(product.sale_price) if product.sale_price is not None else None,"profit_margin":float(product.profit_margin),"sale_currency":product.sale_currency,"condition":product.condition,"opening_quantity":float(product.opening_quantity or 0),"store_family":product.store_family,"store_category":product.store_category,"vehicle_details":product.vehicle_details or {},"owned_stock":float(product.owned_stock or 0),"consigned_stock":0}
+    return {"id":product.id,"sku":product.sku,"name":product.name,"model":product.model,"description":product.description or "","owner_user_id":product.owner_user_id,"sale_price":float(product.sale_price) if product.sale_price is not None else None,"profit_margin":float(product.profit_margin),"sale_currency":product.sale_currency,"condition":product.condition,"opening_quantity":float(product.opening_quantity or 0),"store_family":product.store_family,"store_category":product.store_category,"vehicle_details":product.vehicle_details or {},"owned_stock":float(product.owned_stock or 0),"consigned_stock":0}
 
 @app.get("/inventory/products")
 def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=Depends(require_permission("inventory","view"))):
@@ -1375,7 +1378,7 @@ def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=
     }
     rows=[p for p in rows if (u.role=="owner" and p.owner_user_id is None and str(p.sku or "").strip().upper() in invoiced_skus) or (u.role!="owner" and p.owner_user_id==u.id)]
     store_categories,latest_purchase=latest_store_catalog_data(s)
-    return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owner_user_id":p.owner_user_id,"condition":p.condition or "new","is_store_visible":bool(p.is_store_visible),"opening_quantity":float(p.opening_quantity or 0),"store_family":p.store_family,"store_category":p.store_category,"owned_stock":float(p.owned_stock or 0),**({"consigned_stock":float(p.consigned_stock or 0)} if u.role=="owner" else {}),"image_count":len(p.images or []),"shipping_included":bool(p.shipping_included),"video_url":p.video_url or "",**store_categories.get(p.sku,{}),"vehicle_details":(p.vehicle_details or store_categories.get(p.sku,{}).get("vehicle_details") or {}),**latest_purchase.get(p.sku,{"purchase_price":0,"sale_price":0,"currency":"—"}),"sale_price":round(float(latest_purchase[p.sku]["purchase_price"])*(1+float(p.profit_margin if p.profit_margin is not None else 35)/100),2) if p.sku in latest_purchase and latest_purchase[p.sku].get("purchase_price") else (float(p.sale_price) if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("sale_price")),"profit_margin":float(p.profit_margin or 35),"sale_currency":p.sale_currency if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("currency","")} for p in rows]
+    return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"description":p.description or "","owner_user_id":p.owner_user_id,"condition":p.condition or "new","is_store_visible":bool(p.is_store_visible),"opening_quantity":float(p.opening_quantity or 0),"store_family":p.store_family,"store_category":p.store_category,"owned_stock":float(p.owned_stock or 0),**({"consigned_stock":float(p.consigned_stock or 0)} if u.role=="owner" else {}),"image_count":len(p.images or []),"shipping_included":bool(p.shipping_included),"video_url":p.video_url or "",**store_categories.get(p.sku,{}),"vehicle_details":(p.vehicle_details or store_categories.get(p.sku,{}).get("vehicle_details") or {}),**latest_purchase.get(p.sku,{"purchase_price":0,"sale_price":0,"currency":"—"}),"sale_price":round(float(latest_purchase[p.sku]["purchase_price"])*(1+float(p.profit_margin if p.profit_margin is not None else 35)/100),2) if p.sku in latest_purchase and latest_purchase[p.sku].get("purchase_price") else (float(p.sale_price) if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("sale_price")),"profit_margin":float(p.profit_margin or 35),"sale_currency":p.sale_currency if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("currency","")} for p in rows]
 
 class InventoryProductUpdate(BaseModel):
     name: str=Field(min_length=2,max_length=240)
@@ -1416,11 +1419,12 @@ def edit_inventory_product(product_id:int,p:InventoryProductUpdate,request:Reque
     # Employee edits must never reset or alter the owner-controlled consigned balance.
     new_consigned=(float(p.consigned_stock) if p.consigned_stock is not None else old_consigned) if u.role=="owner" else old_consigned
     stock_adjustment={"owned_delta":round(new_owned-old_owned,3),"consigned_delta":round(new_consigned-old_consigned,3)}
-    before={"name":product.name,"model":product.model,"sale_price":float(product.sale_price) if product.sale_price is not None else None,"sale_currency":product.sale_currency,"condition":product.condition,"store_family":product.store_family,"store_category":product.store_category,"owned_stock":old_owned,"consigned_stock":old_consigned}
+    before={"name":product.name,"model":product.model,"description":product.description or "","sale_price":float(product.sale_price) if product.sale_price is not None else None,"sale_currency":product.sale_currency,"condition":product.condition,"store_family":product.store_family,"store_category":product.store_category,"owned_stock":old_owned,"consigned_stock":old_consigned}
     product.owned_stock=new_owned
     product.consigned_stock=new_consigned
     product.name=p.name.strip()
     product.model=p.model.strip()
+    product.description=p.description.strip()
     product.sale_price=p.sale_price
     if p.profit_margin is not None:
         product.profit_margin=p.profit_margin
