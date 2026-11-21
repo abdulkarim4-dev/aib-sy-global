@@ -3139,11 +3139,12 @@ def review_online_purchase_order(order_id:int,p:OnlineOrderReviewPayload,s:Sessi
         bucket["items"].append({"sku":line["sku"],"quantity":seller_qty,"gross":gross})
     total_owner_commission=0.0
     for seller_id,amounts in seller_totals.items():
-        amounts["commission"]=round(amounts["gross"]*0.015,2)
-        amounts["net"]=round(amounts["gross"]-amounts["commission"],2)
         seller=s.get(User,seller_id)
         if not seller or seller.deleted or seller.role=="owner":
             raise HTTPException(409,"تعذر تحديد صاحب أحد منتجات المستخدمين؛ لم يتم اعتماد الطلب")
+        amounts["rate_percent"]=round(float(seller.owner_commission_rate if seller.owner_commission_rate is not None else 1.5),3)
+        amounts["commission"]=round(amounts["gross"]*amounts["rate_percent"]/100,2)
+        amounts["net"]=round(amounts["gross"]-amounts["commission"],2)
         ensure_user_wallets(s,seller.id)
         seller_wallet=s.scalar(select(UserWallet).where(UserWallet.user_id==seller.id,UserWallet.currency==order.currency).with_for_update())
         if not seller_wallet: raise HTTPException(500,"تعذر تجهيز محفظة صاحب المنتج")
@@ -3154,7 +3155,7 @@ def review_online_purchase_order(order_id:int,p:OnlineOrderReviewPayload,s:Sessi
         if amounts["commission"]>0:
             seller_wallet.balance=round(float(seller_wallet.balance or 0)-amounts["commission"],2)
             seller_wallet.updated_at=datetime.now(timezone.utc)
-            s.add(WalletTransaction(wallet_id=seller_wallet.id,user_id=seller.id,amount=amounts["commission"],currency=order.currency,direction="out",reason=f"اقتطاع عمولة المتجر 1.5٪ · طلب #{order.id} · فاتورة {record.invoice_no}",reference_type="store_order_seller_commission",reference_id=record.id,created_by=u.id))
+            s.add(WalletTransaction(wallet_id=seller_wallet.id,user_id=seller.id,amount=amounts["commission"],currency=order.currency,direction="out",reason=f"اقتطاع عمولة المتجر {amounts['rate_percent']:g}% · طلب #{order.id} · فاتورة {record.invoice_no}",reference_type="store_order_seller_commission",reference_id=record.id,created_by=u.id))
         total_owner_commission=round(total_owner_commission+amounts["commission"],2)
     if total_owner_commission>0:
         owner=s.scalar(select(User).where(User.role=="owner",User.deleted.is_(False)).order_by(User.id).limit(1))
@@ -3164,7 +3165,7 @@ def review_online_purchase_order(order_id:int,p:OnlineOrderReviewPayload,s:Sessi
         if not owner_wallet: raise HTTPException(500,"تعذر تجهيز محفظة المالك")
         owner_wallet.balance=round(float(owner_wallet.balance or 0)+total_owner_commission,2)
         owner_wallet.updated_at=datetime.now(timezone.utc)
-        s.add(WalletTransaction(wallet_id=owner_wallet.id,user_id=owner.id,amount=total_owner_commission,currency=order.currency,direction="in",reason=f"عمولة 1.5٪ من بيع منتجات المستخدمين عبر المتجر · طلب #{order.id} · فاتورة {record.invoice_no}",reference_type="store_order_owner_commission",reference_id=record.id,created_by=u.id))
+        s.add(WalletTransaction(wallet_id=owner_wallet.id,user_id=owner.id,amount=total_owner_commission,currency=order.currency,direction="in",reason=f"عمولة المستخدمين حسب النسب المحددة لكل حساب · طلب #{order.id} · فاتورة {record.invoice_no}",reference_type="store_order_owner_commission",reference_id=record.id,created_by=u.id))
     order.status="approved";order.record_id=record.id;order.reviewed_by=u.id;order.reviewed_at=datetime.now(timezone.utc);order.review_note=p.note
     audit(s,u,"online_order_approved","online_purchase_order",order.id,{"record_id":record.id,"invoice_no":record.invoice_no,"payment_method":"sham_cash"},request=None)
     s.commit()
@@ -3186,7 +3187,7 @@ def review_online_purchase_order(order_id:int,p:OnlineOrderReviewPayload,s:Sessi
             f"اسم المستلم: {buyer_name}\nعنوان المستلم: {buyer.get('shipping_address') or 'غير متوفر'}\n"
             f"رقم هاتف المستلم: {buyer_phone or 'غير متوفر'}\nالمنتجات المباعة من مخزونك:\n{seller_item_text}\n"
             f"إجمالي قيمة منتجاتك: {amounts['gross']:.2f} {order.currency}\n"
-            f"عمولة المتجر 1.5٪: {amounts['commission']:.2f} {order.currency}\n"
+            f"عمولة المالك {amounts['rate_percent']:g}%: {amounts['commission']:.2f} {order.currency}\n"
             f"صافي المبلغ المضاف إلى محفظتك: {amounts['net']:.2f} {order.currency}")
         seller_html=aib_email_html(f"تم بيع منتجاتك – الطلب #{order.id}",
             "تم تأكيد الدفع بنجاح، وهذه تفاصيل المستلم والمنتجات التي بيعت من مخزونك.",
@@ -3194,7 +3195,7 @@ def review_online_purchase_order(order_id:int,p:OnlineOrderReviewPayload,s:Sessi
              ("اسم المستلم",html.escape(buyer_name)),("عنوان المستلم",html.escape(str(buyer.get("shipping_address") or "غير متوفر"))),
              ("هاتف المستلم",html.escape(buyer_phone or "غير متوفر")),("المنتجات المباعة",html.escape(seller_item_text).replace("\n","<br>")),
              ("إجمالي قيمة منتجاتك",f"{amounts['gross']:.2f} {html.escape(order.currency)}"),
-             ("عمولة المتجر 1.5٪",f"{amounts['commission']:.2f} {html.escape(order.currency)}"),
+             (f"عمولة المالك {amounts['rate_percent']:g}%",f"{amounts['commission']:.2f} {html.escape(order.currency)}"),
              ("صافي المبلغ المضاف لمحفظتك",f"{amounts['net']:.2f} {html.escape(order.currency)}")],
             accent="#168447",note="يمكنك مراجعة تفاصيل الطلب وطباعة فاتورة الطلب من صفحة طلبات الشراء عبر الإنترنت في تطبيق AIB.")
         send_notification_email(seller.email,f"تم بيع منتج من مخزونك – طلب #{order.id} | AIB",seller_body,seller_html)
