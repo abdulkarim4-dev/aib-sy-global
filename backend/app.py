@@ -1167,7 +1167,7 @@ def prepare_record_inventory(s:Session, section:str, raw_data:dict, allow_legacy
         if not product:
             if section not in {"purchase","deposit"}:
                 raise HTTPException(400,f"رقم القطعة {sku} غير موجود في المخزون. أضفها أولاً عبر الشراء أو الأمانة.")
-            product=InventoryProduct(sku=sku,name=name or sku,model=model,owner_user_id=(user.id if user and user.role!="owner" else None))
+            product=InventoryProduct(sku=sku,name=name or sku,model=model,description=str(item.get("product_description") or "").strip(),owner_user_id=(user.id if user and user.role!="owner" else None))
             s.add(product)
             try: s.flush()
             except Exception:
@@ -1179,6 +1179,8 @@ def prepare_record_inventory(s:Session, section:str, raw_data:dict, allow_legacy
                 raise HTTPException(403,f"القطعة {sku} ليست ضمن مخزون حسابك")
             if not name: item["description"]=product.name
             if not model: item["model"]=product.model
+            if not str(item.get("product_description") or "").strip():
+                item["product_description"]=product.description or ""
         item["sku"]=sku
         family=str(item.get("store_family") or "").strip()
         category=str(item.get("store_category") or "").strip()
@@ -1383,6 +1385,7 @@ def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=
 class InventoryProductUpdate(BaseModel):
     name: str=Field(min_length=2,max_length=240)
     model: str=Field(default="",max_length=160)
+    description: str=Field(default="",max_length=5000)
     sale_price: Optional[float]=Field(default=None,ge=0)
     profit_margin: Optional[float]=Field(default=None,ge=0,le=1000)
     sale_currency: str="USD"
