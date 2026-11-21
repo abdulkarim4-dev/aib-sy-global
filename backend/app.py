@@ -3464,6 +3464,11 @@ class GeminiChatPayload(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
     history: list[dict[str, str]] = Field(default_factory=list, max_length=12)
 
+class GeminiImageSearchPayload(BaseModel):
+    image_base64: str = Field(min_length=1, max_length=12000000)
+    mime_type: str = Field(default="image/jpeg", max_length=100)
+    history: list[dict[str, str]] = Field(default_factory=list, max_length=12)
+
 class GeminiVoicePayload(BaseModel):
     audio_base64: str = Field(min_length=1, max_length=12000000)
     mime_type: str = Field(default="audio/webm", max_length=100)
@@ -3696,6 +3701,87 @@ def gemini_store_voice(payload: GeminiVoicePayload, s: Session = Depends(db)):
         else:
             raise
     return {"transcript": transcript, "language": detected["language"], "reply": reply, "products": products}
+
+
+@app.post("/ai/store-image-search")
+def gemini_store_image_search(payload: GeminiImageSearchPayload, s: Session = Depends(db)):
+    if not settings.gemini_api_key:
+        raise HTTPException(503, "مساعد Gemini غير مفعّل. تحقق من إعداد GEMINI_API_KEY.")
+    try:
+        image_bytes = base64.b64decode(payload.image_base64, validate=True)
+    except (binascii.Error, ValueError):
+        raise HTTPException(400, "ملف الصورة غير صالح.")
+    if not image_bytes or len(image_bytes) > 8 * 1024 * 1024:
+        raise HTTPException(413, "حجم الصورة كبير. اختر صورة أصغر من 8 ميغابايت.")
+    mime_type = payload.mime_type.split(";")[0].strip().lower()
+    if mime_type not in ("image/jpeg", "image/png", "image/webp", "image/gif"):
+        raise HTTPException(415, "صيغة الصورة غير مدعومة. استخدم JPG أو PNG أو WEBP.")
+    now = datetime.now(timezone.utc).timestamp()
+    recent = [stamp for stamp in _gemini_rate_limits.get("global", []) if now - stamp < 60]
+    if len(recent) >= 50:
+        raise HTTPException(429, "تم تجاوز عدد الطلبات مؤقتاً. حاول بعد دقيقة.")
+    recent.append(now)
+    _gemini_rate_limits["global"] = recent
+    request_payload = {
+        "contents": [{
+            "role": "user",
+            "parts": [
+                {"text": "حلل صورة المنتج أو قطعة الغيار المرفقة لتحديد ماهيتها والعلامة أو رقم القطعة أو الموديل إن أمكن. أعد JSON صحيحاً فقط بمفتاحين: search_terms وهي كلمات قصيرة دقيقة للبحث في كتالوج قطع ومركبات AIB، وdescription وصف عربي موجز لما يظهر. لا تخمن رقم قطعة غير واضح، ولا تذكر معلومات غير مرئية."},
+                {"inline_data": {"mime_type": mime_type, "data": base64.b64encode(image_bytes).decode("ascii")}}
+            ]
+        }],
+        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 300, "responseMimeType": "application/json"}
+    }
+    req = UrlRequest(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent",
+        data=json.dumps(request_payload, ensure_ascii=False).encode("utf-8"),
+        headers={"Content-Type": "application/json", "x-goog-api-key": settings.gemini_api_key},
+        method="POST"
+    )
+    try:
+        with urlopen(req, timeout=60) as response:
+            result = json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        if exc.code == 429:
+            raise HTTPException(429, "وصلنا إلى حد الاستخدام المؤقت لدى Google. حاول لاحقاً.")
+        if exc.code in (401, 403):
+            raise HTTPException(502, "تعذر التحقق من مفتاح Gemini.")
+        if exc.code >= 500:
+            raise HTTPException(503, "خدمة Gemini مشغولة حالياً. حاول بعد قليل.")
+        raise HTTPException(502, "تعذر تحليل الصورة.")
+    except (URLError, TimeoutError):
+        raise HTTPException(504, "انتهت مهلة تحليل الصورة.")
+    except Exception:
+        raise HTTPException(502, "حدث خطأ أثناء تحليل الصورة.")
+    candidates = result.get("candidates") or []
+    parts = ((candidates[0].get("content") or {}).get("parts") or []) if candidates else []
+    raw = "\n".join(str(part.get("text", "")) for part in parts if part.get("text")).strip()
+    try:
+        identified = json.loads(raw)
+    except (ValueError, TypeError):
+        raise HTTPException(502, "لم يتمكن Gemini من تحديد المنتج في الصورة. جرّب صورة أوضح.")
+    description = str(identified.get("description", "")).strip()[:500]
+    search_terms = str(identified.get("search_terms", "")).strip()[:500] or description
+    if not search_terms:
+        raise HTTPException(422, "لم يظهر منتج واضح في الصورة. التقط صورة أقرب وأكثر وضوحاً.")
+    products = _store_inventory_search(s, search_terms)
+    context = json.dumps(products, ensure_ascii=False)
+    prompt = (
+        "أنت مساعد متجر مجموعة AIB التجارية. حللنا صورة العميل ووصفها: " + description +
+        ". كلمات البحث المستخلصة: " + search_terms +
+        ". نتائج البحث الفعلية من المخزون: " + context +
+        ". أجب بالعربية، اشرح باختصار ما تم التعرف عليه، واعرض المنتجات المطابقة إن وجدت. لا تخترع أسعاراً أو مواصفات."
+    )
+    try:
+        reply = _gemini_reply(search_terms, payload.history, prompt)
+    except HTTPException as exc:
+        if products:
+            reply = "تم تحليل الصورة والبحث في مخزون AIB. أدرجت المنتجات المطابقة أدناه."
+        elif exc.status_code in (429, 502, 503, 504):
+            reply = "تم تحليل الصورة، لكن تعذر رد Gemini مؤقتاً ولم تظهر نتائج مطابقة في المخزون."
+        else:
+            raise
+    return {"description": description, "search_terms": search_terms, "reply": reply, "products": products}
 
 
 @app.post("/ai/store-chat")
