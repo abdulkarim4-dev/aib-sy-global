@@ -1587,7 +1587,7 @@ def create_record(p:RecordCreate, request:Request, s:Session=Depends(db), u:User
         seller_net=round(commission_base-commission_amount,2)
         if seller_net<0: raise HTTPException(400,"تعذر احتساب صافي مستحقات المستخدم")
         prepared_data["outside_store_sale"]=True
-        prepared_data["owner_commission"]={"rate":commission_rate/100,"rate_percent":commission_rate,"base_amount":commission_base,"amount":commission_amount,"seller_net":seller_net,"currency":p.currency,"status":"auto_deducted","payment_status":"auto_deducted","payment_method":"wallet","payment_reference":None,"payment_submitted_at":None,"paid_at":datetime.now(timezone.utc).isoformat(),"paid_by":u.id,"note":"تم اقتطاع عمولة المالك تلقائياً من محفظة المستخدم"}
+        prepared_data["owner_commission"]={"rate":commission_rate/100,"rate_percent":commission_rate,"base_amount":commission_base,"amount":commission_amount,"seller_net":seller_net,"currency":p.currency,"status":"paid","payment_status":"auto_deducted","payment_method":"wallet","payment_reference":None,"payment_submitted_at":None,"paid_at":datetime.now(timezone.utc).isoformat(),"paid_by":u.id,"note":"تم اقتطاع عمولة المالك تلقائياً من محفظة المستخدم"}
     consume_operation_verification(s,u,"invoice_create",p.verification_token)
     r=Record(section=p.section,invoice_no=invoice_no,currency=p.currency,data=prepared_data,created_by=u.id)
     s.add(r); s.flush()
