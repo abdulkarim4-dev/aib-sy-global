@@ -1317,7 +1317,7 @@ def create_inventory_product(p:InventoryProductCreate,request:Request,s:Session=
     sku=(p.sku or "").strip().upper() or next_inventory_sku(s)
     if s.scalar(select(InventoryProduct.id).where(func.upper(InventoryProduct.sku)==sku)):
         raise HTTPException(409,"رقم القطعة مستخدم مسبقاً")
-    product=InventoryProduct(sku=sku,name=p.name.strip(),model=p.model.strip(),owner_user_id=(None if u.role=="owner" else u.id),sale_price=p.sale_price,sale_currency=p.sale_currency,condition=p.condition,opening_quantity=p.quantity,store_family=p.store_family,store_category=p.store_category,vehicle_details=vehicle_details,owned_stock=p.quantity,consigned_stock=0,active=True)
+    product=InventoryProduct(sku=sku,name=p.name.strip(),model=p.model.strip(),owner_user_id=(None if u.role=="owner" else u.id),sale_price=p.sale_price,profit_margin=p.profit_margin,sale_currency=p.sale_currency,condition=p.condition,opening_quantity=p.quantity,store_family=p.store_family,store_category=p.store_category,vehicle_details=vehicle_details,owned_stock=p.quantity,consigned_stock=0,active=True)
     s.add(product);s.flush()
     audit(s,u,"inventory_product_created","inventory_product",product.id,{"sku":sku,"owner_user_id":product.owner_user_id,"sale_price":p.sale_price,"sale_currency":p.sale_currency,"condition":p.condition,"opening_quantity":p.quantity,"store_family":p.store_family,"store_category":p.store_category},request)
     s.commit()
@@ -1325,7 +1325,7 @@ def create_inventory_product(p:InventoryProductCreate,request:Request,s:Session=
     _store_catalog_cache["at"]=0
     _public_products_cache["value"].clear()
     _public_products_cache["at"].clear()
-    return {"id":product.id,"sku":product.sku,"name":product.name,"model":product.model,"owner_user_id":product.owner_user_id,"sale_price":float(product.sale_price) if product.sale_price is not None else None,"sale_currency":product.sale_currency,"condition":product.condition,"opening_quantity":float(product.opening_quantity or 0),"store_family":product.store_family,"store_category":product.store_category,"vehicle_details":product.vehicle_details or {},"owned_stock":float(product.owned_stock or 0),"consigned_stock":0}
+    return {"id":product.id,"sku":product.sku,"name":product.name,"model":product.model,"owner_user_id":product.owner_user_id,"sale_price":float(product.sale_price) if product.sale_price is not None else None,"profit_margin":float(product.profit_margin),"sale_currency":product.sale_currency,"condition":product.condition,"opening_quantity":float(product.opening_quantity or 0),"store_family":product.store_family,"store_category":product.store_category,"vehicle_details":product.vehicle_details or {},"owned_stock":float(product.owned_stock or 0),"consigned_stock":0}
 
 @app.get("/inventory/products")
 def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=Depends(require_permission("inventory","view"))):
@@ -1360,7 +1360,7 @@ def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=
     }
     rows=[p for p in rows if (u.role=="owner" and p.owner_user_id is None and str(p.sku or "").strip().upper() in invoiced_skus) or (u.role!="owner" and p.owner_user_id==u.id)]
     store_categories,latest_purchase=latest_store_catalog_data(s)
-    return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owner_user_id":p.owner_user_id,"condition":p.condition or "new","is_store_visible":bool(p.is_store_visible),"opening_quantity":float(p.opening_quantity or 0),"store_family":p.store_family,"store_category":p.store_category,"owned_stock":float(p.owned_stock or 0),**({"consigned_stock":float(p.consigned_stock or 0)} if u.role=="owner" else {}),"image_count":len(p.images or []),"shipping_included":bool(p.shipping_included),"video_url":p.video_url or "",**store_categories.get(p.sku,{}),"vehicle_details":(p.vehicle_details or store_categories.get(p.sku,{}).get("vehicle_details") or {}),**latest_purchase.get(p.sku,{"purchase_price":0,"sale_price":0,"currency":"—"}),"sale_price":round(float(latest_purchase[p.sku]["purchase_price"])*(1+float(p.profit_margin or 35)/100),2) if p.sku in latest_purchase and latest_purchase[p.sku].get("purchase_price") else (float(p.sale_price) if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("sale_price")),"profit_margin":float(p.profit_margin or 35),"sale_currency":p.sale_currency if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("currency","")} for p in rows]
+    return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"owner_user_id":p.owner_user_id,"condition":p.condition or "new","is_store_visible":bool(p.is_store_visible),"opening_quantity":float(p.opening_quantity or 0),"store_family":p.store_family,"store_category":p.store_category,"owned_stock":float(p.owned_stock or 0),**({"consigned_stock":float(p.consigned_stock or 0)} if u.role=="owner" else {}),"image_count":len(p.images or []),"shipping_included":bool(p.shipping_included),"video_url":p.video_url or "",**store_categories.get(p.sku,{}),"vehicle_details":(p.vehicle_details or store_categories.get(p.sku,{}).get("vehicle_details") or {}),**latest_purchase.get(p.sku,{"purchase_price":0,"sale_price":0,"currency":"—"}),"sale_price":round(float(latest_purchase[p.sku]["purchase_price"])*(1+float(p.profit_margin if p.profit_margin is not None else 35)/100),2) if p.sku in latest_purchase and latest_purchase[p.sku].get("purchase_price") else (float(p.sale_price) if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("sale_price")),"profit_margin":float(p.profit_margin or 35),"sale_currency":p.sale_currency if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("currency","")} for p in rows]
 
 class InventoryProductUpdate(BaseModel):
     name: str=Field(min_length=2,max_length=240)
@@ -1409,7 +1409,12 @@ def edit_inventory_product(product_id:int,p:InventoryProductUpdate,request:Reque
     product.sale_price=p.sale_price
     if p.profit_margin is not None:
         product.profit_margin=p.profit_margin
-    product.sale_currency=p.sale_currency
+    _,latest_purchase=latest_store_catalog_data(s)
+    purchase=latest_purchase.get(product.sku)
+    if purchase and float(purchase.get("purchase_price") or 0)>0:
+        product.sale_price=round(float(purchase["purchase_price"])*(1+float(product.profit_margin)/100),2)
+        product.sale_currency=purchase.get("currency") or p.sale_currency
+    product.sale_currency=product.sale_currency or p.sale_currency
     product.condition=p.condition
     product.store_family=p.store_family
     product.store_category=p.store_category
@@ -1419,7 +1424,7 @@ def edit_inventory_product(product_id:int,p:InventoryProductUpdate,request:Reque
         product.vehicle_details={str(k):str(v).strip() for k,v in p.vehicle_details.items() if k in {"vehicle_name","vehicle_type","vehicle_make","vehicle_model","vehicle_class","vehicle_generation","vehicle_year","vehicle_odometer","vehicle_fuel","vehicle_color","chassis"} and v not in (None,"")} if is_complete_vehicle else {}
     elif not is_complete_vehicle:
         product.vehicle_details={}
-    audit(s,u,"inventory_product_updated","inventory_product",product.id,{"sku":product.sku,"before":before,"after":{"name":product.name,"model":product.model,"sale_price":p.sale_price,"sale_currency":p.sale_currency,"condition":p.condition,"store_family":p.store_family,"store_category":p.store_category,"owned_stock":new_owned,"consigned_stock":new_consigned},"stock_adjustment":stock_adjustment},request)
+    audit(s,u,"inventory_product_updated","inventory_product",product.id,{"sku":product.sku,"before":before,"after":{"name":product.name,"model":product.model,"sale_price":float(product.sale_price) if product.sale_price is not None else None,"profit_margin":float(product.profit_margin),"sale_currency":product.sale_currency,"condition":p.condition,"store_family":p.store_family,"store_category":p.store_category,"owned_stock":new_owned,"consigned_stock":new_consigned},"stock_adjustment":stock_adjustment},request)
     if abs(stock_adjustment["owned_delta"])>0.0001 or abs(stock_adjustment["consigned_delta"])>0.0001:
         audit(s,u,"inventory_stock_adjustment","inventory_product",product.id,{"sku":product.sku,"stock_adjustment":stock_adjustment},request)
     s.commit()
