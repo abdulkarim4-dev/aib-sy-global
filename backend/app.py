@@ -701,6 +701,7 @@ def send_verification_email(email:str, code:str):
 def operation_verification_required(u:User, action:str)->bool:
     if action in {"cash_movement","cash_transfer"}:
         return True
+    if action=="company_profile_edit": return u.role=="owner"
     return u.role!="owner" and action in {"invoice_create","invoice_payment","password_change"}
 
 def masked_email(email:str)->str:
@@ -717,12 +718,14 @@ class OperationVerificationConfirmPayload(BaseModel):
 
 @app.post("/operation-verifications/start")
 def start_operation_verification(p:OperationVerificationStartPayload,request:Request,s:Session=Depends(db),u:User=Depends(current_user)):
-    if p.action not in {"invoice_create","invoice_payment","cash_movement","cash_transfer","password_change"}:
+    if p.action not in {"invoice_create","invoice_payment","cash_movement","cash_transfer","password_change","company_profile_edit"}:
         raise HTTPException(400,"نوع العملية غير مدعوم للتحقق")
     if not operation_verification_required(u,p.action):
         return {"required":False}
-    if p.action == "password_change" and (not p.current_password or not password_hash.verify(p.current_password,u.password_hash)):
+    if p.action in {"password_change","company_profile_edit"} and (not p.current_password or not password_hash.verify(p.current_password,u.password_hash)):
         raise HTTPException(401,"كلمة المرور الحالية غير صحيحة")
+    if p.action=="company_profile_edit" and u.role!="owner":
+        raise HTTPException(403,"تعديل بيانات صاحب الشركة متاح لحساب المالك فقط")
     email=(u.email or "").strip().lower()
     if not email or (p.action != "password_change" and not u.email_verified):
         raise HTTPException(400,"يجب إضافة بريد إلكتروني موثق لحسابك قبل تنفيذ هذه العملية. راجع إعدادات الحساب.")
@@ -950,6 +953,7 @@ def get_user_inventory(user_id:int,s:Session=Depends(db),u:User=Depends(manager)
 
 class CompanyProfilePayload(BaseModel):
     data: dict
+    verification_token: Optional[str] = None
 
 @app.get("/company-profile")
 def get_company_profile(s:Session=Depends(db), u:User=Depends(current_user)):
@@ -957,7 +961,9 @@ def get_company_profile(s:Session=Depends(db), u:User=Depends(current_user)):
     return profile.data if profile else {}
 
 @app.put("/company-profile")
-def update_company_profile(p:CompanyProfilePayload, request:Request, s:Session=Depends(db), u:User=Depends(manager)):
+def update_company_profile(p:CompanyProfilePayload, request:Request, s:Session=Depends(db), u:User=Depends(current_user)):
+    if u.role!="owner": raise HTTPException(403,"تعديل بيانات صاحب الشركة متاح لحساب المالك فقط")
+    consume_operation_verification(s,u,"company_profile_edit",p.verification_token)
     profile=s.get(CompanyProfile,1)
     if not profile:
         profile=CompanyProfile(id=1,data=p.data,updated_by=u.id)
