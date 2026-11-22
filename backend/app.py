@@ -60,6 +60,7 @@ class User(Base):
     deleted: Mapped[bool]=mapped_column(Boolean, default=False, nullable=False)
     failed_logins: Mapped[int]=mapped_column(Integer, default=0)
     locked_until: Mapped[Optional[datetime]]=mapped_column(DateTime(timezone=True), nullable=True)
+    must_change_password: Mapped[bool]=mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True), default=lambda:datetime.now(timezone.utc))
 class EmployeeEmailApproval(Base):
     __tablename__="employee_email_approvals"
@@ -368,7 +369,7 @@ def token_for(user:User,email_otp_verified:bool=False):
     now=datetime.now(timezone.utc)
     claims={"sub":str(user.id),"iat":now,"email_otp_verified":bool(email_otp_verified)}
     return jwt.encode(claims,settings.jwt_secret,algorithm="HS256")
-def current_user(token:Optional[str]=Depends(oauth), s:Session=Depends(db)):
+def current_user(request:Request, token:Optional[str]=Depends(oauth), s:Session=Depends(db)):
     if not token:
         raise HTTPException(401,"جلسة الدخول غير صالحة أو انتهت")
     try:
@@ -378,6 +379,8 @@ def current_user(token:Optional[str]=Depends(oauth), s:Session=Depends(db)):
     except Exception: raise HTTPException(401,"جلسة الدخول غير صالحة أو انتهت")
     u=s.get(User,uid)
     if not u or not u.active: raise HTTPException(401,"الحساب غير فعال")
+    if u.must_change_password and request.url.path not in {"/auth/me","/auth/first-login-password"}:
+        raise HTTPException(403,"يجب تغيير كلمة المرور المؤقتة قبل استخدام الحساب")
     return u
 def require_store_same_origin(request:Request):
     # SameSite=Lax is reinforced with strict Origin validation for cookie-authenticated mutations.
@@ -447,6 +450,7 @@ def startup():
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT FALSE"))
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS owner_commission_rate NUMERIC(7,3) NOT NULL DEFAULT 1.5"))
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted BOOLEAN NOT NULL DEFAULT FALSE"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT FALSE"))
         conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_email_unique ON users (email) WHERE email IS NOT NULL"))
         conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS description TEXT NOT NULL DEFAULT ''"))
         conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS images JSONB NOT NULL DEFAULT '[]'::jsonb"))
@@ -556,7 +560,7 @@ class AccountingLoginResendPayload(BaseModel):
     challenge_id:int
 
 def accounting_login_user_payload(u:User):
-    return {"id":u.id,"username":u.username,"name":u.full_name,"email":u.email,"role":u.role,"permissions":u.permissions or {}}
+    return {"id":u.id,"username":u.username,"name":u.full_name,"email":u.email,"role":u.role,"permissions":u.permissions or {},"must_change_password":bool(u.must_change_password)}
 
 @app.post("/auth/login")
 def login(form:OAuth2PasswordRequestForm=Depends(), request:Request=None, s:Session=Depends(db)):
@@ -613,7 +617,7 @@ def confirm_accounting_login(p:AccountingLoginConfirmPayload,request:Request,s:S
     return {"access_token":token_for(u,email_otp_verified=True),"token_type":"bearer","user":accounting_login_user_payload(u)}
 
 @app.get("/auth/me")
-def me(u:User=Depends(current_user)): return {"id":u.id,"username":u.username,"name":u.full_name,"email":u.email,"role":u.role,"permissions":u.permissions or {},"business_scopes":u.business_scopes or [],"company_name":u.company_name or ""}
+def me(u:User=Depends(current_user)): return {"id":u.id,"username":u.username,"name":u.full_name,"email":u.email,"role":u.role,"permissions":u.permissions or {},"business_scopes":u.business_scopes or [],"company_name":u.company_name or "","must_change_password":bool(u.must_change_password)}
 
 class AccountSettingsPayload(BaseModel):
     email: Optional[str] = None
@@ -823,6 +827,23 @@ def confirm_email_verification(p:EmailVerificationConfirmPayload, request:Reques
     notify_account_change(old_email,"تم تغيير البريد الإلكتروني المرتبط بحسابك")
     notify_account_change(email,"تم ربط هذا البريد الإلكتروني بحساب AIB")
     return {"ok":True,"email":u.email,"verified":True}
+class FirstLoginPasswordPayload(BaseModel):
+    new_password: str = Field(min_length=8, max_length=256)
+
+@app.post("/auth/first-login-password")
+def first_login_password(p:FirstLoginPasswordPayload,request:Request,s:Session=Depends(db),u:User=Depends(current_user)):
+    if not u.must_change_password or u.role=="owner":
+        raise HTTPException(400,"لا يوجد تغيير كلمة مرور أولي مطلوب لهذا الحساب")
+    validate_account_password(p.new_password)
+    u.password_hash=password_hash.hash(p.new_password)
+    u.must_change_password=False
+    u.failed_logins=0
+    u.locked_until=None
+    audit(s,u,"employee_initial_password_changed","user",u.id,{"required_on_first_login":True},request)
+    s.commit()
+    notify_account_change(u.email,"تم تغيير كلمة المرور المؤقتة لحسابك")
+    return {"ok":True,"message":"تم تغيير كلمة المرور بنجاح","must_change_password":False}
+
 @app.post("/auth/change-password")
 def change_owner_password(p:PasswordChangePayload, request:Request, s:Session=Depends(db), u:User=Depends(current_user)):
     validate_account_password(p.new_password)
@@ -1103,9 +1124,10 @@ def reset_user_password(user_id:int, p:UserPasswordResetPayload, request:Request
     if not target: raise HTTPException(404,"المستخدم غير موجود")
     if target.role=="owner": raise HTTPException(400,"لا يمكن إصدار بطاقة دخول لحساب المالك من هذه الصفحة")
     target.password_hash=password_hash.hash(p.password)
+    target.must_change_password=True
     target.failed_logins=0
     target.locked_until=None
-    audit(s,u,"user_credentials_reissued","user",user_id,{"username":target.username},request)
+    audit(s,u,"user_credentials_reissued","user",user_id,{"username":target.username,"must_change_password":True},request)
     s.commit()
     return {"ok":True,"username":target.username,"full_name":target.full_name,"email":target.email}
 
