@@ -1605,11 +1605,13 @@ def create_record(p:RecordCreate, request:Request, s:Session=Depends(db), u:User
     serial=int(s.scalar(select(func.count(Record.id)).where(Record.section==p.section)) or 0)+1
     invoice_no=f"{section_codes[p.section]}-{serial:05d}-B"
     prepared_data=prepare_record_inventory(s,p.section,p.data,user=u)
-    # Employee-owned inventory sales are settled immediately into separate seller/owner wallets.
+    # Employee outside-store sales remain financially pending until the owner
+    # verifies the transfer and explicitly confirms receipt.
     employee_sale = u.role!="owner" and p.section=="directSale"
     commission_base=0.0
     commission_amount=0.0
     seller_net=0.0
+    commission_rate=0.0
     if employee_sale:
         items=prepared_data.get("items") if isinstance(prepared_data.get("items"),list) else []
         commission_base=round(sum(max(0.0,float(x.get("quantity") or 0))*max(0.0,float(x.get("price") or 0)) for x in items if isinstance(x,dict)),2)
@@ -1619,29 +1621,12 @@ def create_record(p:RecordCreate, request:Request, s:Session=Depends(db), u:User
         seller_net=round(commission_base-commission_amount,2)
         if seller_net<0: raise HTTPException(400,"تعذر احتساب صافي مستحقات المستخدم")
         prepared_data["outside_store_sale"]=True
-        prepared_data["owner_commission"]={"rate":commission_rate/100,"rate_percent":commission_rate,"base_amount":commission_base,"amount":commission_amount,"seller_net":seller_net,"currency":p.currency,"status":"paid","payment_status":"auto_deducted","payment_method":"wallet","payment_reference":None,"payment_submitted_at":None,"paid_at":datetime.now(timezone.utc).isoformat(),"paid_by":u.id,"note":"تم اقتطاع عمولة المالك تلقائياً من محفظة المستخدم"}
+        prepared_data["owner_commission"]={"rate":commission_rate/100,"rate_percent":commission_rate,"base_amount":commission_base,"amount":commission_amount,"seller_net":seller_net,"currency":p.currency,"status":"pending","payment_status":"pending","payment_type":None,"payment_amount":None,"payment_method":None,"payment_reference":None,"payment_proof":None,"payment_submitted_at":None,"paid_at":None,"paid_by":None,"note":"بانتظار إرسال إثبات التحويل وموافقة المالك"}
     consume_operation_verification(s,u,"invoice_create",p.verification_token)
     r=Record(section=p.section,invoice_no=invoice_no,currency=p.currency,data=prepared_data,created_by=u.id)
     s.add(r); s.flush()
-    if employee_sale:
-        ensure_user_wallets(s,u.id)
-        seller_wallet=s.scalar(select(UserWallet).where(UserWallet.user_id==u.id,UserWallet.currency==p.currency).with_for_update())
-        owner=s.scalar(select(User).where(User.role=="owner",User.deleted.is_(False)).order_by(User.id).limit(1))
-        if not seller_wallet or not owner: raise HTTPException(500,"تعذر تجهيز محافظ المستخدم والمالك لاقتطاع العمولة")
-        seller_wallet.balance=round(float(seller_wallet.balance or 0)+commission_base,2)
-        seller_wallet.updated_at=datetime.now(timezone.utc)
-        s.add(WalletTransaction(wallet_id=seller_wallet.id,user_id=u.id,amount=commission_base,currency=p.currency,direction="in",reason=f"قيمة فاتورة المبيع {invoice_no} قبل اقتطاع العمولة",reference_type="invoice_sale_gross",reference_id=r.id,created_by=u.id))
-        if commission_amount>0:
-            seller_wallet.balance=round(float(seller_wallet.balance or 0)-commission_amount,2)
-            s.add(WalletTransaction(wallet_id=seller_wallet.id,user_id=u.id,amount=commission_amount,currency=p.currency,direction="out",reason=f"اقتطاع عمولة المالك {commission_rate:g}% من فاتورة المبيع {invoice_no}",reference_type="invoice_sale_commission",reference_id=r.id,created_by=u.id))
-            ensure_user_wallets(s,owner.id)
-            owner_wallet=s.scalar(select(UserWallet).where(UserWallet.user_id==owner.id,UserWallet.currency==p.currency).with_for_update())
-            if not owner_wallet: raise HTTPException(500,"تعذر تجهيز محفظة المالك")
-            owner_wallet.balance=round(float(owner_wallet.balance or 0)+commission_amount,2)
-            owner_wallet.updated_at=datetime.now(timezone.utc)
-            s.add(WalletTransaction(wallet_id=owner_wallet.id,user_id=owner.id,amount=commission_amount,currency=p.currency,direction="in",reason=f"عمولة {commission_rate:g}% من فاتورة الموظف {invoice_no}",reference_type="invoice_owner_commission",reference_id=r.id,created_by=u.id))
     recalculate_inventory(s)
-    audit(s,u,"record_created","record",r.id,{"section":r.section,"invoice_no":r.invoice_no,"seller_wallet_credit":seller_net if employee_sale else 0,"seller_wallet_credit_pending":0,"owner_commission":commission_amount if employee_sale else 0,"commission_rate_percent":commission_rate if employee_sale else 0,"currency":p.currency},request)
+    audit(s,u,"record_created","record",r.id,{"section":r.section,"invoice_no":r.invoice_no,"seller_wallet_credit":0,"seller_wallet_credit_pending":seller_net if employee_sale else 0,"owner_commission":commission_amount if employee_sale else 0,"commission_rate_percent":commission_rate if employee_sale else 0,"owner_confirmation_required":bool(employee_sale),"currency":p.currency},request)
     s.commit()
     # Invalidate shop catalog caches immediately after a stock-changing record.
     if p.section in {"purchase","carPurchase","deposit","directSale","consignSale"}:
@@ -2114,7 +2099,7 @@ def confirm_outside_store_commission(record_id:int,p:OwnerCommissionConfirmPaylo
     data["seller_wallet_credit"]={"amount":seller_net if payment_type=="full_amount" else 0,"currency":record.currency,"wallet_transaction_id":seller_tx.id if seller_tx else None,"reason":"full_amount_transferred" if payment_type=="full_amount" else "commission_only_no_seller_credit"}
     record.data=data
     record.updated_at=now
-    audit(s,u,"owner_commission_payment_confirmed","record",record.id,{"invoice_no":record.invoice_no,"commission_amount":amount,"seller_net":seller_net if payment_type=="full_amount" else 0,"payment_type":payment_type,"payment_amount":commission.get("payment_amount"),"currency":record.currency,"rate":0.015,"seller_id":seller.id,"owner_wallet_id":owner_wallet.id,"seller_wallet_id":seller_wallet.id if seller_wallet else None,"owner_wallet_transaction_id":owner_tx.id,"seller_wallet_transaction_id":seller_tx.id if seller_tx else None,"payment_method":commission.get("payment_method"),"payment_reference":commission.get("payment_reference"),"note":commission["note"]},request)
+    audit(s,u,"owner_commission_payment_confirmed","record",record.id,{"invoice_no":record.invoice_no,"commission_amount":amount,"seller_net":seller_net if payment_type=="full_amount" else 0,"payment_type":payment_type,"payment_amount":commission.get("payment_amount"),"currency":record.currency,"rate":float(commission.get("rate") or 0),"rate_percent":float(commission.get("rate_percent") or 0),"seller_id":seller.id,"owner_wallet_id":owner_wallet.id,"seller_wallet_id":seller_wallet.id if seller_wallet else None,"owner_wallet_transaction_id":owner_tx.id,"seller_wallet_transaction_id":seller_tx.id if seller_tx else None,"payment_method":commission.get("payment_method"),"payment_reference":commission.get("payment_reference"),"note":commission["note"]},request)
     s.commit()
     return {"ok":True,"record_id":record.id,"status":"paid","seller_credit":seller_net if payment_type=="full_amount" else 0,"payment_type":payment_type,"amount":amount,"currency":record.currency}
 
