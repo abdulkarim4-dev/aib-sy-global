@@ -619,7 +619,7 @@ class AccountSettingsPayload(BaseModel):
     email: Optional[str] = None
     full_name: Optional[str] = None
 def validate_account_password(value:str):
-    if len(value)<8 or not re.search(r"[A-Z]",value) or not re.search(r"[a-z]",value) or not re.search(r"\\d",value) or not re.search(r"[^A-Za-z0-9]",value):
+    if len(value)<8 or not re.search(r"[A-Z]",value) or not re.search(r"[a-z]",value) or not re.search(r"\d",value) or not re.search(r"[^A-Za-z0-9]",value):
         raise HTTPException(400,"كلمة المرور يجب أن تكون 8 خانات على الأقل وتتضمن حرفاً كبيراً وحرفاً صغيراً ورقماً ورمزاً.")
     return value
 
