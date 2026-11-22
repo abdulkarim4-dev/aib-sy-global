@@ -1962,12 +1962,12 @@ def cash_move_display_description(s:Session, move:CashMove)->str:
 def cash_box_movements(box_name:str,s:Session=Depends(db),u:User=Depends(require_permission("cash","view"))):
     if u.role!="owner" and box_name.strip() in {"صندوق الأمانة","صندوق مبيع الأمانة","صندوق قل أمانة","صندوق قُل أمانة"}:
         raise HTTPException(403,"حركات صندوق الأمانة متاحة للمالك فقط")
-    rows=s.scalars(select(CashMove).where(CashMove.box_name==box_name).order_by(CashMove.id.desc())).all()
+    rows=s.scalars(select(CashMove).where(CashMove.box_name==box_name,CashMove.voided.is_(False)).order_by(CashMove.id.desc())).all()
     return [{"id":m.id,"box_name":m.box_name,"movement":m.movement,"amount":float(m.amount),"currency":m.currency,"description":cash_move_display_description(s,m),"created_by":m.created_by,"created_at":m.created_at,"transfer_group":m.transfer_group,"voided":m.voided,"voided_by":m.voided_by,"voided_at":m.voided_at,"sale_locked":is_sale_cash_move(s,m),"purchase_locked":is_purchase_cash_move(s,m)} for m in rows]
 
 @app.get("/cash-movements")
 def cash_list(s:Session=Depends(db),u:User=Depends(require_permission("cash","view"))):
-    query=select(CashMove)
+    query=select(CashMove).where(CashMove.voided.is_(False))
     if u.role!="owner": query=query.where(CashMove.box_name.not_in(["صندوق الأمانة","صندوق مبيع الأمانة","صندوق قل أمانة","صندوق قُل أمانة"]))
     rows=s.scalars(query.order_by(CashMove.id.desc())).all()
     return [{"id":m.id,"box_name":m.box_name,"movement":m.movement,"amount":float(m.amount),"currency":m.currency,"description":cash_move_display_description(s,m),"created_by":m.created_by,"created_at":m.created_at,"transfer_group":m.transfer_group,"voided":m.voided,"voided_by":m.voided_by,"voided_at":m.voided_at,"sale_locked":is_sale_cash_move(s,m),"purchase_locked":is_purchase_cash_move(s,m)} for m in rows]
