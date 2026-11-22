@@ -1354,7 +1354,7 @@ def create_inventory_product(p:InventoryProductCreate,request:Request,s:Session=
         vehicle_details["vehicle_make"]=manufacturer_item
     if is_complete_vehicle and not vehicle_details.get("vehicle_name"):
         raise HTTPException(400,"أدخل اسم السيارة أو المركبة")
-    if not is_complete_vehicle and any(k!="manufacturer" for k in vehicle_details):
+    if not is_complete_vehicle and any(k not in {"manufacturer","vehicle_fuel"} for k in vehicle_details):
         raise HTTPException(400,"بيانات المركبة متاحة للأقسام الكاملة فقط")
     if u.role!="owner":
         scopes=set(u.business_scopes or [])
