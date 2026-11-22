@@ -1362,7 +1362,7 @@ def create_inventory_product(p:InventoryProductCreate,request:Request,s:Session=
     _store_catalog_cache["at"]=0
     _public_products_cache["value"].clear()
     _public_products_cache["at"].clear()
-    return {"id":product.id,"sku":product.sku,"name":product.name,"model":product.model,"description":product.description or "","owner_user_id":product.owner_user_id,"sale_price":float(product.sale_price) if product.sale_price is not None else None,"profit_margin":float(product.profit_margin),"sale_currency":product.sale_currency,"condition":product.condition,"opening_quantity":float(product.opening_quantity or 0),"store_family":product.store_family,"store_category":product.store_category,"vehicle_details":product.vehicle_details or {},"owned_stock":float(product.owned_stock or 0),"consigned_stock":0}
+    return {"id":product.id,"sku":product.sku,"name":product.name,"model":product.model,"description":product.description or "","owner_user_id":product.owner_user_id,"sale_price":float(product.sale_price) if product.sale_price is not None else None,**({"profit_margin":float(product.profit_margin)} if u.role=="owner" else {}),"sale_currency":product.sale_currency,"condition":product.condition,"opening_quantity":float(product.opening_quantity or 0),"store_family":product.store_family,"store_category":product.store_category,"vehicle_details":product.vehicle_details or {},"owned_stock":float(product.owned_stock or 0),"consigned_stock":0}
 
 @app.get("/inventory/products")
 def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=Depends(require_permission("inventory","view"))):
