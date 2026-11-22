@@ -3364,6 +3364,14 @@ from pathlib import Path
 from fastapi.responses import FileResponse, Response
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 
+@app.get("/assets/aib-design-system.css", include_in_schema=False)
+def aib_design_system_stylesheet():
+    return FileResponse(
+        FRONTEND_DIR / "assets" / "aib-design-system.css",
+        media_type="text/css",
+        headers={"Cache-Control": "public, max-age=300"},
+    )
+
 @app.get("/customer-i18n.js", include_in_schema=False)
 def customer_i18n_script():
     return FileResponse(
