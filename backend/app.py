@@ -865,7 +865,7 @@ def manufacturer_scope_tokens()->set[str]:
     except Exception:
         return set()
 
-USER_BUSINESS_SCOPES={"car","truck","heavy","agri","special","cars","car_parts","car_engines","car_engine_parts","trucks","truck_parts","truck_engines","truck_engine_parts","heavy_parts","heavy_engines","heavy_engine_parts","agri_parts","agri_engines","agri_engine_parts","trailer","trailers","car_trailers","caravans","cargo_trailers","flatbed_trailers","equipment_trailers","tanker_trailers","dump_trailers","livestock_trailers","other_trailers","generators","hydraulic_compressors","water_pumps","road_equipment","special_parts","special_engines"}
+USER_BUSINESS_SCOPES={"fuel:gasoline","fuel:diesel","fuel:electric","fuel:hybrid","fuel:cng","fuel:lpg","fuel:other","condition:new","condition:used","car","truck","heavy","agri","special","cars","car_parts","car_engines","car_engine_parts","trucks","truck_parts","truck_engines","truck_engine_parts","heavy_parts","heavy_engines","heavy_engine_parts","agri_parts","agri_engines","agri_engine_parts","trailer","trailers","car_trailers","caravans","cargo_trailers","flatbed_trailers","equipment_trailers","tanker_trailers","dump_trailers","livestock_trailers","other_trailers","generators","hydraulic_compressors","water_pumps","road_equipment","special_parts","special_engines"}
 class UserCreate(BaseModel):
     username:str=Field(min_length=3,max_length=80)
     full_name:str=Field(min_length=2,max_length=160)
@@ -1319,7 +1319,8 @@ class InventoryProductCreate(BaseModel):
     sale_price: Optional[float]=Field(default=None,ge=0)
     profit_margin: float=Field(default=35,ge=0,le=1000)
     sale_currency: str="USD"
-    condition: str="new"
+    condition: str=Field(min_length=3,max_length=16)
+    fuel_type: str=Field(min_length=1,max_length=30)
     quantity: float=Field(default=0,ge=0)
     store_family: str
     store_category: str
@@ -1330,6 +1331,12 @@ class InventoryProductCreate(BaseModel):
 def create_inventory_product(p:InventoryProductCreate,request:Request,s:Session=Depends(db),u:User=Depends(require_permission("inventory","create"))):
     if p.sale_currency not in {"USD","SYP"}: raise HTTPException(400,"عملة سعر البيع غير مدعومة")
     if p.condition not in {"new","used"}: raise HTTPException(400,"اختر حالة المنتج: جديد أو مستعمل")
+    allowed_fuels={"gasoline","diesel","electric","hybrid","cng","lpg","other"}
+    if p.fuel_type not in allowed_fuels: raise HTTPException(400,"اختر نوع وقود صحيحاً")
+    if u.role!="owner":
+        scopes=set(u.business_scopes or [])
+        if "fuel:"+p.fuel_type not in scopes: raise HTTPException(403,"نوع الوقود هذا غير مسموح لك بالنشر به. اطلب من المالك تفعيله في صلاحيات المستخدم.")
+        if "condition:"+p.condition not in scopes: raise HTTPException(403,"حالة القطعة أو السيارة هذه غير مسموح لك بالنشر بها. اطلب من المالك تفعيلها في صلاحيات المستخدم.")
     allowed={"car":{"cars","car_parts","car_engines","car_engine_parts"},"truck":{"trucks","truck_parts","truck_engines","truck_engine_parts"},"heavy":{"heavy","heavy_parts","heavy_engines","heavy_engine_parts"},"agri":{"agri","agri_parts","agri_engines","agri_engine_parts"},"special":{"generators","hydraulic_compressors","water_pumps","road_equipment","special_parts","special_engines"}}
     if p.store_category not in allowed.get(p.store_family,set()): raise HTTPException(400,"اختر قسم المتجر بشكل صحيح")
     vehicle_categories={"car":"cars","truck":"trucks","heavy":"heavy","agri":"agri"}
@@ -1342,6 +1349,7 @@ def create_inventory_product(p:InventoryProductCreate,request:Request,s:Session=
         raise HTTPException(403,"هذه الشركة المصنّعة غير مسموح لك بالنشر باسمها. اطلب من المالك تفعيلها في صلاحيات المستخدم.")
     vehicle_details={str(k):str(v).strip() for k,v in (p.vehicle_details or {}).items() if k in {"manufacturer","vehicle_name","vehicle_type","vehicle_make","vehicle_model","vehicle_class","vehicle_generation","vehicle_year","vehicle_odometer","vehicle_fuel","vehicle_color","chassis"} and v not in (None,"")}
     vehicle_details["manufacturer"]=manufacturer_item
+    vehicle_details["vehicle_fuel"]=p.fuel_type
     if is_complete_vehicle:
         vehicle_details["vehicle_make"]=manufacturer_item
     if is_complete_vehicle and not vehicle_details.get("vehicle_name"):
@@ -1356,7 +1364,7 @@ def create_inventory_product(p:InventoryProductCreate,request:Request,s:Session=
         raise HTTPException(409,"رقم القطعة مستخدم مسبقاً")
     product=InventoryProduct(sku=sku,name=p.name.strip(),model=p.model.strip(),description=p.description.strip(),owner_user_id=(None if u.role=="owner" else u.id),sale_price=p.sale_price,profit_margin=p.profit_margin,sale_currency=p.sale_currency,condition=p.condition,opening_quantity=p.quantity,store_family=p.store_family,store_category=p.store_category,vehicle_details=vehicle_details,owned_stock=p.quantity,consigned_stock=0,active=True)
     s.add(product);s.flush()
-    audit(s,u,"inventory_product_created","inventory_product",product.id,{"sku":sku,"owner_user_id":product.owner_user_id,"sale_price":p.sale_price,"sale_currency":p.sale_currency,"condition":p.condition,"opening_quantity":p.quantity,"store_family":p.store_family,"store_category":p.store_category},request)
+    audit(s,u,"inventory_product_created","inventory_product",product.id,{"sku":sku,"owner_user_id":product.owner_user_id,"sale_price":p.sale_price,"sale_currency":p.sale_currency,"condition":p.condition,"fuel_type":p.fuel_type,"opening_quantity":p.quantity,"store_family":p.store_family,"store_category":p.store_category},request)
     s.commit()
     _store_catalog_cache["value"]=None
     _store_catalog_cache["at"]=0
