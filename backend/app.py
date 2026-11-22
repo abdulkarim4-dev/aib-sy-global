@@ -1397,7 +1397,7 @@ def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=
     }
     rows=[p for p in rows if (u.role=="owner" and p.owner_user_id is None and str(p.sku or "").strip().upper() in invoiced_skus) or (u.role!="owner" and p.owner_user_id==u.id)]
     store_categories,latest_purchase=latest_store_catalog_data(s)
-    return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"description":p.description or "","owner_user_id":p.owner_user_id,"condition":p.condition or "new","is_store_visible":bool(p.is_store_visible),"opening_quantity":float(p.opening_quantity or 0),"store_family":p.store_family,"store_category":p.store_category,"owned_stock":float(p.owned_stock or 0),**({"consigned_stock":float(p.consigned_stock or 0)} if u.role=="owner" else {}),"image_count":len(p.images or []),"shipping_included":bool(p.shipping_included),"video_url":p.video_url or "",**store_categories.get(p.sku,{}),"vehicle_details":(p.vehicle_details or store_categories.get(p.sku,{}).get("vehicle_details") or {}),**latest_purchase.get(p.sku,{"purchase_price":0,"sale_price":0,"currency":"—"}),"sale_price":round(float(latest_purchase[p.sku]["purchase_price"])*(1+float(p.profit_margin if p.profit_margin is not None else 35)/100),2) if p.sku in latest_purchase and latest_purchase[p.sku].get("purchase_price") else (float(p.sale_price) if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("sale_price")),"profit_margin":float(p.profit_margin or 35),"sale_currency":p.sale_currency if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("currency","")} for p in rows]
+    return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"description":p.description or "","owner_user_id":p.owner_user_id,"condition":p.condition or "new","is_store_visible":bool(p.is_store_visible),"opening_quantity":float(p.opening_quantity or 0),"store_family":p.store_family,"store_category":p.store_category,"owned_stock":float(p.owned_stock or 0),**({"consigned_stock":float(p.consigned_stock or 0)} if u.role=="owner" else {}),"image_count":len(p.images or []),"shipping_included":bool(p.shipping_included),"video_url":p.video_url or "",**store_categories.get(p.sku,{}),"vehicle_details":(p.vehicle_details or store_categories.get(p.sku,{}).get("vehicle_details") or {}),**latest_purchase.get(p.sku,{"purchase_price":0,"sale_price":0,"currency":"—"}),"sale_price":round(float(latest_purchase[p.sku]["purchase_price"])*(1+float(p.profit_margin if p.profit_margin is not None else 35)/100),2) if p.sku in latest_purchase and latest_purchase[p.sku].get("purchase_price") else (float(p.sale_price) if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("sale_price")),**({"profit_margin":float(p.profit_margin or 35)} if u.role=="owner" else {}),"sale_currency":p.sale_currency if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("currency","")} for p in rows]
 
 class InventoryProductUpdate(BaseModel):
     name: str=Field(min_length=2,max_length=240)
@@ -1446,7 +1446,7 @@ def edit_inventory_product(product_id:int,p:InventoryProductUpdate,request:Reque
     product.model=p.model.strip()
     product.description=p.description.strip()
     product.sale_price=p.sale_price
-    if p.profit_margin is not None:
+    if u.role=="owner" and p.profit_margin is not None:
         product.profit_margin=p.profit_margin
     _,latest_purchase=latest_store_catalog_data(s)
     purchase=latest_purchase.get(product.sku)
