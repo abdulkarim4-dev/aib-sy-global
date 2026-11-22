@@ -858,6 +858,13 @@ def review_password_change_request(request_id:int, approve:bool, request:Request
         notify_account_change(target.email,"تم اعتماد تغيير كلمة المرور من قبل المالك")
     return {"status":row.status}
 
+def manufacturer_scope_tokens()->set[str]:
+    try:
+        catalog=json.loads((FRONTEND_DIR / "data" / "manufacturers.json").read_text(encoding="utf-8"))
+        return {"manufacturer:"+str(item.get("key") or "").strip() for item in catalog.get("manufacturers",[]) if item.get("key")}
+    except Exception:
+        return set()
+
 USER_BUSINESS_SCOPES={"car","truck","heavy","agri","special","cars","car_parts","car_engines","car_engine_parts","trucks","truck_parts","truck_engines","truck_engine_parts","heavy_parts","heavy_engines","heavy_engine_parts","agri_parts","agri_engines","agri_engine_parts","trailer","trailers","car_trailers","caravans","cargo_trailers","flatbed_trailers","equipment_trailers","tanker_trailers","dump_trailers","livestock_trailers","other_trailers","generators","hydraulic_compressors","water_pumps","road_equipment","special_parts","special_engines"}
 class UserCreate(BaseModel):
     username:str=Field(min_length=3,max_length=80)
@@ -979,7 +986,7 @@ def list_users(s:Session=Depends(db), _:User=Depends(manager)):
 @app.post("/users")
 def add_user(payload:UserCreate, request:Request, s:Session=Depends(db), u:User=Depends(manager)):
     if payload.role not in ("employee","owner"): raise HTTPException(400,"دور غير صالح")
-    invalid_scopes=set(payload.business_scopes or [])-USER_BUSINESS_SCOPES
+    invalid_scopes={x for x in (payload.business_scopes or []) if x not in USER_BUSINESS_SCOPES and x not in manufacturer_scope_tokens()}
     if invalid_scopes: raise HTTPException(400,"يوجد مجال عمل غير معروف")
     if payload.role=="owner" and payload.business_scopes: raise HTTPException(400,"لا تُحدد مجالات عمل لحساب المالك")
     if s.scalar(select(User).where(User.username==payload.username)): raise HTTPException(409,"اسم المستخدم مستخدم")
@@ -1056,7 +1063,7 @@ def update_user_permissions(user_id:int,p:UserPermissionsPayload,request:Request
         clean["invoices"]["view"]=True
     if any(clean["cash"][k] for k in ("create","edit","delete","print")):
         clean["cash"]["view"]=True
-    invalid_scopes=set(p.business_scopes or [])-USER_BUSINESS_SCOPES
+    invalid_scopes={x for x in (p.business_scopes or []) if x not in USER_BUSINESS_SCOPES and x not in manufacturer_scope_tokens()}
     if invalid_scopes: raise HTTPException(400,"يوجد قسم أو قسم فرعي غير معروف")
     target.business_scopes=sorted(set(p.business_scopes or []))
     target.permissions=clean
@@ -1316,6 +1323,7 @@ class InventoryProductCreate(BaseModel):
     quantity: float=Field(default=0,ge=0)
     store_family: str
     store_category: str
+    manufacturer: str=Field(min_length=1,max_length=160)
     vehicle_details: Optional[dict]=None
 
 @app.post("/inventory/products")
@@ -1326,10 +1334,19 @@ def create_inventory_product(p:InventoryProductCreate,request:Request,s:Session=
     if p.store_category not in allowed.get(p.store_family,set()): raise HTTPException(400,"اختر قسم المتجر بشكل صحيح")
     vehicle_categories={"car":"cars","truck":"trucks","heavy":"heavy","agri":"agri"}
     is_complete_vehicle=p.store_category==vehicle_categories.get(p.store_family)
-    vehicle_details={str(k):str(v).strip() for k,v in (p.vehicle_details or {}).items() if k in {"vehicle_name","vehicle_type","vehicle_make","vehicle_model","vehicle_class","vehicle_generation","vehicle_year","vehicle_odometer","vehicle_fuel","vehicle_color","chassis"} and v not in (None,"")}
+    manufacturer=p.manufacturer.strip()
+    catalog_manufacturers={str(item.get("key")):str(item.get("name")) for item in json.loads((FRONTEND_DIR / "data" / "manufacturers.json").read_text(encoding="utf-8")).get("manufacturers",[]) if item.get("key") and item.get("name")}
+    manufacturer_item=next((item for item in catalog_manufacturers.values() if item.casefold()==manufacturer.casefold()),None)
+    if not manufacturer_item: raise HTTPException(400,"اختر شركة مصنّعة صحيحة من القائمة")
+    if u.role!="owner" and "manufacturer:"+next((key for key,name in catalog_manufacturers.items() if name.casefold()==manufacturer.casefold()),"") not in set(u.business_scopes or []):
+        raise HTTPException(403,"هذه الشركة المصنّعة غير مسموح لك بالنشر باسمها. اطلب من المالك تفعيلها في صلاحيات المستخدم.")
+    vehicle_details={str(k):str(v).strip() for k,v in (p.vehicle_details or {}).items() if k in {"manufacturer","vehicle_name","vehicle_type","vehicle_make","vehicle_model","vehicle_class","vehicle_generation","vehicle_year","vehicle_odometer","vehicle_fuel","vehicle_color","chassis"} and v not in (None,"")}
+    vehicle_details["manufacturer"]=manufacturer_item
+    if is_complete_vehicle:
+        vehicle_details["vehicle_make"]=manufacturer_item
     if is_complete_vehicle and not vehicle_details.get("vehicle_name"):
         raise HTTPException(400,"أدخل اسم السيارة أو المركبة")
-    if not is_complete_vehicle and vehicle_details:
+    if not is_complete_vehicle and any(k!="manufacturer" for k in vehicle_details):
         raise HTTPException(400,"بيانات المركبة متاحة للأقسام الكاملة فقط")
     if u.role!="owner":
         scopes=set(u.business_scopes or [])
@@ -3386,7 +3403,7 @@ def shop_page():
 @app.get("/data/{filename}", include_in_schema=False)
 def public_reference_data(filename: str):
     # Only expose the two curated public reference catalogues; never serve arbitrary files.
-    allowed = {"vehiclesdb-catalog.json", "tractor-brands.json", "heavy-equipment-brands.json"}
+    allowed = {"vehiclesdb-catalog.json", "tractor-brands.json", "heavy-equipment-brands.json", "manufacturers.json"}
     if filename not in allowed:
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Reference data not found")
