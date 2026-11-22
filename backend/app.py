@@ -82,6 +82,15 @@ class AccountingLoginVerification(Base):
     used_at: Mapped[Optional[datetime]]=mapped_column(DateTime(timezone=True),nullable=True)
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True),default=lambda:datetime.now(timezone.utc))
 
+class AccountingPasswordReset(Base):
+    __tablename__="accounting_password_resets"
+    id: Mapped[int]=mapped_column(primary_key=True)
+    user_id: Mapped[int]=mapped_column(ForeignKey("users.id"),index=True)
+    token_hash: Mapped[str]=mapped_column(String(64),unique=True,index=True)
+    expires_at: Mapped[datetime]=mapped_column(DateTime(timezone=True))
+    used_at: Mapped[Optional[datetime]]=mapped_column(DateTime(timezone=True),nullable=True)
+    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True),default=lambda:datetime.now(timezone.utc))
+
 class StoreCustomer(Base):
     __tablename__="store_customers"
     id: Mapped[int]=mapped_column(primary_key=True)
@@ -552,6 +561,12 @@ def startup():
 def health(s:Session=Depends(db)):
     s.execute(text("SELECT 1"))
     return {"status":"ok","service":"AIB Accounting API","database":"ok"}
+class AccountingPasswordResetRequestPayload(BaseModel):
+    email: str = Field(min_length=5,max_length=254)
+class AccountingPasswordResetConfirmPayload(BaseModel):
+    token: str = Field(min_length=32,max_length=256)
+    new_password: str = Field(min_length=8,max_length=256)
+
 class AccountingLoginConfirmPayload(BaseModel):
     challenge_id:int
     code:str=Field(min_length=6,max_length=6)
@@ -578,6 +593,69 @@ def login(form:OAuth2PasswordRequestForm=Depends(), request:Request=None, s:Sess
     audit(s,u,"login","user",u.id,{"method":"password","email_otp_skipped":True},request)
     s.commit()
     return {"access_token":token_for(u,email_otp_verified=True),"token_type":"bearer","user":accounting_login_user_payload(u)}
+
+@app.post("/auth/password-reset/request")
+def request_accounting_password_reset(p:AccountingPasswordResetRequestPayload,request:Request,s:Session=Depends(db)):
+    email=p.email.strip().lower()
+    # Always return the same response so account existence cannot be discovered.
+    generic={"ok":True,"message":"إذا كان البريد مرتبطاً بحساب محاسبة، فسيصلك رابط إعادة التعيين خلال دقائق."}
+    u=s.scalar(select(User).where(func.lower(User.email)==email,User.active==True,User.deleted==False))
+    if not u:
+        return generic
+    now=datetime.now(timezone.utc)
+    recent=s.scalar(select(AccountingPasswordReset).where(
+        AccountingPasswordReset.user_id==u.id,
+        AccountingPasswordReset.created_at>now-timedelta(minutes=1)
+    ).order_by(AccountingPasswordReset.created_at.desc()).limit(1))
+    if recent:
+        return generic
+    raw_token=secrets.token_urlsafe(40)
+    token_digest=hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+    s.query(AccountingPasswordReset).filter(
+        AccountingPasswordReset.user_id==u.id,
+        AccountingPasswordReset.used_at.is_(None)
+    ).update({AccountingPasswordReset.used_at:now},synchronize_session=False)
+    reset=AccountingPasswordReset(user_id=u.id,token_hash=token_digest,expires_at=now+timedelta(minutes=30))
+    s.add(reset);s.flush()
+    base_url=str(request.base_url).rstrip("/")
+    reset_url=base_url+"/accounting?reset_token="+raw_token
+    try:
+        send_aib_email(u.email,"إعادة تعيين كلمة مرور المحاسبة – مجموعة AIB",
+            "وصلنا طلب لإعادة تعيين كلمة مرور حسابك في تطبيق AIB. افتح الرابط التالي خلال 30 دقيقة لإعداد كلمة مرور جديدة: "+reset_url+"\nإذا لم تطلب ذلك، تجاهل هذه الرسالة.",
+            f"""<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><body style="margin:0;background:#f2f5f7;padding:24px;font-family:Tahoma,Arial"><div style="max-width:520px;margin:auto;background:#fff;border:1px solid #e4eaf0;border-radius:16px;overflow:hidden"><div style="background:#172b3b;padding:22px;text-align:center;color:#fff"><b style="font-size:27px">AIB</b><div>مجموعة AIB التجارية</div></div><div style="padding:28px;text-align:center;color:#243342"><h2>إعادة تعيين كلمة المرور</h2><p style="line-height:2">اضغط الزر أدناه لإعداد كلمة مرور جديدة لحساب المحاسبة. الرابط صالح لمدة 30 دقيقة ولمرة واحدة فقط.</p><a href="{html.escape(reset_url,quote=True)}" style="display:inline-block;background:#e58a42;color:#fff;text-decoration:none;padding:13px 25px;border-radius:9px;font-weight:bold">إعادة تعيين كلمة المرور</a><p style="font-size:12px;color:#697887;margin-top:22px">إذا لم تطلب إعادة التعيين، تجاهل هذه الرسالة. لن تتغير كلمة مرورك دون إكمال الخطوات.</p></div></div></body></html>""")
+    except Exception:
+        s.rollback()
+        raise HTTPException(503,"تعذر إرسال رابط إعادة التعيين. تحقق من إعدادات البريد وحاول لاحقاً.")
+    audit(s,u,"accounting_password_reset_requested","user",u.id,{"reset_id":reset.id},request)
+    s.commit()
+    return generic
+
+@app.post("/auth/password-reset/confirm")
+def confirm_accounting_password_reset(p:AccountingPasswordResetConfirmPayload,request:Request,s:Session=Depends(db)):
+    value=p.new_password
+    if not re.match(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9]).{8,256}$",value):
+        raise HTTPException(400,"كلمة المرور يجب أن تتضمن 8 خانات على الأقل وحرفاً كبيراً وصغيراً ورقماً ورمزاً.")
+    digest=hashlib.sha256(p.token.encode("utf-8")).hexdigest()
+    now=datetime.now(timezone.utc)
+    reset=s.scalar(select(AccountingPasswordReset).where(AccountingPasswordReset.token_hash==digest))
+    if not reset or reset.used_at or reset.expires_at<now:
+        raise HTTPException(400,"رابط إعادة التعيين غير صالح أو منتهي. اطلب رابطاً جديداً.")
+    u=s.get(User,reset.user_id)
+    if not u or not u.active or u.deleted:
+        raise HTTPException(400,"تعذر إعادة تعيين كلمة المرور لهذا الحساب.")
+    reset.used_at=now
+    u.password_hash=password_hash.hash(value)
+    u.failed_logins=0
+    u.locked_until=None
+    u.must_change_password=False
+    s.query(AccountingPasswordReset).filter(
+        AccountingPasswordReset.user_id==u.id,
+        AccountingPasswordReset.used_at.is_(None),
+        AccountingPasswordReset.id!=reset.id
+    ).update({AccountingPasswordReset.used_at:now},synchronize_session=False)
+    audit(s,u,"accounting_password_reset_completed","user",u.id,{"reset_id":reset.id},request)
+    s.commit()
+    return {"ok":True,"message":"تم تعيين كلمة المرور الجديدة بنجاح. يمكنك تسجيل الدخول الآن."}
 
 @app.post("/auth/login/resend")
 def resend_accounting_login_code(p:AccountingLoginResendPayload,request:Request,s:Session=Depends(db)):
