@@ -329,9 +329,9 @@ function updateNewInventoryVehicleSelectors(changed=''){
  const oldType=typeEl.value,oldMake=makeEl.value,oldModel=modelEl.value,oldClass=classEl.value,oldGeneration=generationEl.value;
  setOptions(typeEl,typeSets[family]||[],changed==='family'?'':oldType,'اختر نوع المركبة');
  const kind=family==='car'?'car':family==='truck'?'truck':family;
- const catalogMakes=Array.isArray(catalog.makes)?catalog.makes:[];let eligibleMakes=catalogMakes.filter(m=>(m.kinds||[]).includes(kind)||(m.kinds||[]).includes('van')||(m.kinds||[]).includes('bus'));if(!eligibleMakes.length&&family==='car')eligibleMakes=catalogMakes.filter(m=>(m.models||[]).length);const makes=(family==='car'||family==='truck')?eligibleMakes.map(m=>m.name):(staticMakes[family]||[]);
- setOptions(makeEl,makes,changed==='type'?'':oldMake,'اختر الشركة المصنعة');
- const make=catalogMakes.find(m=>String(m.name).toLowerCase()===String(makeEl.value).toLowerCase());
+ const catalogMakes=Array.isArray(catalog.makes)?catalog.makes:[];const normName=v=>String(v||'').toLowerCase().normalize('NFKD').replace(/[\\u0300-\\u036f]/g,'').replace(/[^a-z0-9]/g,'');const permittedKind=m=>(m.kinds||[]).includes(kind)||(m.kinds||[]).includes('van')||(m.kinds||[]).includes('bus');let eligibleMakes=catalogMakes.filter(permittedKind);if(!eligibleMakes.length&&family==='car')eligibleMakes=catalogMakes.filter(m=>(m.models||[]).length);const selectedManufacturer=document.getElementById('newInventoryManufacturer')?.value||'';const selectedCatalogMake=catalogMakes.find(m=>normName(m.name)===normName(selectedManufacturer));if(selectedCatalogMake&&!eligibleMakes.some(m=>normName(m.name)===normName(selectedCatalogMake.name)))eligibleMakes.push(selectedCatalogMake);const makes=(family==='car'||family==='truck')?eligibleMakes.map(m=>m.name):(staticMakes[family]||[]);
+ setOptions(makeEl,makes,changed==='type'?'':(oldMake||selectedManufacturer),'اختر الشركة المصنعة');makeEl.disabled=false;modelEl.disabled=false;generationEl.disabled=false;
+ const make=catalogMakes.find(m=>normName(m.name)===normName(makeEl.value))||selectedCatalogMake;
  let modelEntries=make?(make.models||[]).filter(m=>!m.kind||m.kind===kind||m.kind===family||m.kind==='van'||m.kind==='bus'):[];
  if(make&&!modelEntries.length)modelEntries=make.models||[];
  let models=modelEntries.map(m=>m.name);
