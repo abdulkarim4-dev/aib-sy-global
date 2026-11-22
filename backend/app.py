@@ -618,9 +618,14 @@ def me(u:User=Depends(current_user)): return {"id":u.id,"username":u.username,"n
 class AccountSettingsPayload(BaseModel):
     email: Optional[str] = None
     full_name: Optional[str] = None
+def validate_account_password(value:str):
+    if len(value)<8 or not re.search(r"[A-Z]",value) or not re.search(r"[a-z]",value) or not re.search(r"\\d",value) or not re.search(r"[^A-Za-z0-9]",value):
+        raise HTTPException(400,"كلمة المرور يجب أن تكون 8 خانات على الأقل وتتضمن حرفاً كبيراً وحرفاً صغيراً ورقماً ورمزاً.")
+    return value
+
 class PasswordChangePayload(BaseModel):
     current_password: str = Field(min_length=1, max_length=256)
-    new_password: str = Field(min_length=12, max_length=256)
+    new_password: str = Field(min_length=8, max_length=256)
 class EmailVerificationStartPayload(BaseModel):
     email: str = Field(min_length=5, max_length=254)
 class EmailVerificationConfirmPayload(BaseModel):
@@ -813,6 +818,7 @@ def confirm_email_verification(p:EmailVerificationConfirmPayload, request:Reques
     return {"ok":True,"email":u.email,"verified":True}
 @app.post("/auth/change-password")
 def change_owner_password(p:PasswordChangePayload, request:Request, s:Session=Depends(db), u:User=Depends(current_user)):
+    validate_account_password(p.new_password)
     if u.role != "owner":
         raise HTTPException(403,"تغيير كلمة المرور مباشرة متاح لحساب المالك فقط")
     if not password_hash.verify(p.current_password,u.password_hash):
@@ -827,6 +833,7 @@ def change_owner_password(p:PasswordChangePayload, request:Request, s:Session=De
 
 @app.post("/password-change-requests")
 def create_password_change_request(p:PasswordChangePayload, request:Request, s:Session=Depends(db), u:User=Depends(current_user)):
+    validate_account_password(p.new_password)
     if not password_hash.verify(p.current_password,u.password_hash): raise HTTPException(401,"كلمة المرور الحالية غير صحيحة")
     pending=s.scalar(select(PasswordChangeRequest).where(PasswordChangeRequest.user_id==u.id,PasswordChangeRequest.status=="pending"))
     if pending: raise HTTPException(409,"لديك طلب تغيير كلمة مرور قيد انتظار موافقة المالك")
@@ -871,7 +878,7 @@ class UserCreate(BaseModel):
     full_name:str=Field(min_length=2,max_length=160)
     email:str=Field(min_length=5,max_length=254)
     email_confirm:str|None=None
-    password:str=Field(min_length=12)
+    password:str=Field(min_length=8,max_length=256)
     role:str="employee"
     company_name:str=Field(default="",max_length=200)
     business_scopes:list[str]=Field(default_factory=list)
@@ -985,6 +992,7 @@ def list_users(s:Session=Depends(db), _:User=Depends(manager)):
     return [{"id":u.id,"username":u.username,"name":u.full_name,"email":u.email,"role":u.role,"active":u.active,"permissions":u.permissions or {},"company_name":u.company_name or "","business_scopes":u.business_scopes or [],"owner_commission_rate":float(u.owner_commission_rate if u.owner_commission_rate is not None else 1.5)} for u in s.scalars(select(User).where(User.deleted.is_(False))).all()]
 @app.post("/users")
 def add_user(payload:UserCreate, request:Request, s:Session=Depends(db), u:User=Depends(manager)):
+    validate_account_password(payload.password)
     if payload.role not in ("employee","owner"): raise HTTPException(400,"دور غير صالح")
     invalid_scopes={x for x in (payload.business_scopes or []) if x not in USER_BUSINESS_SCOPES and x not in manufacturer_scope_tokens()}
     if invalid_scopes: raise HTTPException(400,"يوجد مجال عمل غير معروف")
@@ -1071,10 +1079,11 @@ def update_user_permissions(user_id:int,p:UserPermissionsPayload,request:Request
     s.commit()
     return {"ok":True,"permissions":clean}
 class UserPasswordResetPayload(BaseModel):
-    password: str = Field(min_length=12, max_length=256)
+    password: str = Field(min_length=8, max_length=256)
 
 @app.patch("/users/{user_id}/password")
 def reset_user_password(user_id:int, p:UserPasswordResetPayload, request:Request, s:Session=Depends(db), u:User=Depends(manager)):
+    validate_account_password(p.password)
     target=s.get(User,user_id)
     if not target: raise HTTPException(404,"المستخدم غير موجود")
     if target.role=="owner": raise HTTPException(400,"لا يمكن إصدار بطاقة دخول لحساب المالك من هذه الصفحة")
