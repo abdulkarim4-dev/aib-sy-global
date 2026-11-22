@@ -626,6 +626,7 @@ def validate_account_password(value:str):
 class PasswordChangePayload(BaseModel):
     current_password: str = Field(min_length=1, max_length=256)
     new_password: str = Field(min_length=8, max_length=256)
+    verification_token: Optional[str] = None
 class EmailVerificationStartPayload(BaseModel):
     email: str = Field(min_length=5, max_length=254)
 class EmailVerificationConfirmPayload(BaseModel):
@@ -700,7 +701,7 @@ def send_verification_email(email:str, code:str):
 def operation_verification_required(u:User, action:str)->bool:
     if action in {"cash_movement","cash_transfer"}:
         return True
-    return u.role!="owner" and action in {"invoice_create","invoice_payment"}
+    return u.role!="owner" and action in {"invoice_create","invoice_payment","password_change"}
 
 def masked_email(email:str)->str:
     local,_,domain=email.partition("@")
@@ -715,12 +716,12 @@ class OperationVerificationConfirmPayload(BaseModel):
 
 @app.post("/operation-verifications/start")
 def start_operation_verification(p:OperationVerificationStartPayload,request:Request,s:Session=Depends(db),u:User=Depends(current_user)):
-    if p.action not in {"invoice_create","invoice_payment","cash_movement","cash_transfer"}:
+    if p.action not in {"invoice_create","invoice_payment","cash_movement","cash_transfer","password_change"}:
         raise HTTPException(400,"نوع العملية غير مدعوم للتحقق")
     if not operation_verification_required(u,p.action):
         return {"required":False}
     email=(u.email or "").strip().lower()
-    if not email or not u.email_verified:
+    if not email or (p.action != "password_change" and not u.email_verified):
         raise HTTPException(400,"يجب إضافة بريد إلكتروني موثق لحسابك قبل تنفيذ هذه العملية. راجع إعدادات الحساب.")
     now=datetime.now(timezone.utc)
     latest=s.scalar(select(OperationVerification).where(
@@ -834,14 +835,18 @@ def change_owner_password(p:PasswordChangePayload, request:Request, s:Session=De
 @app.post("/password-change-requests")
 def create_password_change_request(p:PasswordChangePayload, request:Request, s:Session=Depends(db), u:User=Depends(current_user)):
     validate_account_password(p.new_password)
-    if not password_hash.verify(p.current_password,u.password_hash): raise HTTPException(401,"كلمة المرور الحالية غير صحيحة")
-    pending=s.scalar(select(PasswordChangeRequest).where(PasswordChangeRequest.user_id==u.id,PasswordChangeRequest.status=="pending"))
-    if pending: raise HTTPException(409,"لديك طلب تغيير كلمة مرور قيد انتظار موافقة المالك")
-    row=PasswordChangeRequest(user_id=u.id,requested_by=u.id,new_password_hash=password_hash.hash(p.new_password))
-    s.add(row); s.flush()
-    audit(s,u,"password_change_requested","user",u.id,{"request_id":row.id},request)
+    if u.role == "owner":
+        raise HTTPException(400,"استخدم نموذج تغيير كلمة مرور المالك")
+    if not password_hash.verify(p.current_password,u.password_hash):
+        raise HTTPException(401,"كلمة المرور الحالية غير صحيحة")
+    consume_operation_verification(s,u,"password_change",p.verification_token)
+    u.password_hash=password_hash.hash(p.new_password)
+    u.failed_logins=0
+    u.locked_until=None
+    audit(s,u,"user_password_changed","user",u.id,{"method":"email_otp"},request)
     s.commit()
-    return {"id":row.id,"status":"pending"}
+    notify_account_change(u.email,"تم تغيير كلمة المرور بعد التحقق من رمز البريد الإلكتروني")
+    return {"ok":True,"status":"changed","message":"تم تغيير كلمة المرور بنجاح بعد تأكيد البريد الإلكتروني"}
 @app.get("/password-change-requests")
 def list_password_change_requests(s:Session=Depends(db), _:User=Depends(manager)):
     rows=s.scalars(select(PasswordChangeRequest).order_by(PasswordChangeRequest.id.desc()).limit(200)).all()
