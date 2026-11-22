@@ -1,0 +1,5261 @@
+{
+  "version": "2026.11.22",
+  "manufacturers": [
+    {
+      "name": "212",
+      "key": "212",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Abarth",
+      "key": "abarth",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Acremaster",
+      "key": "acremaster",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Acura",
+      "key": "acura",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Adler",
+      "key": "adler",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Ag King",
+      "key": "ag_king",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "AGCO",
+      "key": "agco",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "AGCO Allis",
+      "key": "agco_allis",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "AGCO lawn tractors",
+      "key": "agco_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "AgraCat",
+      "key": "agracat",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Agrale",
+      "key": "agrale",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Agri-Power",
+      "key": "agri_power",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Agria Hispania",
+      "key": "agria_hispania",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Agrico",
+      "key": "agrico",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Agrinar",
+      "key": "agrinar",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "AgTrac",
+      "key": "agtrac",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Ahorn",
+      "key": "ahorn",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Aion",
+      "key": "aion",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Airman",
+      "key": "airman",
+      "families": [
+        "heavy"
+      ]
+    },
+    {
+      "name": "Aiways",
+      "key": "aiways",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Aixam",
+      "key": "aixam",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Albach",
+      "key": "albach",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Alexander Dennis",
+      "key": "alexander-dennis",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Alfa Romeo",
+      "key": "alfa-romeo",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Allis Chalmers",
+      "key": "allis_chalmers",
+      "families": [
+        "agri",
+        "heavy"
+      ]
+    },
+    {
+      "name": "Allis Chalmers lawn tractors",
+      "key": "allis_chalmers_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Allmand",
+      "key": "allmand",
+      "families": [
+        "heavy"
+      ]
+    },
+    {
+      "name": "Alpina",
+      "key": "alpina",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Alpine",
+      "key": "alpine",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Alvis",
+      "key": "alvis",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Am General",
+      "key": "am-general",
+      "families": [
+        "car",
+        "truck"
+      ]
+    },
+    {
+      "name": "AMC",
+      "key": "amc",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "American",
+      "key": "american",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "AMF lawn tractors",
+      "key": "amf_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Amigo lawn tractors",
+      "key": "amigo_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Amphicar",
+      "key": "amphicar",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Antonio Carraro",
+      "key": "antonio_carraro",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Apollo",
+      "key": "apollo",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Arcfox",
+      "key": "arcfox",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Arctic Enterprises lawn tractors",
+      "key": "arctic_enterprises_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Ariel",
+      "key": "ariel",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Ariens lawn tractors",
+      "key": "ariens_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "ArmaTrac",
+      "key": "armatrac",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Armstrong Siddeley",
+      "key": "armstrong-siddeley",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Ascot Universal",
+      "key": "ascot_universal",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Asia",
+      "key": "asia",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Aston Martin",
+      "key": "aston-martin",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "ATC",
+      "key": "atc",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Auburn",
+      "key": "auburn",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Audi",
+      "key": "audi",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Audi/Porsche",
+      "key": "audi-porsche",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Aultman & Taylor",
+      "key": "aultman_taylor",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Austin",
+      "key": "austin",
+      "families": [
+        "car",
+        "truck"
+      ]
+    },
+    {
+      "name": "Austin-Healey",
+      "key": "austin-healey",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Austin-Morris",
+      "key": "austin-morris",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Auto Union",
+      "key": "auto-union",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Avatr",
+      "key": "avatr",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Avery",
+      "key": "avery",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "B.F. Avery",
+      "key": "b_f_avery",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Bad Boy",
+      "key": "bad_boy",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "BAIC",
+      "key": "baic",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Baldwin",
+      "key": "baldwin",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Barkas",
+      "key": "barkas",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Barreiros",
+      "key": "barreiros",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Beauford",
+      "key": "beauford",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Bedford",
+      "key": "bedford",
+      "families": [
+        "car",
+        "truck"
+      ]
+    },
+    {
+      "name": "Belarus",
+      "key": "belarus",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Bell",
+      "key": "bell",
+      "families": [
+        "heavy"
+      ]
+    },
+    {
+      "name": "Bentley",
+      "key": "bentley",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Benye",
+      "key": "benye",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Berkeley",
+      "key": "berkeley",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Bertone",
+      "key": "bertone",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Best",
+      "key": "best",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Bestune",
+      "key": "bestune",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Big Bud",
+      "key": "big_bud",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Bima",
+      "key": "bima",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Binz",
+      "key": "binz",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Blucamp",
+      "key": "blucamp",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "BMC",
+      "key": "bmc",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "BMW",
+      "key": "bmw",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Bmw Alpina",
+      "key": "bmw-alpina",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Bobcat",
+      "key": "bobcat",
+      "families": [
+        "agri",
+        "heavy"
+      ]
+    },
+    {
+      "name": "Bobcat lawn tractors",
+      "key": "bobcat_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Bolens",
+      "key": "bolens",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Bolens lawn tractors",
+      "key": "bolens_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Bolinder-Munktell",
+      "key": "bolinder_munktell",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Bombardier",
+      "key": "bombardier",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Bond",
+      "key": "bond",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Borgward",
+      "key": "borgward",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Branson",
+      "key": "branson",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Bravia",
+      "key": "bravia",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Bricklin",
+      "key": "bricklin",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Bristol",
+      "key": "bristol",
+      "families": [
+        "car",
+        "agri"
+      ]
+    },
+    {
+      "name": "Brockway",
+      "key": "brockway",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Bucher",
+      "key": "bucher",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Bugatti",
+      "key": "bugatti",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Buhler Versatile",
+      "key": "buhler_versatile",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Buick",
+      "key": "buick",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Bukh",
+      "key": "bukh",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Burns lawn tractors",
+      "key": "burns_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Bush Hog lawn tractors",
+      "key": "bush_hog_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "BYD",
+      "key": "byd",
+      "families": [
+        "car",
+        "truck"
+      ]
+    },
+    {
+      "name": "C.O.D. Tractor Company",
+      "key": "c_o_d_tractor_company",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Cabelas",
+      "key": "cabelas",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Cadillac",
+      "key": "cadillac",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Cameco",
+      "key": "cameco",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Campereve",
+      "key": "campereve",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Captain",
+      "key": "captain",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Carado",
+      "key": "carado",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Carbodies",
+      "key": "carbodies",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Carraro",
+      "key": "carraro",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Case",
+      "key": "case",
+      "families": [
+        "agri",
+        "heavy"
+      ]
+    },
+    {
+      "name": "CaseIH",
+      "key": "caseih",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Caterham",
+      "key": "caterham",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Caterpillar",
+      "key": "caterpillar",
+      "families": [
+        "truck",
+        "agri",
+        "heavy"
+      ]
+    },
+    {
+      "name": "CBT",
+      "key": "cbt",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Centaur",
+      "key": "centaur",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Century",
+      "key": "century",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Challenger",
+      "key": "challenger",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Chamberlain",
+      "key": "chamberlain",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Chamonix",
+      "key": "chamonix",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Changan",
+      "key": "changan",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Checker",
+      "key": "checker",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Chery",
+      "key": "chery",
+      "families": [
+        "car",
+        "agri"
+      ]
+    },
+    {
+      "name": "Chevrolet",
+      "key": "chevrolet",
+      "families": [
+        "car",
+        "truck"
+      ]
+    },
+    {
+      "name": "Chevrolet GMC",
+      "key": "chevrolet-gmc",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Chrysler",
+      "key": "chrysler",
+      "families": [
+        "car",
+        "truck"
+      ]
+    },
+    {
+      "name": "Citroën",
+      "key": "citroen",
+      "families": [
+        "car",
+        "truck"
+      ]
+    },
+    {
+      "name": "Citroen-DS",
+      "key": "citroen-ds",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Claas",
+      "key": "claas",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Cletrac",
+      "key": "cletrac",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "CO-OP",
+      "key": "co_op",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Cockshutt",
+      "key": "cockshutt",
+      "families": [
+        "agri",
+        "heavy"
+      ]
+    },
+    {
+      "name": "Coleman",
+      "key": "coleman",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Colt lawn tractors",
+      "key": "colt_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Commer",
+      "key": "commer",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Continental",
+      "key": "continental",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Corbitt",
+      "key": "corbitt",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "County",
+      "key": "county",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Craftsman lawn tractors",
+      "key": "craftsman_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Craftsman Professional lawn tractors",
+      "key": "craftsman_professional_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Crosscamp",
+      "key": "crosscamp",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Cub Cadet",
+      "key": "cub_cadet",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Cub Cadet lawn tractors",
+      "key": "cub_cadet_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Cupra",
+      "key": "cupra",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Custom",
+      "key": "custom",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Dacia",
+      "key": "dacia",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Daedong",
+      "key": "daedong",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Daewoo",
+      "key": "daewoo",
+      "families": [
+        "car",
+        "heavy"
+      ]
+    },
+    {
+      "name": "DAF",
+      "key": "daf",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Daihatsu",
+      "key": "daihatsu",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Daimler",
+      "key": "daimler",
+      "families": [
+        "car",
+        "truck"
+      ]
+    },
+    {
+      "name": "Daimler Benz",
+      "key": "daimler-benz",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Daimlerchrysler",
+      "key": "daimlerchrysler",
+      "families": [
+        "car",
+        "truck"
+      ]
+    },
+    {
+      "name": "Datsun",
+      "key": "datsun",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "David Brown",
+      "key": "david_brown",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "De Lorean",
+      "key": "de-lorean",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "De Soto",
+      "key": "de-soto",
+      "families": [
+        "car",
+        "truck"
+      ]
+    },
+    {
+      "name": "De Tomaso",
+      "key": "de-tomaso",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Deepal",
+      "key": "deepal",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Deere",
+      "key": "deere",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Delage",
+      "key": "delage",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Demag",
+      "key": "demag",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Denning",
+      "key": "denning",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Dennis Eagle",
+      "key": "dennis-eagle",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Denza",
+      "key": "denza",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Deutz",
+      "key": "deutz",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Deutz-Allis",
+      "key": "deutz_allis",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Deutz-Allis lawn tractors",
+      "key": "deutz_allis_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Deutz-Fahr",
+      "key": "deutz_fahr",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "DFSK",
+      "key": "dfsk",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Dodge",
+      "key": "dodge",
+      "families": [
+        "car",
+        "truck"
+      ]
+    },
+    {
+      "name": "Dodge Brothers",
+      "key": "dodge-brothers",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Dongfeng",
+      "key": "dongfeng",
+      "families": [
+        "car",
+        "agri"
+      ]
+    },
+    {
+      "name": "Donkervoort",
+      "key": "donkervoort",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Doosan",
+      "key": "doosan",
+      "families": [
+        "heavy"
+      ]
+    },
+    {
+      "name": "DR",
+      "key": "dr",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "DS",
+      "key": "ds",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Dutra",
+      "key": "dutra",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "E.go",
+      "key": "e-go",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Eagle",
+      "key": "eagle",
+      "families": [
+        "car",
+        "agri"
+      ]
+    },
+    {
+      "name": "Eagle Manufacturing",
+      "key": "eagle_manufacturing",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "EarthForce",
+      "key": "earthforce",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Earthmaster",
+      "key": "earthmaster",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "East Wind",
+      "key": "east_wind",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Ebro",
+      "key": "ebro",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "EBRO",
+      "key": "ebro",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Economy lawn tractors",
+      "key": "economy_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Eder Gmbh",
+      "key": "eder-gmbh",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Edsel",
+      "key": "edsel",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Eicher",
+      "key": "eicher",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Empire",
+      "key": "empire",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Erf",
+      "key": "erf",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Eriba",
+      "key": "eriba",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Erkunt",
+      "key": "erkunt",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Escorts",
+      "key": "escorts",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Essex",
+      "key": "essex",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Esterel",
+      "key": "esterel",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Etalmobil",
+      "key": "etalmobil",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Eunos",
+      "key": "eunos",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Evo",
+      "key": "evo",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Excalibur",
+      "key": "excalibur",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Fahr",
+      "key": "fahr",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Farm Pro",
+      "key": "farm_pro",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Farmall",
+      "key": "farmall",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Farmhand lawn tractors",
+      "key": "farmhand_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Farmtrac",
+      "key": "farmtrac",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Fate-Root-Heath",
+      "key": "fate_root_heath",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Faun",
+      "key": "faun",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Faun Umwelttechnik",
+      "key": "faun-umwelttechnik",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "FAW",
+      "key": "faw",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Fendt",
+      "key": "fendt",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Ferguson",
+      "key": "ferguson",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Ferrari",
+      "key": "ferrari",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Fiat",
+      "key": "fiat",
+      "families": [
+        "car",
+        "truck",
+        "agri",
+        "heavy"
+      ]
+    },
+    {
+      "name": "Fiat Allis",
+      "key": "fiat-allis",
+      "families": [
+        "heavy"
+      ]
+    },
+    {
+      "name": "Fiat-Hesston",
+      "key": "fiat_hesston",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Fiat-Hitachi",
+      "key": "fiat-hitachi",
+      "families": [
+        "heavy"
+      ]
+    },
+    {
+      "name": "Fisker",
+      "key": "fisker",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Fleetwood",
+      "key": "fleetwood",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Foden",
+      "key": "foden",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Font Vendome",
+      "key": "font-vendome",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Force Motors",
+      "key": "force_motors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Ford",
+      "key": "ford",
+      "families": [
+        "car",
+        "truck",
+        "agri",
+        "heavy"
+      ]
+    },
+    {
+      "name": "Ford lawn tractors",
+      "key": "ford_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Ford-New Holland",
+      "key": "ford_new_holland",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Fordson",
+      "key": "fordson",
+      "families": [
+        "truck",
+        "agri"
+      ]
+    },
+    {
+      "name": "Forthing",
+      "key": "forthing",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Fortschritt",
+      "key": "fortschritt",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Foton",
+      "key": "foton",
+      "families": [
+        "truck",
+        "agri",
+        "heavy"
+      ]
+    },
+    {
+      "name": "Fox River Tractor Company",
+      "key": "fox_river_tractor_company",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Freightliner",
+      "key": "freightliner",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Friday",
+      "key": "friday",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Fsm",
+      "key": "fsm",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "FSO",
+      "key": "fso",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "GAC",
+      "key": "gac",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Galloway",
+      "key": "galloway",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "GAZ",
+      "key": "gaz",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "GBT",
+      "key": "gbt",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Geely",
+      "key": "geely",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Gehl",
+      "key": "gehl",
+      "families": [
+        "heavy"
+      ]
+    },
+    {
+      "name": "General Electric lawn tractors",
+      "key": "general_electric_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "General Ordnance",
+      "key": "general_ordnance",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Genesis",
+      "key": "genesis",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Geo",
+      "key": "geo",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Gibson",
+      "key": "gibson",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Gilson lawn tractors",
+      "key": "gilson_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Ginaf",
+      "key": "ginaf",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Ginetta",
+      "key": "ginetta",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "GMC",
+      "key": "gmc",
+      "families": [
+        "car",
+        "truck"
+      ]
+    },
+    {
+      "name": "Goggomobil",
+      "key": "goggomobil",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Goliath",
+      "key": "goliath",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Graham",
+      "key": "graham",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Graham-Bradley",
+      "key": "graham_bradley",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Gravely lawn tractors",
+      "key": "gravely_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Gray Tractor",
+      "key": "gray_tractor",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Great Wall",
+      "key": "great-wall",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Grove",
+      "key": "grove",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Gutbrod lawn tractors",
+      "key": "gutbrod_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Haas",
+      "key": "haas",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Halla",
+      "key": "halla",
+      "families": [
+        "heavy"
+      ]
+    },
+    {
+      "name": "Haller Benelux",
+      "key": "haller-benelux",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Hanomag",
+      "key": "hanomag",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Happy Farmer",
+      "key": "happy_farmer",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Hart-Parr",
+      "key": "hart_parr",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Hartge",
+      "key": "hartge",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Haval",
+      "key": "haval",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Hefty",
+      "key": "hefty",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Heider",
+      "key": "heider",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Hesston",
+      "key": "hesston",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Hesston lawn tractors",
+      "key": "hesston_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Hidromek",
+      "key": "hidromek",
+      "families": [
+        "heavy"
+      ]
+    },
+    {
+      "name": "Hiller lawn tractors",
+      "key": "hiller_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Hillman",
+      "key": "hillman",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Hino",
+      "key": "hino",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Hinomoto",
+      "key": "hinomoto",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Hiphi",
+      "key": "hiphi",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Hitachi",
+      "key": "hitachi",
+      "families": [
+        "agri",
+        "heavy"
+      ]
+    },
+    {
+      "name": "Holden",
+      "key": "holden",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Holder",
+      "key": "holder",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Holt",
+      "key": "holt",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Homelite lawn tractors",
+      "key": "homelite_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Honda",
+      "key": "honda",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Honda lawn tractors",
+      "key": "honda_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Hongqi",
+      "key": "hongqi",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Hotchkiss",
+      "key": "hotchkiss",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "HSV",
+      "key": "hsv",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Huber",
+      "key": "huber",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Hudson",
+      "key": "hudson",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Huffy lawn tractors",
+      "key": "huffy_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Humber",
+      "key": "humber",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Hummer",
+      "key": "hummer",
+      "families": [
+        "car",
+        "truck"
+      ]
+    },
+    {
+      "name": "Hupmobile",
+      "key": "hupmobile",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Hurlimann",
+      "key": "hurlimann",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Husqvarna lawn tractors",
+      "key": "husqvarna_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Hydrema",
+      "key": "hydrema",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Hymac",
+      "key": "hymac",
+      "families": [
+        "heavy"
+      ]
+    },
+    {
+      "name": "Hyundai",
+      "key": "hyundai",
+      "families": [
+        "car",
+        "truck",
+        "heavy"
+      ]
+    },
+    {
+      "name": "IHI",
+      "key": "ihi",
+      "families": [
+        "heavy"
+      ]
+    },
+    {
+      "name": "Iic",
+      "key": "iic",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Ikco",
+      "key": "ikco",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Imperial",
+      "key": "imperial",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "IMR Rakovica",
+      "key": "imr_rakovica",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "IMT",
+      "key": "imt",
+      "families": [
+        "agri",
+        "heavy"
+      ]
+    },
+    {
+      "name": "INEOS",
+      "key": "ineos",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Infiniti",
+      "key": "infiniti",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Ingersoll lawn tractors",
+      "key": "ingersoll_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Ingersoll Rand",
+      "key": "ingersoll_rand",
+      "families": [
+        "agri",
+        "heavy"
+      ]
+    },
+    {
+      "name": "Innocenti",
+      "key": "innocenti",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "International",
+      "key": "international",
+      "families": [
+        "car",
+        "truck"
+      ]
+    },
+    {
+      "name": "International Harvester",
+      "key": "international_harvester",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Interstate Tractor",
+      "key": "interstate_tractor",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Iseki",
+      "key": "iseki",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Iseki lawn tractors",
+      "key": "iseki_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Iso",
+      "key": "iso",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Iso Rivolta",
+      "key": "iso-rivolta",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Isuzu",
+      "key": "isuzu",
+      "families": [
+        "car",
+        "truck"
+      ]
+    },
+    {
+      "name": "Iveco",
+      "key": "iveco",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Ivel Agricultural Motors",
+      "key": "ivel_agricultural_motors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "IZh",
+      "key": "izh",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "J.I. Case",
+      "key": "j_i_case",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "J.I. Case lawn tractors",
+      "key": "j_i_case_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "JAC",
+      "key": "jac",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Jackson",
+      "key": "jackson",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Jacobsen",
+      "key": "jacobsen",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Jacobsen lawn tractors",
+      "key": "jacobsen_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Jaecoo",
+      "key": "jaecoo",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Jaguar",
+      "key": "jaguar",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "JCB",
+      "key": "jcb",
+      "families": [
+        "truck",
+        "agri",
+        "heavy"
+      ]
+    },
+    {
+      "name": "Jeep",
+      "key": "jeep",
+      "families": [
+        "car",
+        "agri"
+      ]
+    },
+    {
+      "name": "Jensen",
+      "key": "jensen",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Jetour",
+      "key": "jetour",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Jinma",
+      "key": "jinma",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Jmev",
+      "key": "jmev",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Joa Camp",
+      "key": "joa-camp",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "John Deere",
+      "key": "john_deere",
+      "families": [
+        "agri",
+        "heavy"
+      ]
+    },
+    {
+      "name": "John Deere lawn tractors",
+      "key": "john_deere_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Johnson Manufacturing",
+      "key": "johnson_manufacturing",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Julia Camper",
+      "key": "julia-camper",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Kaiser",
+      "key": "kaiser",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Kaiyi",
+      "key": "kaiyi",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "KAMCO",
+      "key": "kamco",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Karma",
+      "key": "karma",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Kat",
+      "key": "kat",
+      "families": [
+        "heavy"
+      ]
+    },
+    {
+      "name": "Kato",
+      "key": "kato",
+      "families": [
+        "heavy"
+      ]
+    },
+    {
+      "name": "Keck-Gonnerman",
+      "key": "keck_gonnerman",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Kenworth",
+      "key": "kenworth",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "KGM",
+      "key": "kgm",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Kia",
+      "key": "kia",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Kia Motors",
+      "key": "kia-motors",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Kioti",
+      "key": "kioti",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Kirovets",
+      "key": "kirovets",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Knudson",
+      "key": "knudson",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Kobelco",
+      "key": "kobelco",
+      "families": [
+        "heavy"
+      ]
+    },
+    {
+      "name": "Komatsu",
+      "key": "komatsu",
+      "families": [
+        "agri",
+        "heavy"
+      ]
+    },
+    {
+      "name": "Krismar",
+      "key": "krismar",
+      "families": [
+        "car",
+        "truck"
+      ]
+    },
+    {
+      "name": "KTM",
+      "key": "ktm",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Kubota",
+      "key": "kubota",
+      "families": [
+        "agri",
+        "heavy"
+      ]
+    },
+    {
+      "name": "Kubota lawn tractors",
+      "key": "kubota_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Lada",
+      "key": "lada",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Lagonda",
+      "key": "lagonda",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Lamar",
+      "key": "lamar",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Lamborghini",
+      "key": "lamborghini",
+      "families": [
+        "car",
+        "agri"
+      ]
+    },
+    {
+      "name": "Lanchester",
+      "key": "lanchester",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Lancia",
+      "key": "lancia",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Land Rover",
+      "key": "land-rover",
+      "families": [
+        "car",
+        "truck"
+      ]
+    },
+    {
+      "name": "Landini",
+      "key": "landini",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Landwind",
+      "key": "landwind",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Lanz",
+      "key": "lanz",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Lawn Chief lawn tractors",
+      "key": "lawn_chief_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Lawn Rovr lawn tractors",
+      "key": "lawn_rovr_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Lawn-Boy lawn tractors",
+      "key": "lawn_boy_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "LDV",
+      "key": "ldv",
+      "families": [
+        "car",
+        "truck"
+      ]
+    },
+    {
+      "name": "Le Roi",
+      "key": "le_roi",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Le Voyageur",
+      "key": "le-voyageur",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Leader",
+      "key": "leader",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Leapmotor",
+      "key": "leapmotor",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Lenar",
+      "key": "lenar",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Lennox lawn tractors",
+      "key": "lennox_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Lepas",
+      "key": "lepas",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "LEVC",
+      "key": "levc",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Levitt lawn tractors",
+      "key": "levitt_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Lexus",
+      "key": "lexus",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Leyland",
+      "key": "leyland",
+      "families": [
+        "car",
+        "truck",
+        "agri",
+        "heavy"
+      ]
+    },
+    {
+      "name": "Leyland Cars",
+      "key": "leyland-cars",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Leyland Daf",
+      "key": "leyland-daf",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Liebherr",
+      "key": "liebherr",
+      "families": [
+        "truck",
+        "heavy"
+      ]
+    },
+    {
+      "name": "Limb",
+      "key": "limb",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Lincoln",
+      "key": "lincoln",
+      "families": [
+        "car",
+        "truck"
+      ]
+    },
+    {
+      "name": "Lindner",
+      "key": "lindner",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Link-Belt",
+      "key": "link-belt",
+      "families": [
+        "heavy"
+      ]
+    },
+    {
+      "name": "LiuGong",
+      "key": "liugong",
+      "families": [
+        "heavy"
+      ]
+    },
+    {
+      "name": "Livan",
+      "key": "livan",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Lixiang",
+      "key": "lixiang",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Lloyd",
+      "key": "lloyd",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Long",
+      "key": "long",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Lotus",
+      "key": "lotus",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "LS",
+      "key": "ls",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Luaz",
+      "key": "luaz",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Lucid",
+      "key": "lucid",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Lynk & Co",
+      "key": "lynk-co",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "M-R-S",
+      "key": "m_r_s",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Mack",
+      "key": "mack",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Magirus-Deutz",
+      "key": "magirus-deutz",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Mahindra",
+      "key": "mahindra",
+      "families": [
+        "car",
+        "agri"
+      ]
+    },
+    {
+      "name": "Mahindra Gujarat",
+      "key": "mahindra_gujarat",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "MAN",
+      "key": "man",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Marlin",
+      "key": "marlin",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Marshall",
+      "key": "marshall",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Maserati",
+      "key": "maserati",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Massey Ferguson",
+      "key": "massey_ferguson",
+      "families": [
+        "agri",
+        "heavy"
+      ]
+    },
+    {
+      "name": "Massey Ferguson lawn tractors",
+      "key": "massey_ferguson_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Massey-Harris",
+      "key": "massey_harris",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Matra",
+      "key": "matra",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Maxus",
+      "key": "maxus",
+      "families": [
+        "car",
+        "truck"
+      ]
+    },
+    {
+      "name": "Maybach",
+      "key": "maybach",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Mayrath lawn tractors",
+      "key": "mayrath_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Mazda",
+      "key": "mazda",
+      "families": [
+        "car",
+        "truck"
+      ]
+    },
+    {
+      "name": "Mcc",
+      "key": "mcc",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "McConnell-Marc",
+      "key": "mcconnell_marc",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "McCormick Intl",
+      "key": "mccormick_intl",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "McCormick-Deering",
+      "key": "mccormick_deering",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "McCulloch",
+      "key": "mcculloch",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "McKee",
+      "key": "mckee",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "McLaren",
+      "key": "mclaren",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Mecalac",
+      "key": "mecalac",
+      "families": [
+        "truck",
+        "heavy"
+      ]
+    },
+    {
+      "name": "Memo",
+      "key": "memo",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Mercedes-Benz",
+      "key": "mercedes-benz",
+      "families": [
+        "car",
+        "truck",
+        "agri"
+      ]
+    },
+    {
+      "name": "Mercury",
+      "key": "mercury",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Merkur",
+      "key": "merkur",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Merlin",
+      "key": "merlin",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "MG",
+      "key": "mg",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Mgxpower",
+      "key": "mgxpower",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Michigan",
+      "key": "michigan",
+      "families": [
+        "heavy"
+      ]
+    },
+    {
+      "name": "Micro Compact Car",
+      "key": "micro-compact-car",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Midland Company lawn tractors",
+      "key": "midland_company_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Minerva",
+      "key": "minerva",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Mini",
+      "key": "mini",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Minneapolis",
+      "key": "minneapolis",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Minneapolis-Moline",
+      "key": "minneapolis_moline",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Minneapolis-Moline lawn tractors",
+      "key": "minneapolis_moline_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Minot",
+      "key": "minot",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Mitsubishi",
+      "key": "mitsubishi",
+      "families": [
+        "car",
+        "truck",
+        "agri"
+      ]
+    },
+    {
+      "name": "Mitsubishi Fuso",
+      "key": "mitsubishi-fuso",
+      "families": [
+        "car",
+        "truck"
+      ]
+    },
+    {
+      "name": "Mitsuoka",
+      "key": "mitsuoka",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Montana",
+      "key": "montana",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Montana lawn tractors",
+      "key": "montana_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Montgomery Ward",
+      "key": "montgomery_ward",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Montgomery Ward lawn tractors",
+      "key": "montgomery_ward_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Monza",
+      "key": "monza",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Morgan",
+      "key": "morgan",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Morris",
+      "key": "morris",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Moskvich",
+      "key": "moskvich",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "MTD lawn tractors",
+      "key": "mtd_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Muir-Hill",
+      "key": "muir_hill",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Müller",
+      "key": "m_ller",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Multicar",
+      "key": "multicar",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Murray lawn tractors",
+      "key": "murray_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Mustang",
+      "key": "mustang",
+      "families": [
+        "heavy"
+      ]
+    },
+    {
+      "name": "Nash",
+      "key": "nash",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Neta",
+      "key": "neta",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "New Holland",
+      "key": "new_holland",
+      "families": [
+        "agri",
+        "heavy"
+      ]
+    },
+    {
+      "name": "New Holland lawn tractors",
+      "key": "new_holland_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "New Idea lawn tractors",
+      "key": "new_idea_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Nichols-Shepard",
+      "key": "nichols_shepard",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Nilsson",
+      "key": "nilsson",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Nio",
+      "key": "nio",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Nissan",
+      "key": "nissan",
+      "families": [
+        "car",
+        "truck"
+      ]
+    },
+    {
+      "name": "Nobel Art",
+      "key": "nobel-art",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "NorTrac",
+      "key": "nortrac",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Notin",
+      "key": "notin",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "NSU",
+      "key": "nsu",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Nuffield",
+      "key": "nuffield",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Oakland",
+      "key": "oakland",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Oldsmobile",
+      "key": "oldsmobile",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Oliver",
+      "key": "oliver",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Oliver lawn tractors",
+      "key": "oliver_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Omoda",
+      "key": "omoda",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Opel",
+      "key": "opel",
+      "families": [
+        "car",
+        "truck"
+      ]
+    },
+    {
+      "name": "Ora",
+      "key": "ora",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "P & H",
+      "key": "p-h",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Packard",
+      "key": "packard",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Pagani",
+      "key": "pagani",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Page lawn tractors",
+      "key": "page_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Panama",
+      "key": "panama",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Panhard",
+      "key": "panhard",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Panther",
+      "key": "panther",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Panzer lawn tractors",
+      "key": "panzer_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Parrett",
+      "key": "parrett",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Pasquali",
+      "key": "pasquali",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Pegaso",
+      "key": "pegaso",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Pel-Job",
+      "key": "pel-job",
+      "families": [
+        "heavy"
+      ]
+    },
+    {
+      "name": "Pennsylvania lawn tractors",
+      "key": "pennsylvania_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Perodua",
+      "key": "perodua",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Peterbilt",
+      "key": "peterbilt",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Peugeot",
+      "key": "peugeot",
+      "families": [
+        "car",
+        "truck"
+      ]
+    },
+    {
+      "name": "PGO",
+      "key": "pgo",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Piaggio",
+      "key": "piaggio",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Pininfarina",
+      "key": "pininfarina",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Pioneer Tractor",
+      "key": "pioneer_tractor",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Plymouth",
+      "key": "plymouth",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Polaris",
+      "key": "polaris",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Polestar",
+      "key": "polestar",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Poloron lawn tractors",
+      "key": "poloron_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Polski Fiat",
+      "key": "polski-fiat",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Pontiac",
+      "key": "pontiac",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Porsche",
+      "key": "porsche",
+      "families": [
+        "car",
+        "agri"
+      ]
+    },
+    {
+      "name": "Poulan lawn tractors",
+      "key": "poulan_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Power King lawn tractors",
+      "key": "power_king_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Power-Flex lawn tractors",
+      "key": "power_flex_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Praga",
+      "key": "praga",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Prince",
+      "key": "prince",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Princess",
+      "key": "princess",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Proton",
+      "key": "proton",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Puch",
+      "key": "puch",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Raba",
+      "key": "raba",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Ram",
+      "key": "ram",
+      "families": [
+        "car",
+        "truck"
+      ]
+    },
+    {
+      "name": "Rambler",
+      "key": "rambler",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Ranch Hand",
+      "key": "ranch_hand",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Ransomes",
+      "key": "ransomes",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Raven lawn tractors",
+      "key": "raven_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Ravon",
+      "key": "ravon",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "RedMax lawn tractors",
+      "key": "redmax_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Reliant",
+      "key": "reliant",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Renault",
+      "key": "renault",
+      "families": [
+        "car",
+        "truck",
+        "agri"
+      ]
+    },
+    {
+      "name": "Reo",
+      "key": "reo",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "REO lawn tractors",
+      "key": "reo_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Reva",
+      "key": "reva",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Rhino",
+      "key": "rhino",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Riley",
+      "key": "riley",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Rivian",
+      "key": "rivian",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "RK Tractors",
+      "key": "rk_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Rock Island",
+      "key": "rock_island",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Rolls-Royce",
+      "key": "rolls-royce",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Rome",
+      "key": "rome",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Roper lawn tractors",
+      "key": "roper_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Rover",
+      "key": "rover",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Rugg lawn tractors",
+      "key": "rugg_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Rumely",
+      "key": "rumely",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Saab",
+      "key": "saab",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Sabre lawn tractors",
+      "key": "sabre_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Sachsenring",
+      "key": "sachsenring",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "SAME",
+      "key": "same",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Samson",
+      "key": "samson",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Samsung",
+      "key": "samsung",
+      "families": [
+        "heavy"
+      ]
+    },
+    {
+      "name": "Sany",
+      "key": "sany",
+      "families": [
+        "truck",
+        "heavy"
+      ]
+    },
+    {
+      "name": "Satoh",
+      "key": "satoh",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Saturn",
+      "key": "saturn",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Saukville",
+      "key": "saukville",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Saunderson",
+      "key": "saunderson",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Saurer",
+      "key": "saurer",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Saxas",
+      "key": "saxas",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Scania",
+      "key": "scania",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Scania-Vabis",
+      "key": "scania-vabis",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Schilter",
+      "key": "schilter",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Schluter",
+      "key": "schluter",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Schmidt",
+      "key": "schmidt",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Schramm",
+      "key": "schramm",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Schwing",
+      "key": "schwing",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Scion",
+      "key": "scion",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Scotts lawn tractors",
+      "key": "scotts_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Sears",
+      "key": "sears",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Sears lawn tractors",
+      "key": "sears_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "SEAT",
+      "key": "seat",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Setra",
+      "key": "setra",
+      "families": [
+        "car",
+        "truck"
+      ]
+    },
+    {
+      "name": "Shaktimaan",
+      "key": "shaktimaan",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Shelby",
+      "key": "shelby",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Sheppard Diesel",
+      "key": "sheppard_diesel",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Shibaura",
+      "key": "shibaura",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Shibaura lawn tractors",
+      "key": "shibaura_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Shineray",
+      "key": "shineray",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Silver King",
+      "key": "silver_king",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Simca",
+      "key": "simca",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Simplicity",
+      "key": "simplicity",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Simplicity lawn tractors",
+      "key": "simplicity_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Simpson Jumbo",
+      "key": "simpson_jumbo",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Singer",
+      "key": "singer",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Sinotruk",
+      "key": "sinotruk",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Siromer",
+      "key": "siromer",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Sisu",
+      "key": "sisu",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Škoda",
+      "key": "skoda",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Skoda-LIAZ",
+      "key": "skoda_liaz",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Skywell",
+      "key": "skywell",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Skyworth",
+      "key": "skyworth",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Smart",
+      "key": "smart",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Snapper lawn tractors",
+      "key": "snapper_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Solis",
+      "key": "solis",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "SOMECA",
+      "key": "someca",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Sonalika",
+      "key": "sonalika",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Spartan",
+      "key": "spartan",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Spier",
+      "key": "spier",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Spierings",
+      "key": "spierings",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Springfield lawn tractors",
+      "key": "springfield_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Spyker",
+      "key": "spyker",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Square Turn",
+      "key": "square_turn",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Srt",
+      "key": "srt",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "SsangYong",
+      "key": "ssangyong",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Standard",
+      "key": "standard",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Stanley lawn tractors",
+      "key": "stanley_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Steiger",
+      "key": "steiger",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Steiner lawn tractors",
+      "key": "steiner_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Sterling",
+      "key": "sterling",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Steyr",
+      "key": "steyr",
+      "families": [
+        "truck",
+        "agri"
+      ]
+    },
+    {
+      "name": "Steyr-Puch",
+      "key": "steyr-puch",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Stihl",
+      "key": "stihl",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Stuart Taylor",
+      "key": "stuart-taylor",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Studebaker",
+      "key": "studebaker",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Stutz",
+      "key": "stutz",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Stx",
+      "key": "stx",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Subaru",
+      "key": "subaru",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Sumitomo",
+      "key": "sumitomo",
+      "families": [
+        "heavy"
+      ]
+    },
+    {
+      "name": "Summit Tractors",
+      "key": "summit_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Sunbeam",
+      "key": "sunbeam",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Sunward",
+      "key": "sunward",
+      "families": [
+        "heavy"
+      ]
+    },
+    {
+      "name": "Superior",
+      "key": "superior",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Suzue",
+      "key": "suzue",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Suzuki",
+      "key": "suzuki",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Swallow",
+      "key": "swallow",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Swaraj",
+      "key": "swaraj",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "SWM",
+      "key": "swm",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Sylva",
+      "key": "sylva",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Tadano",
+      "key": "tadano",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Tadano Faun",
+      "key": "tadano-faun",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "TAFE",
+      "key": "tafe",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Taishan-America",
+      "key": "taishan_america",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Takeuchi",
+      "key": "takeuchi",
+      "families": [
+        "heavy"
+      ]
+    },
+    {
+      "name": "Talbot",
+      "key": "talbot",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Tank",
+      "key": "tank",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Tata",
+      "key": "tata",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Tata Hitachi",
+      "key": "tata-hitachi",
+      "families": [
+        "heavy"
+      ]
+    },
+    {
+      "name": "Tatra",
+      "key": "tatra",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Tec",
+      "key": "tec",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Terberg",
+      "key": "terberg",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Terex",
+      "key": "terex",
+      "families": [
+        "truck",
+        "heavy"
+      ]
+    },
+    {
+      "name": "Terraplane",
+      "key": "terraplane",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Terrion",
+      "key": "terrion",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Tesla",
+      "key": "tesla",
+      "families": [
+        "car",
+        "truck"
+      ]
+    },
+    {
+      "name": "Thieman Harvester",
+      "key": "thieman_harvester",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Think",
+      "key": "think",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Thomas",
+      "key": "thomas",
+      "families": [
+        "heavy"
+      ]
+    },
+    {
+      "name": "Thwaites",
+      "key": "thwaites",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Tiger",
+      "key": "tiger",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Tigercat",
+      "key": "tigercat",
+      "families": [
+        "heavy"
+      ]
+    },
+    {
+      "name": "Togg",
+      "key": "togg",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Toro",
+      "key": "toro",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Toro lawn tractors",
+      "key": "toro_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Toth Es Fiai",
+      "key": "toth-es-fiai",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Toyota",
+      "key": "toyota",
+      "families": [
+        "car",
+        "truck"
+      ]
+    },
+    {
+      "name": "Trabant",
+      "key": "trabant",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Triumph",
+      "key": "triumph",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Troy-Bilt lawn tractors",
+      "key": "troy_bilt_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Tsd",
+      "key": "tsd",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Turner-Simplicity",
+      "key": "turner_simplicity",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "TVR",
+      "key": "tvr",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Twin City",
+      "key": "twin_city",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "TYM",
+      "key": "tym",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Tytan",
+      "key": "tytan",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "UAZ",
+      "key": "uaz",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Ud",
+      "key": "ud",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Unimog",
+      "key": "unimog",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Unitrak",
+      "key": "unitrak",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Upton",
+      "key": "upton",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Ural",
+      "key": "ural",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Ursus",
+      "key": "ursus",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "UTB/Universal",
+      "key": "utb_universal",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Valiant",
+      "key": "valiant",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Valmet",
+      "key": "valmet",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Valpadana",
+      "key": "valpadana",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Valtra",
+      "key": "valtra",
+      "families": [
+        "agri",
+        "heavy"
+      ]
+    },
+    {
+      "name": "Vanden Plas",
+      "key": "vanden-plas",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Vanster",
+      "key": "vanster",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Vauxhall",
+      "key": "vauxhall",
+      "families": [
+        "car",
+        "truck"
+      ]
+    },
+    {
+      "name": "Ventrac",
+      "key": "ventrac",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Ventrac lawn tractors",
+      "key": "ventrac_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Vermeer",
+      "key": "vermeer",
+      "families": [
+        "heavy"
+      ]
+    },
+    {
+      "name": "Versatile",
+      "key": "versatile",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Vinfast",
+      "key": "vinfast",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Vm",
+      "key": "vm",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Volga",
+      "key": "volga",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Volkswagen",
+      "key": "volkswagen",
+      "families": [
+        "car",
+        "truck"
+      ]
+    },
+    {
+      "name": "Volta Trucks",
+      "key": "volta-trucks",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Volvo",
+      "key": "volvo",
+      "families": [
+        "car",
+        "truck",
+        "agri",
+        "heavy"
+      ]
+    },
+    {
+      "name": "Volvo BM",
+      "key": "volvo-bm",
+      "families": [
+        "heavy"
+      ]
+    },
+    {
+      "name": "Volvo CE",
+      "key": "volvo-ce",
+      "families": [
+        "heavy"
+      ]
+    },
+    {
+      "name": "Voyah",
+      "key": "voyah",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "VST",
+      "key": "vst",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "VW-Porsche",
+      "key": "vw-porsche",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Wacker Neuson",
+      "key": "wacker-neuson",
+      "families": [
+        "truck",
+        "heavy"
+      ]
+    },
+    {
+      "name": "Wagner",
+      "key": "wagner",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Wallis",
+      "key": "wallis",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Waltanna",
+      "key": "waltanna",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Wartburg",
+      "key": "wartburg",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Waterloo Boy",
+      "key": "waterloo_boy",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Waterloo Manufacturing Company",
+      "key": "waterloo_manufacturing_company",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Wecon",
+      "key": "wecon",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Western Star",
+      "key": "western-star",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Westfield",
+      "key": "westfield",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Wetmore",
+      "key": "wetmore",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Wey",
+      "key": "wey",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Wheel Horse lawn tractors",
+      "key": "wheel_horse_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "White",
+      "key": "white",
+      "families": [
+        "truck",
+        "agri",
+        "heavy"
+      ]
+    },
+    {
+      "name": "White lawn tractors",
+      "key": "white_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Willys",
+      "key": "willys",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Wingin",
+      "key": "wingin",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Wisconsin Tractor",
+      "key": "wisconsin_tractor",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Wolseley",
+      "key": "wolseley",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Woods & Copeland",
+      "key": "woods_copeland",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Woods lawn tractors",
+      "key": "woods_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Wuling",
+      "key": "wuling",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Wuzheng",
+      "key": "wuzheng",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Wvt",
+      "key": "wvt",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "XCG",
+      "key": "xcg",
+      "families": [
+        "heavy"
+      ]
+    },
+    {
+      "name": "Xcmg",
+      "key": "xcmg",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "XCMG",
+      "key": "xcmg",
+      "families": [
+        "heavy"
+      ]
+    },
+    {
+      "name": "Xev",
+      "key": "xev",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Xiaomi",
+      "key": "xiaomi",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "XPeng",
+      "key": "xpeng",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "XTZ",
+      "key": "xtz",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Yamaha lawn tractors",
+      "key": "yamaha_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Yanmar",
+      "key": "yanmar",
+      "families": [
+        "agri",
+        "heavy"
+      ]
+    },
+    {
+      "name": "Yanmar lawn tractors",
+      "key": "yanmar_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Yard Machines lawn tractors",
+      "key": "yard_machines_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Yard Pro lawn tractors",
+      "key": "yard_pro_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Yard-Man lawn tractors",
+      "key": "yard_man_lawn_tractors",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Yaxing",
+      "key": "yaxing",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "YTO",
+      "key": "yto",
+      "families": [
+        "agri",
+        "heavy"
+      ]
+    },
+    {
+      "name": "Yucon",
+      "key": "yucon",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Yugo",
+      "key": "yugo",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Zanello",
+      "key": "zanello",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Zastava",
+      "key": "zastava",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "ZAZ",
+      "key": "zaz",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Zeekr",
+      "key": "zeekr",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Zenos",
+      "key": "zenos",
+      "families": [
+        "car"
+      ]
+    },
+    {
+      "name": "Zetor",
+      "key": "zetor",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Zetor Zebra",
+      "key": "zetor_zebra",
+      "families": [
+        "agri"
+      ]
+    },
+    {
+      "name": "Zil",
+      "key": "zil",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Zoeller-Kipper",
+      "key": "zoeller-kipper",
+      "families": [
+        "truck"
+      ]
+    },
+    {
+      "name": "Zoomlion",
+      "key": "zoomlion",
+      "families": [
+        "heavy"
+      ]
+    }
+  ]
+}
