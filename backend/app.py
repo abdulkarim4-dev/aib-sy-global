@@ -710,6 +710,7 @@ def masked_email(email:str)->str:
 
 class OperationVerificationStartPayload(BaseModel):
     action: str
+    current_password: Optional[str] = None
 class OperationVerificationConfirmPayload(BaseModel):
     challenge_id: int
     code: str = Field(min_length=6,max_length=6)
@@ -720,6 +721,8 @@ def start_operation_verification(p:OperationVerificationStartPayload,request:Req
         raise HTTPException(400,"نوع العملية غير مدعوم للتحقق")
     if not operation_verification_required(u,p.action):
         return {"required":False}
+    if p.action == "password_change" and (not p.current_password or not password_hash.verify(p.current_password,u.password_hash)):
+        raise HTTPException(401,"كلمة المرور الحالية غير صحيحة")
     email=(u.email or "").strip().lower()
     if not email or (p.action != "password_change" and not u.email_verified):
         raise HTTPException(400,"يجب إضافة بريد إلكتروني موثق لحسابك قبل تنفيذ هذه العملية. راجع إعدادات الحساب.")
