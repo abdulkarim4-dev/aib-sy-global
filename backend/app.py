@@ -1349,7 +1349,7 @@ def create_inventory_product(p:InventoryProductCreate,request:Request,s:Session=
         raise HTTPException(403,"هذه الشركة المصنّعة غير مسموح لك بالنشر باسمها. اطلب من المالك تفعيلها في صلاحيات المستخدم.")
     vehicle_details={str(k):str(v).strip() for k,v in (p.vehicle_details or {}).items() if k in {"manufacturer","vehicle_name","vehicle_type","vehicle_make","vehicle_model","vehicle_class","vehicle_generation","vehicle_year","vehicle_odometer","vehicle_fuel","vehicle_color","chassis"} and v not in (None,"")}
     vehicle_details["manufacturer"]=manufacturer_item
-    vehicle_details["vehicle_fuel"]=p.fuel_type
+    vehicle_details["vehicle_fuel"]={"gasoline":"بنزين","diesel":"ديزل","electric":"كهرباء","hybrid":"هجين","cng":"غاز طبيعي","lpg":"غاز بترولي","other":"أخرى"}[p.fuel_type]
     if is_complete_vehicle:
         vehicle_details["vehicle_make"]=manufacturer_item
     if is_complete_vehicle and not vehicle_details.get("vehicle_name"):
