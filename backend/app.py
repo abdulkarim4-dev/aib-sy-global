@@ -699,10 +699,10 @@ def send_verification_email(email:str, code:str):
         f"رمز التحقق الخاص بك في تطبيق AIB هو: {code}\nصلاحية الرمز 10 دقائق. لا تشاركه مع أحد.")
 
 def operation_verification_required(u:User, action:str)->bool:
-    if action in {"cash_movement","cash_transfer"}:
+    if action in {"cash_movement","cash_transfer","password_change"}:
         return True
-    if action=="company_profile_edit": return u.role=="owner"
-    return u.role!="owner" and action in {"invoice_create","invoice_payment","password_change"}
+    if action in {"company_profile_edit"}: return u.role=="owner"
+    return u.role!="owner" and action in {"invoice_create","invoice_payment"}
 
 def masked_email(email:str)->str:
     local,_,domain=email.partition("@")
@@ -830,10 +830,11 @@ def change_owner_password(p:PasswordChangePayload, request:Request, s:Session=De
         raise HTTPException(403,"تغيير كلمة المرور مباشرة متاح لحساب المالك فقط")
     if not password_hash.verify(p.current_password,u.password_hash):
         raise HTTPException(401,"كلمة المرور الحالية غير صحيحة")
+    consume_operation_verification(s,u,"password_change",p.verification_token)
     u.password_hash=password_hash.hash(p.new_password)
     u.failed_logins=0
     u.locked_until=None
-    audit(s,u,"owner_password_changed","user",u.id,{"method":"self_service"},request)
+    audit(s,u,"owner_password_changed","user",u.id,{"method":"email_otp"},request)
     s.commit()
     notify_account_change(u.email,"تم تغيير كلمة المرور")
     return {"ok":True,"message":"تم تغيير كلمة المرور بنجاح"}
