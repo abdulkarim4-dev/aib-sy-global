@@ -597,11 +597,10 @@ def login(form:OAuth2PasswordRequestForm=Depends(), request:Request=None, s:Sess
 @app.post("/auth/password-reset/request")
 def request_accounting_password_reset(p:AccountingPasswordResetRequestPayload,request:Request,s:Session=Depends(db)):
     email=p.email.strip().lower()
-    # Always return the same response so account existence cannot be discovered.
-    generic={"ok":True,"message":"إذا كان البريد مرتبطاً بحساب محاسبة، فسيصلك رابط إعادة التعيين خلال دقائق."}
+    generic={"ok":True,"message":"تم قبول الطلب. إذا كان البريد مرتبطاً بحساب محاسبة، فسيصلك رابط إعادة التعيين خلال دقائق."}
     u=s.scalar(select(User).where(func.lower(User.email)==email,User.active==True,User.deleted==False))
     if not u:
-        return generic
+        raise HTTPException(404,"هذا البريد الإلكتروني غير مسجل في حساب محاسبة نشط على الموقع. تحقق من البريد وحاول مجدداً.")
     now=datetime.now(timezone.utc)
     recent=s.scalar(select(AccountingPasswordReset).where(
         AccountingPasswordReset.user_id==u.id,
