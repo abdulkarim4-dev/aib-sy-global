@@ -1115,21 +1115,27 @@ def update_user_permissions(user_id:int,p:UserPermissionsPayload,request:Request
     s.commit()
     return {"ok":True,"permissions":clean}
 class UserPasswordResetPayload(BaseModel):
-    password: str = Field(min_length=8, max_length=256)
+    password: Optional[str] = None
 
 @app.patch("/users/{user_id}/password")
 def reset_user_password(user_id:int, p:UserPasswordResetPayload, request:Request, s:Session=Depends(db), u:User=Depends(manager)):
-    validate_account_password(p.password)
     target=s.get(User,user_id)
     if not target: raise HTTPException(404,"المستخدم غير موجود")
     if target.role=="owner": raise HTTPException(400,"لا يمكن إصدار بطاقة دخول لحساب المالك من هذه الصفحة")
-    target.password_hash=password_hash.hash(p.password)
+    alphabet_upper="ABCDEFGHJKLMNPQRSTUVWXYZ"
+    alphabet_lower="abcdefghijkmnopqrstuvwxyz"
+    alphabet_digits="23456789"
+    alphabet_symbols="!@#$%*-_"
+    temporary_password="".join([secrets.choice(alphabet_upper),secrets.choice(alphabet_lower),secrets.choice(alphabet_digits),secrets.choice(alphabet_symbols)]+[secrets.choice(alphabet_upper+alphabet_lower+alphabet_digits+alphabet_symbols) for _ in range(4)])
+    chars=list(temporary_password);secrets.SystemRandom().shuffle(chars);temporary_password="".join(chars)
+    validate_account_password(temporary_password)
+    target.password_hash=password_hash.hash(temporary_password)
     target.must_change_password=True
     target.failed_logins=0
     target.locked_until=None
-    audit(s,u,"user_credentials_reissued","user",user_id,{"username":target.username,"must_change_password":True},request)
+    audit(s,u,"user_credentials_reissued","user",user_id,{"username":target.username,"must_change_password":True,"temporary_password_length":8},request)
     s.commit()
-    return {"ok":True,"username":target.username,"full_name":target.full_name,"email":target.email}
+    return {"ok":True,"username":target.username,"full_name":target.full_name,"email":target.email,"temporary_password":temporary_password}
 
 @app.delete("/users/{user_id}")
 def delete_user(user_id:int, request:Request, s:Session=Depends(db), u:User=Depends(manager)):
