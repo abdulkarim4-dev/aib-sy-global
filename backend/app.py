@@ -708,7 +708,7 @@ def confirm_accounting_login(p:AccountingLoginConfirmPayload,request:Request,s:S
 @app.get("/auth/me")
 def me(request:Request,u:User=Depends(current_user)):
     impersonated_by=getattr(u,"_impersonated_by_owner_id",None)
-    return {"id":u.id,"username":u.username,"name":u.full_name,"email":u.email,"role":u.role,"permissions":u.permissions or {},"business_scopes":u.business_scopes or [],"company_name":u.company_name or "","must_change_password":bool(u.must_change_password),"is_impersonating":bool(impersonated_by),"impersonated_by_owner_id":impersonated_by}
+    return {"id":u.id,"username":u.username,"name":u.full_name,"email":u.email,"role":u.role,"permissions":u.permissions or {},"business_scopes":u.business_scopes or [],"company_name":u.company_name or "","must_change_password":bool(u.must_change_password) if not impersonated_by else False,"is_impersonating":bool(impersonated_by),"impersonated_by_owner_id":impersonated_by}
 
 @app.post("/auth/impersonate/{user_id}")
 def impersonate_user(user_id:int,request:Request,s:Session=Depends(db),owner:User=Depends(manager)):
@@ -717,7 +717,7 @@ def impersonate_user(user_id:int,request:Request,s:Session=Depends(db),owner:Use
         raise HTTPException(404,"حساب المستخدم غير موجود أو غير فعال")
     audit(s,owner,"owner_impersonation_started","user",target.id,{"target_username":target.username},request)
     s.commit()
-    return {"access_token":token_for(target,email_otp_verified=True,impersonated_by_owner_id=owner.id),"token_type":"bearer","user":{**accounting_login_user_payload(target),"is_impersonating":True,"impersonated_by_owner_id":owner.id}}
+    return {"access_token":token_for(target,email_otp_verified=False,impersonated_by_owner_id=owner.id),"token_type":"bearer","user":{**accounting_login_user_payload(target),"must_change_password":False,"is_impersonating":True,"impersonated_by_owner_id":owner.id}}
 
 class AccountSettingsPayload(BaseModel):
     email: Optional[str] = None
