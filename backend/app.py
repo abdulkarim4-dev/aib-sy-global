@@ -1724,6 +1724,17 @@ def update_inventory_product_images(product_id:int, p:InventoryImagesPayload, re
     _public_products_cache["at"].clear()
     return {"ok":True,"count":len(product.images or [])}
 
+VEHICLE_CONTRACT_CATEGORIES={"cars","trucks","heavy","agri"}
+def inventory_vehicle_seller_snapshot(s:Session,item:dict,fallback_user:User)->dict:
+    sku=str(item.get("sku") or "").strip().upper()
+    product=s.scalar(select(InventoryProduct).where(InventoryProduct.sku==sku)) if sku else None
+    seller_id=product.owner_user_id if product and product.owner_user_id is not None else fallback_user.id
+    seller=s.get(User,seller_id) or fallback_user
+    profile=seller.profile_data if isinstance(seller.profile_data,dict) else {}
+    first_name=str(profile.get("first_name") or seller.full_name or seller.username).strip()
+    last_name=str(profile.get("last_name") or "").strip()
+    return {**profile,"first_name":first_name,"last_name":last_name,"seller_full_name":" ".join(x for x in (first_name,last_name) if x),"company_name":seller.company_name or "","seller_user_id":seller.id}
+
 class RecordCreate(BaseModel): section:str; invoice_no:Optional[str]=None; currency:str="USD"; data:dict; verification_token:Optional[str]=None
 @app.post("/records")
 def create_record(p:RecordCreate, request:Request, s:Session=Depends(db), u:User=Depends(require_permission("invoices","create"))):
@@ -1737,6 +1748,10 @@ def create_record(p:RecordCreate, request:Request, s:Session=Depends(db), u:User
     serial=int(s.scalar(select(func.count(Record.id)).where(Record.section==p.section)) or 0)+1
     invoice_no=f"{section_codes[p.section]}-{serial:05d}-B"
     prepared_data=prepare_record_inventory(s,p.section,p.data,user=u)
+    if p.section in {"directSale","carSale"}:
+        for item in prepared_data.get("items",[]) if isinstance(prepared_data.get("items"),list) else []:
+            if isinstance(item,dict) and str(item.get("store_category") or "") in VEHICLE_CONTRACT_CATEGORIES:
+                item["seller_profile_snapshot"]=inventory_vehicle_seller_snapshot(s,item,u)
     # Employee outside-store sales remain financially pending until the owner
     # verifies the transfer and explicitly confirms receipt.
     employee_sale = u.role!="owner" and p.section=="directSale"
@@ -1786,7 +1801,16 @@ def list_records(section:Optional[str]=None, s:Session=Depends(db), u:User=Depen
         pays=payments_by_record.get(r.id,[])
         total=float(r.data.get("amount",r.data.get("price",r.data.get("sale",0))) or 0)
         paid=sum(float(x.amount) for x in pays)
-        out.append({"id":r.id,"section":r.section,"invoice_no":r.invoice_no,"currency":r.currency,"data":r.data,"created_by":r.created_by,"created_at":r.created_at,"updated_at":r.updated_at,"payments":[{"id":x.id,"amount":float(x.amount),"method":x.method,"cash_box":x.cash_box,"paid_at":x.paid_at} for x in pays],"paid_total":round(paid,2),"remaining":round(max(total-paid,0),2),"payment_status":"paid" if total>0 and paid>=total else "partial" if paid>0 else "unpaid"})
+        record_data=dict(r.data or {})
+        if r.section in {"directSale","carSale"} and isinstance(record_data.get("items"),list):
+            enriched_items=[]
+            for raw_item in record_data["items"]:
+                item=dict(raw_item) if isinstance(raw_item,dict) else raw_item
+                if isinstance(item,dict) and str(item.get("store_category") or "") in VEHICLE_CONTRACT_CATEGORIES and not isinstance(item.get("seller_profile_snapshot"),dict):
+                    item["seller_profile_snapshot"]=inventory_vehicle_seller_snapshot(s,item,u)
+                enriched_items.append(item)
+            record_data["items"]=enriched_items
+        out.append({"id":r.id,"section":r.section,"invoice_no":r.invoice_no,"currency":r.currency,"data":record_data,"created_by":r.created_by,"created_at":r.created_at,"updated_at":r.updated_at,"payments":[{"id":x.id,"amount":float(x.amount),"method":x.method,"cash_box":x.cash_box,"paid_at":x.paid_at} for x in pays],"paid_total":round(paid,2),"remaining":round(max(total-paid,0),2),"payment_status":"paid" if total>0 and paid>=total else "partial" if paid>0 else "unpaid"})
     return out
 class PaymentPayload(BaseModel):
     amount: float = Field(gt=0)
