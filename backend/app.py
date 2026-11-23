@@ -3524,6 +3524,12 @@ def _public_search_terms(value: Optional[str]) -> list[str]:
     return [term for term in re.split(r"\s+", str(value or "").strip()) if term]
 
 
+def _public_search_like_pattern(value: str) -> str:
+    """Build a literal substring pattern for SQL LIKE/ILIKE."""
+    escaped = str(value).replace("!", "!!").replace("%", "!%").replace("_", "!_")
+    return f"%{escaped}%"
+
+
 @app.get("/public/products")
 def public_products(q:Optional[str]=None, category:Optional[str]=None, response:Response=None, s:Session=Depends(db)):
     import time
@@ -3551,8 +3557,7 @@ def public_products(q:Optional[str]=None, category:Optional[str]=None, response:
         # Escape SQL LIKE wildcards so user input is always interpreted literally.
         search_terms = _public_search_terms(q)
         for token in search_terms:
-            escaped = token.replace("!", "!!").replace("%", "!%").replace("_", "!_")
-            pattern = f"%{escaped}%"
+            pattern = _public_search_like_pattern(token)
             query = query.where(or_(
                 InventoryProduct.sku.ilike(pattern, escape="!"),
                 InventoryProduct.name.ilike(pattern, escape="!"),
