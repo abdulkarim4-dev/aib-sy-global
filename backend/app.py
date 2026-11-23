@@ -717,7 +717,7 @@ def impersonate_user(user_id:int,request:Request,s:Session=Depends(db),owner:Use
         raise HTTPException(404,"حساب المستخدم غير موجود أو غير فعال")
     audit(s,owner,"owner_impersonation_started","user",target.id,{"target_username":target.username},request)
     s.commit()
-    return {"access_token":token_for(target,email_otp_verified=False,impersonated_by_owner_id=owner.id),"token_type":"bearer","user":{**accounting_login_user_payload(target),"must_change_password":False,"is_impersonating":True,"impersonated_by_owner_id":owner.id}}
+    return {"access_token":token_for(target,email_otp_verified=False,impersonated_by_owner_id=owner.id),"token_type":"bearer","user":{**accounting_login_user_payload(target),"business_scopes":target.business_scopes or [],"company_name":target.company_name or "","must_change_password":False,"is_impersonating":True,"impersonated_by_owner_id":owner.id}}
 
 class AccountSettingsPayload(BaseModel):
     email: Optional[str] = None
