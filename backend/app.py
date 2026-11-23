@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Any
-import os, secrets, json, base64, binascii, smtplib, hashlib, html, logging, re
+import os, secrets, json, ast, base64, binascii, smtplib, hashlib, html, logging, re
 from urllib.parse import urlencode
 from email.message import EmailMessage
 from urllib.request import Request as UrlRequest, urlopen
@@ -3371,10 +3371,29 @@ def update_online_purchase_order_status(order_id:int,p:OnlineOrderStatusPayload,
     send_notification_email(customer_email,f"تحديث حالة الطلب #{order.id} - مجموعة AIB",status_label,status_html)
     return {"ok":True,"status":order.status}
 
+def _normalize_public_search_query(value: Optional[str]) -> str:
+    """Unwrap list-shaped query strings emitted by callers; keep ordinary text unchanged."""
+    raw = str(value or "").strip()
+    if len(raw) >= 2 and raw.startswith("[") and raw.endswith("]"):
+        try:
+            parsed = ast.literal_eval(raw)
+        except (ValueError, SyntaxError):
+            parsed = None
+        if isinstance(parsed, (list, tuple)):
+            terms = [
+                str(item).strip()
+                for item in parsed
+                if isinstance(item, (str, int, float)) and str(item).strip()
+            ]
+            return " ".join(terms)
+    return raw
+
+
 @app.get("/public/products")
 def public_products(q:Optional[str]=None, category:Optional[str]=None, response:Response=None, s:Session=Depends(db)):
     import time
     started=time.perf_counter()
+    q = _normalize_public_search_query(q)
     cache_key=((q or "").strip().casefold(),(category or "").strip().casefold())
     now=time.monotonic()
     cached=_public_products_cache["value"].get(cache_key)
