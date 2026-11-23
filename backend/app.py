@@ -3521,7 +3521,7 @@ def _normalize_public_search_query(value: Optional[str]) -> str:
 
 def _public_search_terms(value: Optional[str]) -> list[str]:
     """Split a normalized storefront query into literal terms."""
-    return [term for term in re.split(r"\\s+", str(value or "").strip()) if term]
+    return [term for term in re.split(r"\s+", str(value or "").strip()) if term]
 
 
 @app.get("/public/products")
