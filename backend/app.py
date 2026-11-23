@@ -1853,6 +1853,45 @@ def list_records(section:Optional[str]=None, s:Session=Depends(db), u:User=Depen
             record_data["items"]=enriched_items
         out.append({"id":r.id,"section":r.section,"invoice_no":r.invoice_no,"currency":r.currency,"data":record_data,"created_by":r.created_by,"created_at":r.created_at,"updated_at":r.updated_at,"payments":[{"id":x.id,"amount":float(x.amount),"method":x.method,"cash_box":x.cash_box,"paid_at":x.paid_at} for x in pays],"paid_total":round(paid,2),"remaining":round(max(total-paid,0),2),"payment_status":"paid" if total>0 and paid>=total else "partial" if paid>0 else "unpaid"})
     return out
+
+@app.get("/sales-summary/mine")
+def my_sales_summary(s:Session=Depends(db),u:User=Depends(current_user)):
+    # Store sales are attributed from approved online orders by the actual owner
+    # and quantity of each user's inventory line, not by the employee who approved it.
+    summary={
+        "store":{"USD":0.0,"SYP":0.0},
+        "outside_store":{"USD":0.0,"SYP":0.0},
+    }
+    rows=s.scalars(
+        select(Record).where(Record.section=="directSale",Record.deleted.is_(False))
+    ).all()
+    for record in rows:
+        data=record.data if isinstance(record.data,dict) else {}
+        currency=record.currency if record.currency in ("USD","SYP") else "USD"
+        if record.created_by==u.id and data.get("outside_store_sale"):
+            commission=data.get("owner_commission") if isinstance(data.get("owner_commission"),dict) else {}
+            amount=commission.get("base_amount")
+            if amount is None:
+                amount=data.get("amount",data.get("price",data.get("sale",0)))
+            try:
+                summary["outside_store"][currency]=round(summary["outside_store"][currency]+max(0.0,float(amount or 0)),2)
+            except (TypeError,ValueError):
+                pass
+            continue
+        if data.get("outside_store_sale"):
+            continue
+        items=data.get("items") if isinstance(data.get("items"),list) else []
+        for item in items:
+            if not isinstance(item,dict) or str(item.get("owner_user_id") or "")!=str(u.id):
+                continue
+            try:
+                quantity=max(0.0,float(item.get("user_owned_quantity") or 0))
+                price=max(0.0,float(item.get("price") or 0))
+                summary["store"][currency]=round(summary["store"][currency]+quantity*price,2)
+            except (TypeError,ValueError):
+                continue
+    return summary
+
 class PaymentPayload(BaseModel):
     amount: float = Field(gt=0)
     method: str
