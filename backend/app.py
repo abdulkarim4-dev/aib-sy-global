@@ -3653,6 +3653,23 @@ from pathlib import Path
 from fastapi.responses import FileResponse, Response
 FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 
+@app.get("/assets/{filename}", include_in_schema=False)
+def public_store_asset(filename: str):
+    # Serve only explicitly approved storefront artwork; do not expose arbitrary files.
+    allowed_assets = {"aib-tourist-cars.jpg"}
+    if filename not in allowed_assets:
+        raise HTTPException(404, "Store asset not found")
+    assets_dir = (FRONTEND_DIR / "assets").resolve()
+    asset_path = (assets_dir / filename).resolve()
+    if asset_path.parent != assets_dir or not asset_path.is_file():
+        raise HTTPException(404, "Store asset not found")
+    return FileResponse(
+        asset_path,
+        media_type="image/jpeg",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
 @app.get("/customer-i18n.js", include_in_schema=False)
 def customer_i18n_script():
     return FileResponse(
