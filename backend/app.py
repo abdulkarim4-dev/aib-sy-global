@@ -1047,8 +1047,26 @@ def get_user_profile(user_id:int,s:Session=Depends(db),u:User=Depends(current_us
 def get_user_inventory(user_id:int,s:Session=Depends(db),u:User=Depends(manager)):
     target=s.get(User,user_id)
     if not target or target.deleted: raise HTTPException(404,"المستخدم غير موجود")
-    products=s.scalars(select(InventoryProduct).where(InventoryProduct.owner_user_id==user_id).order_by(InventoryProduct.sku)).all()
-    return {"user_id":target.id,"username":target.username,"company_name":target.company_name or "","products":[{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"description":p.description or "","owned_stock":float(p.owned_stock or 0),"consigned_stock":float(p.consigned_stock or 0),"sale_price":float(p.sale_price) if p.sale_price is not None else None,"sale_currency":p.sale_currency,"images":p.images or [],"video_url":p.video_url or ""} for p in products]}
+    # Compact, read-only summary for the owner's user-inventory modal.
+    # Select only displayed columns; do not load large image/video JSON fields.
+    rows=s.execute(
+        select(
+            InventoryProduct.id, InventoryProduct.sku, InventoryProduct.name,
+            InventoryProduct.model, InventoryProduct.owned_stock,
+            InventoryProduct.consigned_stock, InventoryProduct.sale_price,
+            InventoryProduct.sale_currency,
+        )
+        .where(InventoryProduct.owner_user_id==user_id,InventoryProduct.active.is_(True))
+        .order_by(InventoryProduct.sku)
+    ).all()
+    products=[{
+        "id":p.id,"sku":p.sku,"name":p.name,"model":p.model,
+        "owned_stock":float(p.owned_stock or 0),
+        "consigned_stock":float(p.consigned_stock or 0),
+        "sale_price":float(p.sale_price) if p.sale_price is not None else None,
+        "sale_currency":p.sale_currency,
+    } for p in rows]
+    return {"user_id":target.id,"username":target.username,"company_name":target.company_name or "","products":products}
 
 class CompanyProfilePayload(BaseModel):
     data: dict
