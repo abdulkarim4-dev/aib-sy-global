@@ -371,12 +371,18 @@ def db():
     try: yield s
     finally: s.close()
 def audit(s:Session, user:Optional[User], action:str, entity:str, entity_id:Optional[int], details:dict, request:Optional[Request]=None):
-    s.add(AuditEvent(user_id=user.id if user else None, action=action, entity=entity, entity_id=entity_id, details=details, ip_address=request.client.host if request and request.client else ""))
-def token_for(user:User,email_otp_verified:bool=False):
+    audit_details=dict(details or {})
+    impersonator_id=getattr(user,"_impersonated_by_owner_id",None) if user else None
+    if impersonator_id:
+        audit_details["impersonated_by_owner_id"]=impersonator_id
+    s.add(AuditEvent(user_id=user.id if user else None, action=action, entity=entity, entity_id=entity_id, details=audit_details, ip_address=request.client.host if request and request.client else ""))
+def token_for(user:User,email_otp_verified:bool=False,impersonated_by_owner_id:Optional[int]=None):
     # Accounting sessions remain valid across browser restarts and do not expire
     # automatically; the user signs out explicitly from the accounting app.
     now=datetime.now(timezone.utc)
     claims={"sub":str(user.id),"iat":now,"email_otp_verified":bool(email_otp_verified)}
+    if impersonated_by_owner_id:
+        claims["impersonated_by_owner_id"]=int(impersonated_by_owner_id)
     return jwt.encode(claims,settings.jwt_secret,algorithm="HS256")
 def current_user(request:Request, token:Optional[str]=Depends(oauth), s:Session=Depends(db)):
     if not token:
@@ -385,10 +391,16 @@ def current_user(request:Request, token:Optional[str]=Depends(oauth), s:Session=
         payload=jwt.decode(token,settings.jwt_secret,algorithms=["HS256"])
         if payload.get("typ")=="store_customer": raise ValueError("store token")
         uid=int(payload["sub"])
+        impersonator_id=int(payload["impersonated_by_owner_id"]) if payload.get("impersonated_by_owner_id") else None
     except Exception: raise HTTPException(401,"جلسة الدخول غير صالحة أو انتهت")
     u=s.get(User,uid)
-    if not u or not u.active: raise HTTPException(401,"الحساب غير فعال")
-    if u.must_change_password and request.url.path not in {"/auth/me","/auth/first-login-password"}:
+    if not u or not u.active or u.deleted: raise HTTPException(401,"الحساب غير فعال")
+    if impersonator_id:
+        owner=s.get(User,impersonator_id)
+        if not owner or not owner.active or owner.deleted or owner.role!="owner" or u.role=="owner":
+            raise HTTPException(401,"جلسة الدخول بالنيابة غير صالحة")
+        u._impersonated_by_owner_id=owner.id
+    if u.must_change_password and not impersonator_id and request.url.path not in {"/auth/me","/auth/first-login-password"}:
         raise HTTPException(403,"يجب تغيير كلمة المرور المؤقتة قبل استخدام الحساب")
     return u
 def require_store_same_origin(request:Request):
@@ -694,7 +706,18 @@ def confirm_accounting_login(p:AccountingLoginConfirmPayload,request:Request,s:S
     return {"access_token":token_for(u,email_otp_verified=True),"token_type":"bearer","user":accounting_login_user_payload(u)}
 
 @app.get("/auth/me")
-def me(u:User=Depends(current_user)): return {"id":u.id,"username":u.username,"name":u.full_name,"email":u.email,"role":u.role,"permissions":u.permissions or {},"business_scopes":u.business_scopes or [],"company_name":u.company_name or "","must_change_password":bool(u.must_change_password)}
+def me(request:Request,u:User=Depends(current_user)):
+    impersonated_by=getattr(u,"_impersonated_by_owner_id",None)
+    return {"id":u.id,"username":u.username,"name":u.full_name,"email":u.email,"role":u.role,"permissions":u.permissions or {},"business_scopes":u.business_scopes or [],"company_name":u.company_name or "","must_change_password":bool(u.must_change_password) if not impersonated_by else False,"is_impersonating":bool(impersonated_by),"impersonated_by_owner_id":impersonated_by}
+
+@app.post("/auth/impersonate/{user_id}")
+def impersonate_user(user_id:int,request:Request,s:Session=Depends(db),owner:User=Depends(manager)):
+    target=s.get(User,user_id)
+    if not target or target.deleted or not target.active or target.role=="owner":
+        raise HTTPException(404,"حساب المستخدم غير موجود أو غير فعال")
+    audit(s,owner,"owner_impersonation_started","user",target.id,{"target_username":target.username},request)
+    s.commit()
+    return {"access_token":token_for(target,email_otp_verified=False,impersonated_by_owner_id=owner.id),"token_type":"bearer","user":{**accounting_login_user_payload(target),"business_scopes":target.business_scopes or [],"company_name":target.company_name or "","must_change_password":False,"is_impersonating":True,"impersonated_by_owner_id":owner.id}}
 
 class AccountSettingsPayload(BaseModel):
     email: Optional[str] = None
