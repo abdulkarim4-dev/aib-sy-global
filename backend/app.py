@@ -1431,7 +1431,10 @@ def latest_store_catalog_data(s:Session)->tuple[dict,dict]:
                 family=str(item.get("store_family") or "").strip()
                 category=str(item.get("store_category") or "").strip()
                 if category in allowed.get(family,set()):
-                    latest_categories[sku]={"store_family":family,"store_category":category,"vehicle_details":{k:item.get(k) for k in ("vehicle_name","vehicle_type","vehicle_make","vehicle_model","vehicle_class","vehicle_generation","vehicle_year","vehicle_odometer","vehicle_fuel","vehicle_color","chassis") if item.get(k) not in (None,"")}}
+                    vehicle_owner={}
+                    if record.section=="carPurchase":
+                        vehicle_owner={k:record.data.get(k) for k in ("seller_first_name","seller_last_name","seller_full_name","seller_father_name","seller_mother_name","seller_national_no","seller_birth_place_date","seller_id_type","seller_id_no","seller_id_issuer","seller_registry","seller_residence","seller_address") if record.data.get(k) not in (None,"")}
+                    latest_categories[sku]={"store_family":family,"store_category":category,"vehicle_details":{k:item.get(k) for k in ("vehicle_name","vehicle_type","vehicle_make","vehicle_model","vehicle_class","vehicle_generation","vehicle_year","vehicle_odometer","vehicle_fuel","vehicle_color","chassis") if item.get(k) not in (None,"")},"vehicle_owner":vehicle_owner}
     result=(latest_categories,latest_prices)
     _store_catalog_cache["value"]=result
     _store_catalog_cache["at"]=now
