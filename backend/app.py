@@ -2190,6 +2190,27 @@ def submit_outside_store_payment(record_id:int,p:OutsideStorePaymentPayload,requ
             send_notification_email(owner.email,subject,body,email_html)
     return {"ok":True,"payment_status":"submitted","owner_notifications_sent":len([o for o in owners if o.email])}
 
+@app.post("/outside-store-sales/{record_id}/reject-payment")
+def reject_outside_store_payment(record_id:int,p:OwnerCommissionConfirmPayload,request:Request,s:Session=Depends(db),u:User=Depends(manager)):
+    record=s.scalar(select(Record).where(Record.id==record_id).with_for_update())
+    if not record or record.deleted or record.section!="directSale" or not (record.data or {}).get("outside_store_sale"):
+        raise HTTPException(404,"عملية البيع خارج المتجر غير موجودة")
+    data=dict(record.data or {})
+    commission=dict(data.get("owner_commission") or {})
+    if commission.get("status")=="paid" or commission.get("payment_status")=="confirmed":
+        raise HTTPException(409,"لا يمكن رفض دفعة تم تأكيدها مسبقاً")
+    if commission.get("payment_status")!="submitted":
+        raise HTTPException(409,"لا يوجد طلب تحويل مرسل بانتظار المراجعة")
+    now=datetime.now(timezone.utc)
+    note=p.note.strip()[:500]
+    commission.update({"payment_status":"rejected","rejected_at":now.isoformat(),"rejected_by":u.id,"rejection_note":note})
+    data["owner_commission"]=commission
+    record.data=data
+    record.updated_at=now
+    audit(s,u,"owner_commission_payment_rejected","record",record.id,{"invoice_no":record.invoice_no,"payment_type":commission.get("payment_type"),"payment_amount":commission.get("payment_amount"),"currency":record.currency,"payment_method":commission.get("payment_method"),"payment_reference":commission.get("payment_reference"),"note":note},request)
+    s.commit()
+    return {"ok":True,"record_id":record.id,"payment_status":"rejected","note":note}
+
 @app.post("/outside-store-sales/{record_id}/confirm-commission")
 def confirm_outside_store_commission(record_id:int,p:OwnerCommissionConfirmPayload,request:Request,s:Session=Depends(db),u:User=Depends(manager)):
     record=s.scalar(select(Record).where(Record.id==record_id).with_for_update())
