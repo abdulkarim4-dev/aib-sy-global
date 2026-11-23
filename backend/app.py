@@ -3519,6 +3519,11 @@ def _normalize_public_search_query(value: Optional[str]) -> str:
     return raw
 
 
+def _public_search_terms(value: Optional[str]) -> list[str]:
+    """Split a normalized storefront query into literal terms."""
+    return [term for term in re.split(r"\\s+", str(value or "").strip()) if term]
+
+
 @app.get("/public/products")
 def public_products(q:Optional[str]=None, category:Optional[str]=None, response:Response=None, s:Session=Depends(db)):
     import time
@@ -3540,8 +3545,20 @@ def public_products(q:Optional[str]=None, category:Optional[str]=None, response:
     query_started=time.perf_counter()
     query=select(InventoryProduct).where(InventoryProduct.active.is_(True),InventoryProduct.is_store_visible.is_(True))
     if q:
-        term=f"%{q.strip()}%"
-        query=query.where(or_(InventoryProduct.sku.ilike(term),InventoryProduct.name.ilike(term),InventoryProduct.model.ilike(term)))
+        # Treat a multi-word query as AND across terms, while each term may match
+        # SKU, product name, model, or description. This supports phrases whose
+        # words are split between the product name and its descriptive fields.
+        # Escape SQL LIKE wildcards so user input is always interpreted literally.
+        search_terms = _public_search_terms(q)
+        for token in search_terms:
+            escaped = token.replace("!", "!!").replace("%", "!%").replace("_", "!_")
+            pattern = f"%{escaped}%"
+            query = query.where(or_(
+                InventoryProduct.sku.ilike(pattern, escape="!"),
+                InventoryProduct.name.ilike(pattern, escape="!"),
+                InventoryProduct.model.ilike(pattern, escape="!"),
+                InventoryProduct.description.ilike(pattern, escape="!"),
+            ))
     rows=s.scalars(query.order_by(InventoryProduct.sku).limit(300)).all()
     query_ms=(time.perf_counter()-query_started)*1000
     # Match the inventory page's visibility rule exactly: employee-owned products
