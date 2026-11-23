@@ -54,6 +54,17 @@ class AIBRegressionTests(unittest.TestCase):
             aib.get_public_product_image(101, 1, fake_session)
         self.assertEqual(caught.exception.status_code, 404)
 
+
+    def test_storefront_category_asset_is_served_from_allowlist(self):
+        response = aib.public_store_asset("aib-tourist-cars.jpg")
+        self.assertEqual(response.media_type, "image/jpeg")
+        self.assertTrue(Path(response.path).is_file())
+
+    def test_storefront_category_asset_rejects_unlisted_files(self):
+        with self.assertRaises(aib.HTTPException) as caught:
+            aib.public_store_asset("../app.py")
+        self.assertEqual(caught.exception.status_code, 404)
+
     def test_gmail_smtp_sender_builds_and_submits_message(self):
         captured = {}
 
