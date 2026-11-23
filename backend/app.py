@@ -1843,6 +1843,10 @@ def list_records(section:Optional[str]=None, s:Session=Depends(db), u:User=Depen
         total=float(r.data.get("amount",r.data.get("price",r.data.get("sale",0))) or 0)
         paid=sum(float(x.amount) for x in pays)
         record_data=dict(r.data or {})
+        # Online store buyer phone numbers are owner-only, even if an invoice is
+        # ever exposed through a seller-facing records view.
+        if u.role!="owner" and record_data.get("online_store_order_id"):
+            record_data.pop("customer_phone",None)
         if r.section in {"directSale","carSale"} and isinstance(record_data.get("items"),list):
             enriched_items=[]
             for raw_item in record_data["items"]:
@@ -3356,7 +3360,9 @@ def list_online_purchase_orders(s:Session=Depends(db),u:User=Depends(current_use
                 continue
             order_items=seller_lines
             seller_total=round(sum(float(x.get("quantity") or 0)*float(x.get("price") or 0) for x in seller_lines),2)
-            customer={k:customer.get(k) for k in ("first_name","last_name","full_name","email","shipping_address","full_phone") if customer.get(k) is not None}
+            # Seller accounts may see recipient name/address for fulfillment, but
+            # never the store customer's phone or its components.
+            customer={k:customer.get(k) for k in ("first_name","last_name","full_name","email","shipping_address") if customer.get(k) is not None}
         result.append({"id":o.id,"customer":customer,"owner_phone":owner_phone,"items":order_items,"total":seller_total,"currency":o.currency,"payment_proof":o.payment_proof if u.role=="owner" else None,"proof_type":o.proof_type,"status":o.status,"record_id":o.record_id,"invoice_no":(s.get(Record,o.record_id).invoice_no if o.record_id and s.get(Record,o.record_id) else None),"review_note":o.review_note,"created_at":o.created_at})
     return result
 
@@ -3390,7 +3396,7 @@ def review_online_purchase_order(order_id:int,p:OnlineOrderReviewPayload,s:Sessi
         from_owned=min(qty,owned)
         from_consigned=qty-from_owned
         allocated_items.append({"sku":x["sku"],"description":x["description"],"model":x.get("model",""),"quantity":qty,"price":x["price"],"owned_quantity":from_owned,"consigned_quantity":from_consigned,"owner_user_id":product.owner_user_id if from_owned>0 else None,"user_owned_quantity":from_owned if product.owner_user_id else 0})
-    data={"customer":order.customer_data["full_name"],"customer_phone":order.customer_data["full_phone"],"customer_address":order.customer_data["shipping_address"],"amount":float(order.total),"items":allocated_items,"notes":"طلب إلكتروني – تم التحقق من إثبات الدفع واعتماده"}
+    data={"customer":order.customer_data["full_name"],"customer_phone":order.customer_data["full_phone"],"customer_address":order.customer_data["shipping_address"],"online_store_order_id":order.id,"amount":float(order.total),"items":allocated_items,"notes":"طلب إلكتروني – تم التحقق من إثبات الدفع واعتماده"}
     identity=(order.customer_data or {}).get("contract_identity") or {}
     if identity:
         data.update({"include_buyer_identity":True,"buyer_first_name":identity.get("first_name",""),"buyer_last_name":identity.get("last_name",""),"buyer_father_name":identity.get("father_name",""),"buyer_mother_name":identity.get("mother_name",""),"buyer_national_no":identity.get("national_no",""),"buyer_birth_place_date":identity.get("birth_place_date",""),"buyer_id_type":identity.get("id_type",""),"buyer_id_no":identity.get("id_no",""),"buyer_id_issuer":identity.get("id_issuer",""),"buyer_registry":identity.get("registry",""),"buyer_residence":identity.get("residence",""),"buyer_address":identity.get("address","")})
@@ -3458,10 +3464,9 @@ def review_online_purchase_order(order_id:int,p:OnlineOrderReviewPayload,s:Sessi
         seller_lines=[line for line in allocated_items if line.get("owner_user_id")==seller_id and float(line.get("user_owned_quantity") or 0)>0]
         seller_item_text="\n".join(f"- {line['description']} ({line['sku']}) × {float(line['user_owned_quantity']):g} = {float(line['user_owned_quantity'])*float(line['price']):.2f} {order.currency}" for line in seller_lines)
         buyer_name=str(buyer.get("full_name") or (str(buyer.get("first_name") or "")+" "+str(buyer.get("last_name") or "")).strip())
-        buyer_phone=str(buyer.get("full_phone") or ((buyer.get("phone_country_code") or "")+(buyer.get("phone_number") or "")))
         seller_body=(f"تم تأكيد الدفع للطلب الإلكتروني رقم #{order.id}.\nرقم الفاتورة: {record.invoice_no}\n"
             f"اسم المستلم: {buyer_name}\nعنوان المستلم: {buyer.get('shipping_address') or 'غير متوفر'}\n"
-            f"رقم هاتف المستلم: {buyer_phone or 'غير متوفر'}\nالمنتجات المباعة من مخزونك:\n{seller_item_text}\n"
+            f"المنتجات المباعة من مخزونك:\n{seller_item_text}\n"
             f"إجمالي قيمة منتجاتك: {amounts['gross']:.2f} {order.currency}\n"
             f"عمولة المالك {amounts['rate_percent']:g}%: {amounts['commission']:.2f} {order.currency}\n"
             f"صافي المبلغ المضاف إلى محفظتك: {amounts['net']:.2f} {order.currency}")
@@ -3469,7 +3474,7 @@ def review_online_purchase_order(order_id:int,p:OnlineOrderReviewPayload,s:Sessi
             "تم تأكيد الدفع بنجاح، وهذه تفاصيل المستلم والمنتجات التي بيعت من مخزونك.",
             [("رقم الطلب",f"#{order.id}"),("رقم الفاتورة",html.escape(record.invoice_no)),
              ("اسم المستلم",html.escape(buyer_name)),("عنوان المستلم",html.escape(str(buyer.get("shipping_address") or "غير متوفر"))),
-             ("هاتف المستلم",html.escape(buyer_phone or "غير متوفر")),("المنتجات المباعة",html.escape(seller_item_text).replace("\n","<br>")),
+             ("المنتجات المباعة",html.escape(seller_item_text).replace("\n","<br>")),
              ("إجمالي قيمة منتجاتك",f"{amounts['gross']:.2f} {html.escape(order.currency)}"),
              (f"عمولة المالك {amounts['rate_percent']:g}%",f"{amounts['commission']:.2f} {html.escape(order.currency)}"),
              ("صافي المبلغ المضاف لمحفظتك",f"{amounts['net']:.2f} {html.escape(order.currency)}")],
