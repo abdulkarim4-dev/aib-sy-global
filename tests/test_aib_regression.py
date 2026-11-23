@@ -189,5 +189,19 @@ class AIBRegressionTests(unittest.TestCase):
                     session.commit()
 
 
+    def test_public_search_splits_multi_word_queries_and_unwraps_list_queries(self):
+        self.assertEqual(
+            aib._normalize_public_search_query("['BMW TwinPower Turbo engine cover']"),
+            "BMW TwinPower Turbo engine cover",
+        )
+        self.assertEqual(
+            aib._public_search_terms("BMW TwinPower Turbo engine cover"),
+            ["BMW", "TwinPower", "Turbo", "engine", "cover"],
+        )
+
+    def test_public_search_escapes_sql_like_wildcards(self):
+        self.assertEqual(aib._public_search_like_pattern("N20_100%"), "%N20!_100!%%")
+
+
 if __name__ == "__main__":
     unittest.main()
