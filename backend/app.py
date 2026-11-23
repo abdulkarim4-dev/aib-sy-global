@@ -1862,8 +1862,10 @@ def my_sales_summary(s:Session=Depends(db),u:User=Depends(current_user)):
         "store":{"USD":0.0,"SYP":0.0},
         "outside_store":{"USD":0.0,"SYP":0.0},
     }
-    rows=s.scalars(
-        select(Record).where(Record.section=="directSale",Record.deleted.is_(False))
+    rows=s.execute(
+        select(Record.id,Record.currency,Record.data,Record.created_by).where(
+            Record.section=="directSale",Record.deleted.is_(False)
+        )
     ).all()
     for record in rows:
         data=record.data if isinstance(record.data,dict) else {}
