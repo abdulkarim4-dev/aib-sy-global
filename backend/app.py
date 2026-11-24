@@ -3488,11 +3488,23 @@ class OnlineOrderStatusPayload(BaseModel):
     note: str = ""
 
 @app.put("/online-purchase-orders/{order_id}/status")
-def update_online_purchase_order_status(order_id:int,p:OnlineOrderStatusPayload,s:Session=Depends(db),u:User=Depends(manager)):
+def update_online_purchase_order_status(order_id:int,p:OnlineOrderStatusPayload,s:Session=Depends(db),u:User=Depends(current_user)):
     if p.status not in {"shipping","delivered"}:
         raise HTTPException(400,"الحالة المطلوبة غير مدعومة")
     order=s.get(OnlinePurchaseOrder,order_id)
     if not order: raise HTTPException(404,"الطلب غير موجود")
+    # Owners can manage every order. A seller can update only an order that
+    # contains a paid quantity from that seller's own inventory.
+    if u.role!="owner":
+        record=s.get(Record,order.record_id) if order.record_id else None
+        seller_lines=(record.data or {}).get("items",[]) if record else []
+        owns_order=any(
+            isinstance(item,dict) and item.get("owner_user_id")==u.id
+            and float(item.get("user_owned_quantity") or 0)>0
+            for item in seller_lines
+        )
+        if not owns_order:
+            raise HTTPException(403,"لا يمكنك تحديث حالة طلب لا يحتوي منتجات مباعة من مخزونك")
     if order.status not in {"approved","shipping"}:
         raise HTTPException(409,"يجب اعتماد الطلب أولاً قبل تحديث حالة الشحن")
     if p.status=="delivered" and order.status!="shipping":
