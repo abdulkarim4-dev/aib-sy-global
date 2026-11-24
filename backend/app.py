@@ -3420,11 +3420,17 @@ def review_online_purchase_order(order_id:int,p:OnlineOrderReviewPayload,s:Sessi
         from_owned=min(qty,owned)
         from_consigned=qty-from_owned
         source_line=next((line for line in (order.items or []) if isinstance(line,dict) and str(line.get("sku") or "").strip().upper()==str(x["sku"]).strip().upper()),{})
-        vehicle_details=source_line.get("vehicle_details") if isinstance(source_line.get("vehicle_details"),dict) else {}
-        allocated_line={"sku":x["sku"],"description":x["description"],"model":x.get("model",""),"quantity":qty,"price":x["price"],"owned_quantity":from_owned,"consigned_quantity":from_consigned,"owner_user_id":product.owner_user_id if from_owned>0 else None,"user_owned_quantity":from_owned if product.owner_user_id else 0,"store_family":source_line.get("store_family",""),"store_category":source_line.get("store_category",""),"vehicle_details":vehicle_details}
+        source_vehicle_details=source_line.get("vehicle_details") if isinstance(source_line.get("vehicle_details"),dict) else {}
+        # Older store carts may contain empty category/details even though the
+        # inventory product has the canonical vehicle metadata. Fall back to
+        # the locked inventory row before creating the accounting sale.
+        vehicle_details=source_vehicle_details or (product.vehicle_details if isinstance(product.vehicle_details,dict) else {})
+        store_category=str(source_line.get("store_category") or product.store_category or "").strip()
+        store_family=str(source_line.get("store_family") or product.store_family or "").strip()
+        allocated_line={"sku":x["sku"],"description":x["description"],"model":x.get("model") or product.model or "","quantity":qty,"price":x["price"],"owned_quantity":from_owned,"consigned_quantity":from_consigned,"owner_user_id":product.owner_user_id if from_owned>0 else None,"user_owned_quantity":from_owned if product.owner_user_id else 0,"store_family":store_family,"store_category":store_category,"vehicle_details":vehicle_details}
         for detail_key,detail_value in vehicle_details.items():
             allocated_line[detail_key]=detail_value
-        if str(source_line.get("store_category") or "") in VEHICLE_CONTRACT_CATEGORIES:
+        if store_category in VEHICLE_CONTRACT_CATEGORIES:
             allocated_line["seller_profile_snapshot"]=inventory_vehicle_seller_snapshot(s,allocated_line,u)
         allocated_items.append(allocated_line)
     data={"customer":order.customer_data["full_name"],"customer_phone":order.customer_data["full_phone"],"customer_address":order.customer_data["shipping_address"],"online_store_order_id":order.id,"amount":float(order.total),"items":allocated_items,"notes":"طلب إلكتروني – تم التحقق من إثبات الدفع واعتماده"}
