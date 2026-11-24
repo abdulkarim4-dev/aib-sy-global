@@ -1847,6 +1847,30 @@ def list_records(section:Optional[str]=None, s:Session=Depends(db), u:User=Depen
         # ever exposed through a seller-facing records view.
         if u.role!="owner" and record_data.get("online_store_order_id"):
             record_data.pop("customer_phone",None)
+        if record_data.get("online_store_order_id") and isinstance(record_data.get("items"),list):
+            # Rehydrate vehicle-contract fields for online orders that were approved
+            # before these fields were copied into the accounting record.
+            linked_order=s.get(OnlinePurchaseOrder,int(record_data["online_store_order_id"]))
+            source_lines={str(x.get("sku") or "").strip().upper():x for x in (linked_order.items or []) if isinstance(x,dict)} if linked_order else {}
+            restored=[]
+            for raw_item in record_data["items"]:
+                item=dict(raw_item) if isinstance(raw_item,dict) else raw_item
+                if isinstance(item,dict):
+                    source=source_lines.get(str(item.get("sku") or "").strip().upper(),{})
+                    item.setdefault("store_family",source.get("store_family",""))
+                    item.setdefault("store_category",source.get("store_category",""))
+                    details=source.get("vehicle_details") if isinstance(source.get("vehicle_details"),dict) else {}
+                    for key,value in details.items():
+                        item.setdefault(key,value)
+                    item.setdefault("vehicle_make",details.get("vehicle_make") or details.get("manufacturer") or "")
+                    item.setdefault("vehicle_model",details.get("vehicle_model") or "")
+                    item.setdefault("vehicle_year",details.get("vehicle_year") or "")
+                    item.setdefault("vehicle_odometer",details.get("vehicle_odometer") or "")
+                    item.setdefault("vehicle_fuel",details.get("vehicle_fuel") or "")
+                    item.setdefault("vehicle_color",details.get("vehicle_color") or "")
+                    item.setdefault("chassis",details.get("chassis") or "")
+                restored.append(item)
+            record_data["items"]=restored
         if r.section in {"directSale","carSale"} and isinstance(record_data.get("items"),list):
             enriched_items=[]
             for raw_item in record_data["items"]:
@@ -3395,7 +3419,14 @@ def review_online_purchase_order(order_id:int,p:OnlineOrderReviewPayload,s:Sessi
             raise HTTPException(409,f"المخزون تغيّر منذ إرسال الطلب. المتاح من {product.name} حالياً {available:g}")
         from_owned=min(qty,owned)
         from_consigned=qty-from_owned
-        allocated_items.append({"sku":x["sku"],"description":x["description"],"model":x.get("model",""),"quantity":qty,"price":x["price"],"owned_quantity":from_owned,"consigned_quantity":from_consigned,"owner_user_id":product.owner_user_id if from_owned>0 else None,"user_owned_quantity":from_owned if product.owner_user_id else 0})
+        source_line=next((line for line in (order.items or []) if isinstance(line,dict) and str(line.get("sku") or "").strip().upper()==str(x["sku"]).strip().upper()),{})
+        vehicle_details=source_line.get("vehicle_details") if isinstance(source_line.get("vehicle_details"),dict) else {}
+        allocated_line={"sku":x["sku"],"description":x["description"],"model":x.get("model",""),"quantity":qty,"price":x["price"],"owned_quantity":from_owned,"consigned_quantity":from_consigned,"owner_user_id":product.owner_user_id if from_owned>0 else None,"user_owned_quantity":from_owned if product.owner_user_id else 0,"store_family":source_line.get("store_family",""),"store_category":source_line.get("store_category",""),"vehicle_details":vehicle_details}
+        for detail_key,detail_value in vehicle_details.items():
+            allocated_line[detail_key]=detail_value
+        if str(source_line.get("store_category") or "") in VEHICLE_CONTRACT_CATEGORIES:
+            allocated_line["seller_profile_snapshot"]=inventory_vehicle_seller_snapshot(s,allocated_line,u)
+        allocated_items.append(allocated_line)
     data={"customer":order.customer_data["full_name"],"customer_phone":order.customer_data["full_phone"],"customer_address":order.customer_data["shipping_address"],"online_store_order_id":order.id,"amount":float(order.total),"items":allocated_items,"notes":"طلب إلكتروني – تم التحقق من إثبات الدفع واعتماده"}
     identity=(order.customer_data or {}).get("contract_identity") or {}
     if identity:
