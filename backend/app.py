@@ -108,6 +108,7 @@ class StoreCustomer(Base):
     phone_country_code: Mapped[str]=mapped_column(String(8),default="+963")
     phone_verified_at: Mapped[Optional[datetime]]=mapped_column(DateTime(timezone=True),nullable=True)
     phone_number: Mapped[str]=mapped_column(String(32),default="")
+    contract_identity: Mapped[dict]=mapped_column(JSON,default=dict,nullable=False)
     avatar_data: Mapped[Optional[str]]=mapped_column(Text,nullable=True)
     google_sub: Mapped[Optional[str]]=mapped_column(String(255),nullable=True,unique=True,index=True)
 
@@ -492,6 +493,7 @@ def startup():
         conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS shipping_address TEXT NOT NULL DEFAULT ''"))
         conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS phone_country_code VARCHAR(8) NOT NULL DEFAULT '+963'"))
         conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS phone_number VARCHAR(32) NOT NULL DEFAULT ''"))
+        conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS contract_identity JSON NOT NULL DEFAULT '{}'::json"))
         conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS avatar_data TEXT"))
         conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS phone_verified_at TIMESTAMP WITH TIME ZONE"))
         conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS google_sub VARCHAR(255)"))
@@ -2768,6 +2770,7 @@ class StoreProfilePayload(BaseModel):
     phone_country_code: str = Field(default="",max_length=8)
     phone_number: str = Field(default="",max_length=32)
     avatar_data: Optional[str] = Field(default=None,max_length=5600000)
+    contract_identity: Optional[dict[str,str]] = None
 class StorePhoneCodePayload(BaseModel):
     phone_country_code: str = Field(default="",max_length=8)
     phone_number: str = Field(min_length=5,max_length=32)
@@ -3074,7 +3077,7 @@ def store_google_callback(request:Request, code:str="", state:str="", error:str=
 
 @app.get("/store/auth/me")
 def store_me(customer:StoreCustomer=Depends(current_store_customer)):
-    return {"id":customer.id,"email":customer.email,"full_name":customer.full_name,"first_name":customer.first_name or "","last_name":customer.last_name or "","shipping_address":customer.shipping_address or "","phone_country_code":customer.phone_country_code or "+963","phone_number":customer.phone_number or "","phone_verified":bool(customer.phone_verified_at),"avatar_data":customer.avatar_data}
+    return {"id":customer.id,"email":customer.email,"full_name":customer.full_name,"first_name":customer.first_name or "","last_name":customer.last_name or "","shipping_address":customer.shipping_address or "","phone_country_code":customer.phone_country_code or "+963","phone_number":customer.phone_number or "","phone_verified":bool(customer.phone_verified_at),"avatar_data":customer.avatar_data,"contract_identity":customer.contract_identity or {}}
 
 _store_phone_codes = {}
 def _store_phone_e164(country_code: str, phone_number: str) -> str:
@@ -3153,8 +3156,11 @@ def update_store_profile(p:StoreProfilePayload, s:Session=Depends(db), customer:
     customer.phone_country_code=new_phone_country_code
     customer.phone_number=new_phone_number
     if p.avatar_data is not None: customer.avatar_data=p.avatar_data or None
+    if p.contract_identity is not None:
+        allowed_identity=("first_name","last_name","father_name","mother_name","national_no","birth_place_date","id_type","id_no","id_issuer","registry","residence","address")
+        customer.contract_identity={k:str(p.contract_identity.get(k) or "").strip()[:500] for k in allowed_identity}
     s.commit()
-    return {"ok":True,"message":"تم حفظ بيانات حسابك","customer":{"id":customer.id,"email":customer.email,"full_name":customer.full_name,"first_name":customer.first_name,"last_name":customer.last_name,"shipping_address":customer.shipping_address,"phone_country_code":customer.phone_country_code,"phone_number":customer.phone_number,"phone_verified":bool(customer.phone_verified_at),"avatar_data":customer.avatar_data}}
+    return {"ok":True,"message":"تم حفظ بيانات حسابك","customer":{"id":customer.id,"email":customer.email,"full_name":customer.full_name,"first_name":customer.first_name,"last_name":customer.last_name,"shipping_address":customer.shipping_address,"phone_country_code":customer.phone_country_code,"phone_number":customer.phone_number,"phone_verified":bool(customer.phone_verified_at),"avatar_data":customer.avatar_data,"contract_identity":customer.contract_identity or {}}}
 
 @app.post("/store/auth/change-password")
 def request_store_password_change(p:StoreChangePasswordPayload, request:Request, s:Session=Depends(db), customer:StoreCustomer=Depends(current_store_customer)):
@@ -3238,7 +3244,7 @@ def save_store_cart(p:StoreCartPayload, request:Request, s:Session=Depends(db), 
 
 @app.get("/store/customer-profile")
 def get_store_customer_profile(customer:StoreCustomer=Depends(current_store_customer)):
-    return {"first_name":customer.first_name,"last_name":customer.last_name,"shipping_address":customer.shipping_address,"phone_country_code":customer.phone_country_code,"phone_number":customer.phone_number}
+    return {"first_name":customer.first_name,"last_name":customer.last_name,"shipping_address":customer.shipping_address,"phone_country_code":customer.phone_country_code,"phone_number":customer.phone_number,"contract_identity":customer.contract_identity or {}}
 
 @app.post("/store/orders")
 def create_online_order(p:OnlineOrderPayload,s:Session=Depends(db),customer:StoreCustomer=Depends(current_store_customer)):
@@ -3266,13 +3272,14 @@ def create_online_order(p:OnlineOrderPayload,s:Session=Depends(db),customer:Stor
         lines.append({"product_id":product.id,"sku":product.sku,"description":product.name,"model":product.model or "","quantity":qty,"price":unit,"store_family":catalog.get("store_family",""),"store_category":catalog.get("store_category",""),"vehicle_details":catalog.get("vehicle_details",{})})
     if not lines: raise HTTPException(400,"السلة فارغة")
     if p.contract_identity and not has_full_vehicle: raise HTTPException(400,"بيانات العقد متاحة فقط عند شراء مركبة كاملة")
-    if has_full_vehicle and not p.contract_identity: raise HTTPException(400,"لا يمكن إرسال طلب شراء مركبة كاملة دون معلومات عقد البيع وهوية العميل")
+    identity_input=p.contract_identity if p.contract_identity is not None else (customer.contract_identity or {})
     contract_identity=None
-    if p.contract_identity:
+    if has_full_vehicle:
         allowed_identity=("first_name","last_name","father_name","mother_name","national_no","birth_place_date","id_type","id_no","id_issuer","registry","residence","address")
-        contract_identity={k:str(p.contract_identity.get(k) or "").strip()[:500] for k in allowed_identity}
+        contract_identity={k:str(identity_input.get(k) or "").strip()[:500] for k in allowed_identity}
         if any(not contract_identity[k] for k in allowed_identity) or contract_identity["id_type"] not in {"هوية شخصية","جواز سفر"}:
             raise HTTPException(400,"يجب إكمال جميع بيانات هوية العميل والعقد قبل إرسال طلب الشراء")
+        customer.contract_identity=contract_identity
     previous_profile={"full_name":customer.full_name,"shipping_address":customer.shipping_address,"phone_country_code":customer.phone_country_code,"phone_number":customer.phone_number}
     customer.first_name=p.first_name.strip();customer.last_name=p.last_name.strip();customer.full_name=(customer.first_name+" "+customer.last_name).strip()
     customer.shipping_address=p.shipping_address.strip();customer.phone_country_code=p.phone_country_code;customer.phone_number=p.phone_number.strip()
