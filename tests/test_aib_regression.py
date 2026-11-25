@@ -189,6 +189,28 @@ class AIBRegressionTests(unittest.TestCase):
                     session.commit()
 
 
+    def test_public_search_loads_catalogue_before_ranking_products(self):
+        import inspect
+
+        source = inspect.getsource(aib.public_products)
+        catalogue_load = source.index("store_categories,latest_purchase=latest_store_catalog_data(s)")
+        ranking_use = source.index("explicit=store_categories.get(product.sku,{})")
+        self.assertLess(catalogue_load, ranking_use)
+
+    def test_public_search_keeps_arabic_terms_and_engine_codes(self):
+        self.assertEqual(
+            aib._normalize_public_search_query("محرك N 63"),
+            "محرك N 63",
+        )
+        self.assertEqual(
+            aib._public_search_terms("محرك N 63"),
+            ["محرك", "N", "63"],
+        )
+        self.assertEqual(
+            aib._normalize_public_search_query("['مكينة N63']"),
+            "مكينة N63",
+        )
+
     def test_public_search_splits_multi_word_queries_and_unwraps_list_queries(self):
         self.assertEqual(
             aib._normalize_public_search_query("['BMW TwinPower Turbo engine cover']"),
