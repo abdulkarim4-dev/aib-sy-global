@@ -1426,6 +1426,7 @@ def recalculate_inventory(s:Session):
 _store_catalog_cache={"at":0.0,"value":None}
 # Short-lived in-process cache for public storefront searches; keeps repeat searches off the database.
 _public_products_cache={"at":{},"value":{}}
+_public_products_visibility_cache={"at":0.0,"value":None}
 _PUBLIC_PRODUCTS_CACHE_TTL=20
 _PUBLIC_PRODUCTS_CACHE_MAX=120
 
@@ -1564,22 +1565,28 @@ def list_inventory_products(q:Optional[str]=None, s:Session=Depends(db), u:User=
     # stock values are deleted or modified by this display filter.
     # Extract only invoice SKUs in PostgreSQL instead of loading every full invoice
     # (including unrelated fields) into Python whenever inventory is opened.
-    invoiced_skus={
-        str(value).strip().upper()
-        for value in s.execute(text("""
-            SELECT DISTINCT UPPER(BTRIM(item->>'sku'))
-            FROM records AS r
-            CROSS JOIN LATERAL jsonb_array_elements(
-                CASE
-                    WHEN jsonb_typeof(CAST(r.data AS JSONB)->'items')='array'
-                    THEN CAST(r.data AS JSONB)->'items'
-                    ELSE '[]'::jsonb
-                END
-            ) AS item
-            WHERE r.deleted IS FALSE
-              AND NULLIF(BTRIM(item->>'sku'),'') IS NOT NULL
-        """)).scalars().all()
-    }
+    visibility_now=time.monotonic()
+    visibility_cached=_public_products_visibility_cache["value"]
+    if visibility_cached is None or visibility_now-_public_products_visibility_cache["at"]>=30:
+        visibility_cached={
+            str(value).strip().upper()
+            for value in s.execute(text("""
+                SELECT DISTINCT UPPER(BTRIM(item->>'sku'))
+                FROM records AS r
+                CROSS JOIN LATERAL jsonb_array_elements(
+                    CASE
+                        WHEN jsonb_typeof(CAST(r.data AS JSONB)->'items')='array'
+                        THEN CAST(r.data AS JSONB)->'items'
+                        ELSE '[]'::jsonb
+                    END
+                ) AS item
+                WHERE r.deleted IS FALSE
+                  AND NULLIF(BTRIM(item->>'sku'),'') IS NOT NULL
+            """)).scalars().all()
+        }
+        _public_products_visibility_cache["value"]=visibility_cached
+        _public_products_visibility_cache["at"]=visibility_now
+    invoiced_skus=visibility_cached
     rows=[p for p in rows if (u.role=="owner" and p.owner_user_id is None and str(p.sku or "").strip().upper() in invoiced_skus) or (u.role!="owner" and p.owner_user_id==u.id)]
     store_categories,latest_purchase=latest_store_catalog_data(s)
     return [{"id":p.id,"sku":p.sku,"name":p.name,"model":p.model,"description":p.description or "","owner_user_id":p.owner_user_id,"condition":p.condition or "new","is_store_visible":bool(p.is_store_visible),"opening_quantity":float(p.opening_quantity or 0),"store_family":p.store_family,"store_category":p.store_category,"owned_stock":float(p.owned_stock or 0),**({"consigned_stock":float(p.consigned_stock or 0)} if u.role=="owner" else {}),"image_count":len(p.images or []),"shipping_included":bool(p.shipping_included),"video_url":p.video_url or "",**store_categories.get(p.sku,{}),"vehicle_details":(p.vehicle_details or store_categories.get(p.sku,{}).get("vehicle_details") or {}),**latest_purchase.get(p.sku,{"purchase_price":0,"sale_price":0,"currency":"—"}),"sale_price":round(float(latest_purchase[p.sku]["purchase_price"])*(1+float(p.profit_margin if p.profit_margin is not None else 35)/100),2) if p.sku in latest_purchase and latest_purchase[p.sku].get("purchase_price") else (float(p.sale_price) if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("sale_price")),**({"profit_margin":float(p.profit_margin or 35)} if u.role=="owner" else {}),"sale_currency":p.sale_currency if p.sale_price is not None else latest_purchase.get(p.sku,{}).get("currency","")} for p in rows]
@@ -3689,27 +3696,39 @@ def public_products(q:Optional[str]=None, category:Optional[str]=None, response:
     ]
     visibility_ms=(time.perf_counter()-query_started)*1000-query_ms
 
-    # Keyword aliases for common customer language and component terminology.
+    # Understand colloquial requests and common names customers use instead of catalogue labels.
     synonym_groups = (
         ("محرك","محركات","مكينة","مكينه","موتور","engine","motor"),
-        ("جير","قير","فتيس","علبة سرعة","gearbox","transmission"),
-        ("سيارة","سيارات","مركبة","مركبات","car","cars","vehicle"),
-        ("شاحنة","شاحنات","تريلا","قاطرة","truck","lorry"),
-        ("حفارة","حفار","بوكلين","تركس","لودر","excavator","loader"),
+        ("جير","قير","فتيس","علبة سرعة","ناقل حركة","gearbox","transmission"),
+        ("سيارة","سيارات","مركبة","مركبات","سياحية","car","cars","vehicle"),
+        ("شاحنة","شاحنات","تريلا","قاطرة","رأس قاطر","truck","lorry"),
+        ("حفارة","حفار","بوكلين","تركس","لودر","بلدوزر","excavator","loader"),
         ("جرار","جرارات","تركتور","زراعي","tractor","agricultural"),
         ("قطع","قطعة","غيار","سبير","spare","parts"),
+        ("طرمبة","طلمبة","مضخة","مضخات","pump","pumps"),
+        ("ماء","مياه","water"),
+        ("فلتر","مرشح","filter"),
+        ("زيت","زيوت","oil"),
+        ("بستم","مكبس","piston"),
+        ("بخاخ","انجكتر","رشاش","injector"),
+        ("فرامل","بريك","كابح","brake"),
+        ("كشاف","مصباح","ضوء","headlight"),
         ("قصة","قصه"),
     )
+    search_stop_words={"اريد","ابغي","ابغى","بدي","عايز","عاوزه","ابي","محتاج","محتاجه","ابحث","بحث","عن","لي","من","في","متجر","المتجر","قسم","هل","يوجد","موجود","متوفر","شراء","طلب","السعر","كم","تفاصيل","اعرض","وريني","اظهر","هات","جيب","عندي","عندكم","وين","شو","لو","سمحت","فضلك","please","find","search","show","get","want","need","the","for","me"}
     normalized_query=_normalize_order_search(q)
-    query_tokens=[x for x in normalized_query.split() if len(x)>1]
+    query_tokens=[x for x in normalized_query.split() if len(x)>1 and x not in search_stop_words]
     expanded_tokens=set(query_tokens)
+    for token in query_tokens:
+        if token.startswith("ال") and len(token)>3:
+            expanded_tokens.add(token[2:])
     for group in synonym_groups:
         normalized_group={_normalize_order_search(x) for x in group}
         if expanded_tokens.intersection(normalized_group):
             expanded_tokens.update(normalized_group)
-    # Preserve compact engine/model identifiers so "N 63" matches "N63".
+    # Preserve model codes with or without spaces (for example N63 / N 63).
     compact_query="".join(ch for ch in normalized_query if ch.isalnum())
-    if compact_query:
+    if compact_query and compact_query not in search_stop_words:
         expanded_tokens.add(compact_query)
 
     if not q:
@@ -3734,9 +3753,9 @@ def public_products(q:Optional[str]=None, category:Optional[str]=None, response:
                     matched+=1
                     continue
                 # Approximate spelling match for words of useful length only.
-                best=max((difflib.SequenceMatcher(None,token,word).ratio()
-                          for word in words if abs(len(token)-len(word))<=2),default=0)
-                if best>=0.76:
+                candidates=[word for word in words if len(token)>=3 and abs(len(token)-len(word))<=2]
+                best=difflib.get_close_matches(token,candidates,n=1,cutoff=0.76)
+                if best:
                     score+=max(1,int(best*4))
                     matched+=1
             if compact_query and compact_query in compact_search:
@@ -4013,22 +4032,22 @@ def _gemini_reply(message: str, history: list[dict[str, str]], system_prompt: st
     return answer.strip()
 
 def _store_inventory_search(s: Session, message: str) -> list[dict]:
-    """Search the full active store catalogue using short Arabic/English keywords."""
+    """Search inventory by everyday Arabic/English wording, model codes and near spellings."""
+    import difflib
     normalized = _normalize_order_search(message)
     stop_words = {
-        "اريد","ابغي","ابحث","بحث","عن","لي","من","في","متجر","المتجر","قسم",
-        "رجاء","لو","سمحت","هل","يوجد","موجود","متوفر","شراء","طلب","السعر",
-        "كم","تفاصيل","اعرض","وريني","اظهر","هات","جيب","عندي","عندكم",
+        "اريد","ابغي","ابغى","بدي","عايز","ابي","محتاج","ابحث","بحث","عن","لي","من","في",
+        "متجر","المتجر","قسم","رجاء","لو","سمحت","هل","يوجد","موجود","متوفر","شراء","طلب",
+        "السعر","كم","تفاصيل","اعرض","وريني","اظهر","هات","جيب","عندي","عندكم","وين","شو",
         "please","find","search","show","get","want","need","the","for","me"
     }
     raw_tokens = [x for x in normalized.split() if len(x) > 1 and x not in stop_words]
     if not raw_tokens:
         return []
 
-    # Expand everyday customer wording to the terms used in inventory records/categories.
     synonym_groups = [
         ("محرك","محركات","مكينة","مكينه","موتور","engine","motor"),
-        ("جير","قير","فتيس","علبة","علب","سرعة","gearbox","transmission"),
+        ("جير","قير","فتيس","علبة","علب","سرعة","ناقل","gearbox","transmission"),
         ("سيارة","سيارات","مركبة","مركبات","سياحية","car","cars","vehicle"),
         ("شاحنة","شاحنات","تريلا","قاطرة","رأس","truck","trucks","lorry"),
         ("حفارة","حفارات","حفار","بوكلين","تركس","لودر","بلدوزر","excavator","loader"),
@@ -4036,11 +4055,15 @@ def _store_inventory_search(s: Session, message: str) -> list[dict]:
         ("مولد","مولدة","مولدات","كهرباء","generator","generators"),
         ("مضخة","مضخات","طرمبة","طلمبة","pump","pumps"),
         ("قطع","قطعة","غيار","سبير","spare","parts"),
-        ("بستم","مكبس","piston"),("بخاخ","انجكتر","injector"),
+        ("بستم","مكبس","piston"),("بخاخ","انجكتر","رشاش","injector"),
         ("فلتر","مرشح","filter"),("فرامل","بريك","brake"),
-        ("باب","ابواب","أبواب","door"),("كشاف","مصباح","ضوء","headlight"),
+        ("باب","ابواب","door"),("كشاف","مصباح","ضوء","headlight"),
+        ("زيت","زيوت","oil"),("ماء","مياه","water"),
     ]
     expanded = set(raw_tokens)
+    for token in raw_tokens:
+        if token.startswith("ال") and len(token)>3:
+            expanded.add(token[2:])
     for group in synonym_groups:
         normalized_group = {_normalize_order_search(x) for x in group}
         if expanded.intersection(normalized_group):
@@ -4048,10 +4071,9 @@ def _store_inventory_search(s: Session, message: str) -> list[dict]:
     tokens = list(expanded)
 
     rows = s.scalars(select(InventoryProduct).where(
-        InventoryProduct.active.is_(True)
-    ).order_by(InventoryProduct.sku).limit(500)).all()
+        InventoryProduct.active.is_(True), InventoryProduct.is_store_visible.is_(True)
+    ).order_by(InventoryProduct.sku).limit(1500)).all()
     store_categories, latest_purchase = latest_store_catalog_data(s)
-
     category_labels = {
         "cars":"سيارات مركبات سياحية","trucks":"شاحنات","heavy":"معدات ثقيلة حفارات",
         "agri":"معدات زراعية جرارات","car_parts":"قطع غيار سيارات",
@@ -4066,39 +4088,51 @@ def _store_inventory_search(s: Session, message: str) -> list[dict]:
         "special_engines":"محركات متنوعة","parts":"قطع غيار","engines":"محركات"
     }
     scored = []
+    compact_query = "".join(ch for ch in normalized if ch.isalnum())
     for p in rows:
-        stock = float(p.owned_stock or 0) + float(p.consigned_stock or 0)
         catalog = store_categories.get(p.sku, {})
-        category = catalog.get("store_category", "")
+        category = catalog.get("store_category") or p.store_category or ""
         vehicle = catalog.get("vehicle_details", {}) or {}
-        vehicle_text = " ".join(str(v) for v in vehicle.values() if v not in (None, ""))
+        product_vehicle = p.vehicle_details if isinstance(p.vehicle_details,dict) else {}
+        vehicle_text = " ".join(str(v) for v in list(vehicle.values())+list(product_vehicle.values()) if v not in (None, ""))
         category_text = category_labels.get(category, category.replace("_"," "))
         searchable = _normalize_order_search(" ".join([
-            p.sku or "", p.name or "", p.model or "", vehicle_text,
-            category_text, catalog.get("store_family", "")
+            p.sku or "", p.name or "", p.model or "", p.description or "",
+            vehicle_text, category_text, catalog.get("store_family", "") or p.store_family or ""
         ]))
-        matched = [token for token in tokens if token in searchable]
-        if not matched:
-            continue
-        # Exact SKU/model hits rank above broad category/description matches.
+        words = set(searchable.split())
+        compact_search = "".join(ch for ch in searchable if ch.isalnum())
         sku_model = _normalize_order_search((p.sku or "") + " " + (p.model or ""))
-        score = len(matched) * 3
-        score += sum(8 for token in matched if token in sku_model)
-        if len(tokens) > 1 and len(matched) == len(tokens):
+        matched = []
+        score = 0
+        for token in tokens:
+            if token in searchable or (len(token)>2 and token in compact_search):
+                matched.append(token)
+                score += 12 if token in sku_model else 6
+                continue
+            candidates=[word for word in words if len(token)>=3 and abs(len(token)-len(word))<=2]
+            if candidates and difflib.get_close_matches(token,candidates,n=1,cutoff=0.76):
+                matched.append(token)
+                score += 3
+        if compact_query and compact_query in compact_search:
+            score += 20
+        if not matched and score == 0:
+            continue
+        if len(raw_tokens)>1 and len(matched)>=len(raw_tokens):
             score += 5
-        scored.append((score, p, stock, catalog, category))
-
-    scored.sort(key=lambda item: (item[0], item[1].sku), reverse=True)
+        stock = float(p.owned_stock or 0) + float(p.consigned_stock or 0)
+        scored.append((score, len(matched), p, stock, catalog, category))
+    scored.sort(key=lambda item: (item[0], item[1], item[2].sku), reverse=True)
     results = []
-    for _, p, stock, catalog, category in scored[:12]:
+    for _, _, p, stock, catalog, category in scored[:12]:
         pricing = latest_purchase.get(p.sku, {})
         results.append({
             "id":p.id, "sku":p.sku, "name":p.name, "model":p.model or "",
-            "category":category or "parts", "store_family":catalog.get("store_family",""),
-            "vehicle_details":catalog.get("vehicle_details",{}),
-            "stock":stock, "sale_price":pricing.get("sale_price"),
-            "currency":pricing.get("currency",""), "images":(p.images or [])[:5],
-            "shipping_included":bool(p.shipping_included)
+            "category":category or "parts", "store_family":catalog.get("store_family",p.store_family or ""),
+            "vehicle_details":catalog.get("vehicle_details",p.vehicle_details or {}),
+            "stock":stock, "sale_price":float(p.sale_price) if p.sale_price is not None else pricing.get("sale_price"),
+            "currency":p.sale_currency if p.sale_price is not None else pricing.get("currency",""),
+            "images":(p.images or [])[:5], "shipping_included":bool(p.shipping_included)
         })
     return results
 
