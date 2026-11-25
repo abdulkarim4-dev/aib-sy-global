@@ -3256,6 +3256,8 @@ def get_store_cart(s:Session=Depends(db), customer:StoreCustomer=Depends(current
 
 @app.put("/store/cart")
 def save_store_cart(p:StoreCartPayload, request:Request, s:Session=Depends(db), customer:StoreCustomer=Depends(current_store_customer)):
+    if not _store_address_complete(customer.shipping_address_data):
+        raise HTTPException(400,"يجب تحديث عنوان الشحن في حسابك قبل استخدام سلة المتجر")
     cleaned=[];seen=set()
     for item in p.items:
         if item.product_id in seen: continue
