@@ -3712,6 +3712,8 @@ def public_products(q:Optional[str]=None, category:Optional[str]=None, response:
     if compact_query:
         expanded_tokens.add(compact_query)
 
+    if not q:
+        rows=rows[:300]
     if q and rows:
         import difflib
         ranked=[]
