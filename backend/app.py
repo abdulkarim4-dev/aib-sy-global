@@ -2876,9 +2876,10 @@ def store_latest_prices(s:Session):
 @app.post("/store/auth/register")
 def store_register(p:StoreRegisterPayload, request:Request, s:Session=Depends(db)):
     require_strong_store_password(p.password)
+    recipient_name=p.full_name.strip()
     phone_country_code=p.phone_country_code.strip()
     phone_number="".join(ch for ch in p.phone_number.strip() if ch.isdigit())
-    if not phone_country_code.startswith("+") or not 5 <= len(phone_number) <= 15:
+    if len(recipient_name)<2 or not phone_country_code.startswith("+") or not 5 <= len(phone_number) <= 15:
         raise HTTPException(400,"أدخل اسم المستلم ورقم هاتف صحيحاً مع اختيار رمز الدولة")
     _store_phone_e164(phone_country_code,phone_number)
     email=p.email.strip().lower()
@@ -2889,10 +2890,10 @@ def store_register(p:StoreRegisterPayload, request:Request, s:Session=Depends(db
         raise HTTPException(409,"هذا البريد مسجل مسبقاً. سجّل الدخول بدلاً من إنشاء حساب جديد")
     now=datetime.now(timezone.utc)
     if not customer:
-        customer=StoreCustomer(email=email,full_name=p.full_name.strip(),phone_country_code=phone_country_code,phone_number=phone_number,password_hash=password_hash.hash(p.password),cart=[],active=False)
+        customer=StoreCustomer(email=email,full_name=recipient_name,phone_country_code=phone_country_code,phone_number=phone_number,password_hash=password_hash.hash(p.password),cart=[],active=False)
         s.add(customer);s.flush()
     else:
-        customer.full_name=p.full_name.strip()
+        customer.full_name=recipient_name
         customer.phone_country_code=phone_country_code
         customer.phone_number=phone_number
         customer.phone_verified_at=None
