@@ -3147,7 +3147,18 @@ def send_store_phone_code(p:StorePhoneCodePayload, customer:StoreCustomer=Depend
     sender=os.getenv("TWILIO_PHONE_NUMBER","").strip()
     if not (sid and token and sender):
         raise HTTPException(503,"خدمة الرسائل النصية غير مهيأة بعد. أضف TWILIO_ACCOUNT_SID وTWILIO_AUTH_TOKEN وTWILIO_PHONE_NUMBER في Render")
-    phone=_store_phone_e164(p.phone_country_code,p.phone_number)
+    phone_country_code=p.phone_country_code.strip()
+    raw_phone=p.phone_number.strip()
+    if raw_phone.startswith("+"):
+        full_phone=_store_phone_e164("",raw_phone)
+        if not full_phone.startswith(phone_country_code):
+            raise HTTPException(400,"اختر رمز الدولة المطابق لرقم الهاتف")
+        phone_number=full_phone[len(phone_country_code):]
+    else:
+        phone_number="".join(ch for ch in raw_phone if ch.isdigit())
+    if not re.fullmatch(r"\+[1-9]\d{0,3}",phone_country_code) or not 5 <= len(phone_number) <= 15:
+        raise HTTPException(400,"رقم الهاتف غير صحيح")
+    phone=_store_phone_e164(phone_country_code,phone_number)
     now=datetime.now(timezone.utc)
     previous=_store_phone_codes.get(customer.id)
     if previous and (now-previous["sent_at"]).total_seconds()<60:
@@ -3167,7 +3178,7 @@ def send_store_phone_code(p:StorePhoneCodePayload, customer:StoreCustomer=Depend
         raise HTTPException(502,detail)
     except (URLError,TimeoutError):
         raise HTTPException(504,"انتهت مهلة إرسال رسالة التحقق. حاول مجدداً")
-    _store_phone_codes[customer.id]={"hash":hashlib.sha256(code.encode()).hexdigest(),"sent_at":now,"expires_at":now+timedelta(minutes=5),"phone":phone,"attempts":0}
+    _store_phone_codes[customer.id]={"hash":hashlib.sha256(code.encode()).hexdigest(),"sent_at":now,"expires_at":now+timedelta(minutes=5),"phone":phone,"phone_country_code":phone_country_code,"phone_number":phone_number,"attempts":0}
     return {"ok":True,"message":"تم إرسال رمز التحقق برسالة SMS، صالح لمدة 5 دقائق"}
 
 @app.post("/store/auth/phone/confirm")
@@ -3182,8 +3193,8 @@ def confirm_store_phone(p:StorePhoneConfirmPayload,s:Session=Depends(db),custome
         raise HTTPException(429,"تم تجاوز محاولات التحقق. اطلب رمزاً جديداً")
     if not secrets.compare_digest(item["hash"],hashlib.sha256(p.code.encode()).hexdigest()):
         raise HTTPException(400,"رمز التحقق غير صحيح")
-    customer.phone_country_code=""
-    customer.phone_number=item["phone"]
+    customer.phone_country_code=item["phone_country_code"]
+    customer.phone_number=item["phone_number"]
     customer.phone_verified_at=datetime.now(timezone.utc)
     s.commit()
     _store_phone_codes.pop(customer.id,None)
