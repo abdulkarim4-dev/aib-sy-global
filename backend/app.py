@@ -2784,6 +2784,8 @@ class StoreProfilePayload(BaseModel):
 class StoreAddressPayload(BaseModel):
     country: str = Field(min_length=2,max_length=100)
     province: str = Field(min_length=2,max_length=120)
+    region: str = Field(min_length=2,max_length=140)
+    district: str = Field(min_length=2,max_length=140)
     address_line1: str = Field(min_length=3,max_length=250)
     address_line2: str = Field(min_length=2,max_length=250)
 
@@ -2818,15 +2820,15 @@ class StoreCartPayload(BaseModel):
 
 def _store_address_data(value: Optional[dict]) -> dict:
     source=value if isinstance(value,dict) else {}
-    return {key:str(source.get(key) or "").strip() for key in ("country","province","address_line1","address_line2")}
+    return {key:str(source.get(key) or "").strip() for key in ("country","province","region","district","address_line1","address_line2")}
 
 def _store_address_complete(value: Optional[dict]) -> bool:
     data=_store_address_data(value)
-    return all(len(data[key]) >= minimum for key,minimum in (("country",2),("province",2),("address_line1",3),("address_line2",2)))
+    return all(len(data[key]) >= minimum for key,minimum in (("country",2),("province",2),("region",2),("district",2),("address_line1",3),("address_line2",2)))
 
 def _store_address_text(value: Optional[dict]) -> str:
     data=_store_address_data(value)
-    return "، ".join(data[key] for key in ("address_line1","address_line2","province","country") if data[key])
+    return "، ".join(data[key] for key in ("address_line1","address_line2","district","region","province","country") if data[key])
 
 def store_customer_token(customer:StoreCustomer):
     # Store sessions have a bounded lifetime and are held only in an HttpOnly cookie.
@@ -3179,7 +3181,7 @@ def update_store_profile(p:StoreProfilePayload, s:Session=Depends(db), customer:
     if p.shipping_address_data is not None:
         address_data=_store_address_data(p.shipping_address_data)
         if not _store_address_complete(address_data):
-            raise HTTPException(400,"أكمل الدولة والمحافظة وسطرَي العنوان قبل الحفظ")
+            raise HTTPException(400,"أكمل الدولة والمحافظة والمنطقة والحي وسطرَي العنوان قبل الحفظ")
         customer.shipping_address_data=address_data
         customer.shipping_address=_store_address_text(address_data)
     elif p.shipping_address.strip() and not customer.shipping_address:
