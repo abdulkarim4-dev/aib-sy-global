@@ -2878,8 +2878,15 @@ def store_register(p:StoreRegisterPayload, request:Request, s:Session=Depends(db
     require_strong_store_password(p.password)
     recipient_name=p.full_name.strip()
     phone_country_code=p.phone_country_code.strip()
-    phone_number="".join(ch for ch in p.phone_number.strip() if ch.isdigit())
-    if len(recipient_name)<2 or not phone_country_code.startswith("+") or not 5 <= len(phone_number) <= 15:
+    raw_phone=p.phone_number.strip()
+    if raw_phone.startswith("+"):
+        full_phone=_store_phone_e164("",raw_phone)
+        if not full_phone.startswith(phone_country_code):
+            raise HTTPException(400,"اختر رمز الدولة المطابق لرقم الهاتف أو أدخل الرقم المحلي دون الرمز")
+        phone_number=full_phone[len(phone_country_code):]
+    else:
+        phone_number="".join(ch for ch in raw_phone if ch.isdigit())
+    if len(recipient_name)<2 or not re.fullmatch(r"\\+[1-9]\\d{0,3}",phone_country_code) or not 5 <= len(phone_number) <= 15:
         raise HTTPException(400,"أدخل اسم المستلم ورقم هاتف صحيحاً مع اختيار رمز الدولة")
     _store_phone_e164(phone_country_code,phone_number)
     email=p.email.strip().lower()
@@ -3198,8 +3205,15 @@ def update_store_profile(p:StoreProfilePayload, s:Session=Depends(db), customer:
     elif p.shipping_address.strip() and not customer.shipping_address:
         customer.shipping_address=p.shipping_address.strip()
     new_phone_country_code=p.phone_country_code.strip()
-    new_phone_number="".join(ch for ch in p.phone_number.strip() if ch.isdigit())
-    if not new_phone_country_code.startswith("+") or not 5 <= len(new_phone_number) <= 15:
+    raw_phone=p.phone_number.strip()
+    if raw_phone.startswith("+"):
+        full_phone=_store_phone_e164("",raw_phone)
+        if not full_phone.startswith(new_phone_country_code):
+            raise HTTPException(400,"اختر رمز الدولة المطابق لرقم الهاتف أو أدخل الرقم المحلي دون الرمز")
+        new_phone_number=full_phone[len(new_phone_country_code):]
+    else:
+        new_phone_number="".join(ch for ch in raw_phone if ch.isdigit())
+    if not re.fullmatch(r"\\+[1-9]\\d{0,3}",new_phone_country_code) or not 5 <= len(new_phone_number) <= 15:
         raise HTTPException(400,"يجب إدخال رقم هاتف المستلم مع رمز الدولة")
     _store_phone_e164(new_phone_country_code,new_phone_number)
     if new_phone_number != customer.phone_number or new_phone_country_code != customer.phone_country_code:
