@@ -3289,7 +3289,7 @@ def get_store_customer_profile(customer:StoreCustomer=Depends(current_store_cust
 def update_store_address(p:StoreAddressPayload,s:Session=Depends(db),customer:StoreCustomer=Depends(current_store_customer)):
     address_data=_store_address_data(p.model_dump())
     if not _store_address_complete(address_data):
-        raise HTTPException(400,"أكمل الدولة والمحافظة وسطرَي العنوان قبل الحفظ")
+        raise HTTPException(400,"أكمل الدولة والمحافظة والمنطقة والحي وسطرَي العنوان قبل الحفظ")
     customer.shipping_address_data=address_data
     customer.shipping_address=_store_address_text(address_data)
     s.commit()
