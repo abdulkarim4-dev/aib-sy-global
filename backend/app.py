@@ -3653,22 +3653,14 @@ def public_products(q:Optional[str]=None, category:Optional[str]=None, response:
         )
         return cached
     query_started=time.perf_counter()
-    query=select(InventoryProduct).where(InventoryProduct.active.is_(True),InventoryProduct.is_store_visible.is_(True))
-    if q:
-        # Treat a multi-word query as AND across terms, while each term may match
-        # SKU, product name, model, or description. This supports phrases whose
-        # words are split between the product name and its descriptive fields.
-        # Escape SQL LIKE wildcards so user input is always interpreted literally.
-        search_terms = _public_search_terms(q)
-        for token in search_terms:
-            pattern = _public_search_like_pattern(token)
-            query = query.where(or_(
-                InventoryProduct.sku.ilike(pattern, escape="!"),
-                InventoryProduct.name.ilike(pattern, escape="!"),
-                InventoryProduct.model.ilike(pattern, escape="!"),
-                InventoryProduct.description.ilike(pattern, escape="!"),
-            ))
-    rows=s.scalars(query.order_by(InventoryProduct.sku).limit(300)).all()
+    # Load the active, storefront-visible catalogue once, then rank it in Python.
+    # This avoids brittle SQL AND matching: partial words, Arabic spelling variants,
+    # model-code spacing (N63 / N 63), and small typos can still find close products.
+    query=select(InventoryProduct).where(
+        InventoryProduct.active.is_(True),
+        InventoryProduct.is_store_visible.is_(True)
+    )
+    rows=s.scalars(query.order_by(InventoryProduct.sku).limit(1500)).all()
     query_ms=(time.perf_counter()-query_started)*1000
     # Match the inventory page's visibility rule exactly: employee-owned products
     # belong to that employee's inventory; legacy/owner products are visible only
@@ -3696,6 +3688,65 @@ def public_products(q:Optional[str]=None, category:Optional[str]=None, response:
         or str(p.sku or "").strip().upper() in invoiced_skus
     ]
     visibility_ms=(time.perf_counter()-query_started)*1000-query_ms
+
+    # Keyword aliases for common customer language and component terminology.
+    synonym_groups = (
+        ("محرك","محركات","مكينة","مكينه","موتور","engine","motor"),
+        ("جير","قير","فتيس","علبة سرعة","gearbox","transmission"),
+        ("سيارة","سيارات","مركبة","مركبات","car","cars","vehicle"),
+        ("شاحنة","شاحنات","تريلا","قاطرة","truck","lorry"),
+        ("حفارة","حفار","بوكلين","تركس","لودر","excavator","loader"),
+        ("جرار","جرارات","تركتور","زراعي","tractor","agricultural"),
+        ("قطع","قطعة","غيار","سبير","spare","parts"),
+        ("قصة","قصه"),
+    )
+    normalized_query=_normalize_order_search(q)
+    query_tokens=[x for x in normalized_query.split() if len(x)>1]
+    expanded_tokens=set(query_tokens)
+    for group in synonym_groups:
+        normalized_group={_normalize_order_search(x) for x in group}
+        if expanded_tokens.intersection(normalized_group):
+            expanded_tokens.update(normalized_group)
+    # Preserve compact engine/model identifiers so "N 63" matches "N63".
+    compact_query="".join(ch for ch in normalized_query if ch.isalnum())
+    if compact_query:
+        expanded_tokens.add(compact_query)
+
+    if q and rows:
+        import difflib
+        ranked=[]
+        for product in rows:
+            searchable=_normalize_order_search(" ".join((
+                product.sku or "", product.name or "", product.model or "",
+                product.description or "",
+                " ".join(str(v) for v in (product.vehicle_details or {}).values()
+                         if v not in (None,""))
+            )))
+            words=set(searchable.split())
+            compact_search="".join(ch for ch in searchable if ch.isalnum())
+            score=0
+            matched=0
+            for token in expanded_tokens:
+                if token in searchable or (len(token)>2 and token in compact_search):
+                    score+=12 if token in _normalize_order_search((product.sku or "")+" "+(product.model or "")) else 6
+                    matched+=1
+                    continue
+                # Approximate spelling match for words of useful length only.
+                best=max((difflib.SequenceMatcher(None,token,word).ratio()
+                          for word in words if abs(len(token)-len(word))<=2),default=0)
+                if best>=0.76:
+                    score+=max(1,int(best*4))
+                    matched+=1
+            if compact_query and compact_query in compact_search:
+                score+=20
+            # If nothing matches, retain a low-confidence similarity score so the
+            # customer sees the closest catalogue items instead of an empty panel.
+            if matched==0 and not (compact_query and compact_query in compact_search):
+                similarity=difflib.SequenceMatcher(None,normalized_query,searchable).ratio()
+                score=max(score,int(similarity*5))
+            ranked.append((score,matched,product))
+        ranked.sort(key=lambda item:(item[0],item[1],item[2].sku),reverse=True)
+        rows=[item[2] for item in ranked[:60]]
     catalog_started=time.perf_counter()
     store_categories,latest_purchase=latest_store_catalog_data(s)
     catalog_ms=(time.perf_counter()-catalog_started)*1000
