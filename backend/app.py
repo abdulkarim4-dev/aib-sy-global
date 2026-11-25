@@ -3325,7 +3325,7 @@ def create_online_order(p:OnlineOrderPayload,s:Session=Depends(db),customer:Stor
         customer.contract_identity=contract_identity
     previous_profile={"full_name":customer.full_name,"shipping_address":customer.shipping_address,"phone_country_code":customer.phone_country_code,"phone_number":customer.phone_number}
     customer.first_name=p.first_name.strip();customer.last_name=p.last_name.strip();customer.full_name=(customer.first_name+" "+customer.last_name).strip()
-    customer.shipping_address=p.shipping_address.strip();customer.phone_country_code=p.phone_country_code;customer.phone_number=p.phone_number.strip()
+    customer.shipping_address=_store_address_text(customer.shipping_address_data);customer.phone_country_code=p.phone_country_code;customer.phone_number=p.phone_number.strip()
     data={"first_name":customer.first_name,"last_name":customer.last_name,"full_name":customer.full_name,"email":customer.email,"shipping_address":customer.shipping_address,"shipping_address_data":_store_address_data(customer.shipping_address_data),"phone_country_code":customer.phone_country_code,"phone_number":customer.phone_number,"full_phone":customer.phone_country_code+customer.phone_number,"payment_method":p.payment_method,"include_contract_identity":bool(contract_identity),"contract_identity":contract_identity}
     order=OnlinePurchaseOrder(customer_id=customer.id,customer_data=data,items=lines,total=round(total,2),currency=currency or "USD",payment_proof=p.payment_proof,proof_type=p.proof_type,status="pending")
     s.add(order);s.commit();s.refresh(order)
