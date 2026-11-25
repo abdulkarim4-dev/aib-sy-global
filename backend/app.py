@@ -105,6 +105,7 @@ class StoreCustomer(Base):
     first_name: Mapped[str]=mapped_column(String(80),default="")
     last_name: Mapped[str]=mapped_column(String(80),default="")
     shipping_address: Mapped[str]=mapped_column(Text,default="")
+    shipping_address_data: Mapped[dict]=mapped_column(JSON,default=dict,nullable=False)
     phone_country_code: Mapped[str]=mapped_column(String(8),default="+963")
     phone_verified_at: Mapped[Optional[datetime]]=mapped_column(DateTime(timezone=True),nullable=True)
     phone_number: Mapped[str]=mapped_column(String(32),default="")
@@ -491,6 +492,7 @@ def startup():
         conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS first_name VARCHAR(80) NOT NULL DEFAULT ''"))
         conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS last_name VARCHAR(80) NOT NULL DEFAULT ''"))
         conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS shipping_address TEXT NOT NULL DEFAULT ''"))
+        conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS shipping_address_data JSONB NOT NULL DEFAULT '{}'::jsonb"))
         conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS phone_country_code VARCHAR(8) NOT NULL DEFAULT '+963'"))
         conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS phone_number VARCHAR(32) NOT NULL DEFAULT ''"))
         conn.execute(text("ALTER TABLE store_customers ADD COLUMN IF NOT EXISTS contract_identity JSON NOT NULL DEFAULT '{}'::json"))
@@ -2767,10 +2769,17 @@ class StoreProfilePayload(BaseModel):
     first_name: str = Field(default="",max_length=80)
     last_name: str = Field(default="",max_length=80)
     shipping_address: str = Field(default="",max_length=1000)
+    shipping_address_data: Optional[dict[str,str]] = None
     phone_country_code: str = Field(default="",max_length=8)
     phone_number: str = Field(default="",max_length=32)
     avatar_data: Optional[str] = Field(default=None,max_length=5600000)
     contract_identity: Optional[dict[str,str]] = None
+class StoreAddressPayload(BaseModel):
+    country: str = Field(min_length=2,max_length=100)
+    province: str = Field(min_length=2,max_length=120)
+    address_line1: str = Field(min_length=3,max_length=250)
+    address_line2: str = Field(min_length=2,max_length=250)
+
 class StorePhoneCodePayload(BaseModel):
     phone_country_code: str = Field(default="",max_length=8)
     phone_number: str = Field(min_length=5,max_length=32)
@@ -2799,6 +2808,18 @@ class OnlineOrderPayload(BaseModel):
 
 class StoreCartPayload(BaseModel):
     items: list[StoreCartItemPayload] = Field(default_factory=list, max_length=100)
+
+def _store_address_data(value: Optional[dict]) -> dict:
+    source=value if isinstance(value,dict) else {}
+    return {key:str(source.get(key) or "").strip() for key in ("country","province","address_line1","address_line2")}
+
+def _store_address_complete(value: Optional[dict]) -> bool:
+    data=_store_address_data(value)
+    return all(len(data[key]) >= minimum for key,minimum in (("country",2),("province",2),("address_line1",3),("address_line2",2)))
+
+def _store_address_text(value: Optional[dict]) -> str:
+    data=_store_address_data(value)
+    return "، ".join(data[key] for key in ("address_line1","address_line2","province","country") if data[key])
 
 def store_customer_token(customer:StoreCustomer):
     # Store sessions have a bounded lifetime and are held only in an HttpOnly cookie.
@@ -3077,7 +3098,7 @@ def store_google_callback(request:Request, code:str="", state:str="", error:str=
 
 @app.get("/store/auth/me")
 def store_me(customer:StoreCustomer=Depends(current_store_customer)):
-    return {"id":customer.id,"email":customer.email,"full_name":customer.full_name,"first_name":customer.first_name or "","last_name":customer.last_name or "","shipping_address":customer.shipping_address or "","phone_country_code":customer.phone_country_code or "+963","phone_number":customer.phone_number or "","phone_verified":bool(customer.phone_verified_at),"avatar_data":customer.avatar_data,"contract_identity":customer.contract_identity or {}}
+    return {"id":customer.id,"email":customer.email,"full_name":customer.full_name,"first_name":customer.first_name or "","last_name":customer.last_name or "","shipping_address":customer.shipping_address or "","shipping_address_data":_store_address_data(customer.shipping_address_data),"address_complete":_store_address_complete(customer.shipping_address_data),"phone_country_code":customer.phone_country_code or "+963","phone_number":customer.phone_number or "","phone_verified":bool(customer.phone_verified_at),"avatar_data":customer.avatar_data,"contract_identity":customer.contract_identity or {}}
 
 _store_phone_codes = {}
 def _store_phone_e164(country_code: str, phone_number: str) -> str:
@@ -3148,7 +3169,14 @@ def update_store_profile(p:StoreProfilePayload, s:Session=Depends(db), customer:
     customer.full_name=p.full_name.strip()
     customer.first_name=p.first_name.strip()
     customer.last_name=p.last_name.strip()
-    customer.shipping_address=p.shipping_address.strip()
+    if p.shipping_address_data is not None:
+        address_data=_store_address_data(p.shipping_address_data)
+        if not _store_address_complete(address_data):
+            raise HTTPException(400,"أكمل الدولة والمحافظة وسطرَي العنوان قبل الحفظ")
+        customer.shipping_address_data=address_data
+        customer.shipping_address=_store_address_text(address_data)
+    elif p.shipping_address.strip() and not customer.shipping_address:
+        customer.shipping_address=p.shipping_address.strip()
     new_phone_country_code=p.phone_country_code.strip()
     new_phone_number=p.phone_number.strip()
     if new_phone_number != customer.phone_number or new_phone_country_code != customer.phone_country_code:
@@ -3160,7 +3188,7 @@ def update_store_profile(p:StoreProfilePayload, s:Session=Depends(db), customer:
         allowed_identity=("first_name","last_name","father_name","mother_name","national_no","birth_place_date","id_type","id_no","id_issuer","registry","residence","address")
         customer.contract_identity={k:str(p.contract_identity.get(k) or "").strip()[:500] for k in allowed_identity}
     s.commit()
-    return {"ok":True,"message":"تم حفظ بيانات حسابك","customer":{"id":customer.id,"email":customer.email,"full_name":customer.full_name,"first_name":customer.first_name,"last_name":customer.last_name,"shipping_address":customer.shipping_address,"phone_country_code":customer.phone_country_code,"phone_number":customer.phone_number,"phone_verified":bool(customer.phone_verified_at),"avatar_data":customer.avatar_data,"contract_identity":customer.contract_identity or {}}}
+    return {"ok":True,"message":"تم حفظ بيانات حسابك","customer":{"id":customer.id,"email":customer.email,"full_name":customer.full_name,"first_name":customer.first_name,"last_name":customer.last_name,"shipping_address":customer.shipping_address,"shipping_address_data":_store_address_data(customer.shipping_address_data),"address_complete":_store_address_complete(customer.shipping_address_data),"phone_country_code":customer.phone_country_code,"phone_number":customer.phone_number,"phone_verified":bool(customer.phone_verified_at),"avatar_data":customer.avatar_data,"contract_identity":customer.contract_identity or {}}}
 
 @app.post("/store/auth/change-password")
 def request_store_password_change(p:StoreChangePasswordPayload, request:Request, s:Session=Depends(db), customer:StoreCustomer=Depends(current_store_customer)):
@@ -3244,7 +3272,17 @@ def save_store_cart(p:StoreCartPayload, request:Request, s:Session=Depends(db), 
 
 @app.get("/store/customer-profile")
 def get_store_customer_profile(customer:StoreCustomer=Depends(current_store_customer)):
-    return {"first_name":customer.first_name,"last_name":customer.last_name,"shipping_address":customer.shipping_address,"phone_country_code":customer.phone_country_code,"phone_number":customer.phone_number,"contract_identity":customer.contract_identity or {}}
+    return {"first_name":customer.first_name,"last_name":customer.last_name,"shipping_address":customer.shipping_address,"shipping_address_data":_store_address_data(customer.shipping_address_data),"address_complete":_store_address_complete(customer.shipping_address_data),"phone_country_code":customer.phone_country_code,"phone_number":customer.phone_number,"contract_identity":customer.contract_identity or {}}
+
+@app.put("/store/auth/address")
+def update_store_address(p:StoreAddressPayload,s:Session=Depends(db),customer:StoreCustomer=Depends(current_store_customer)):
+    address_data=_store_address_data(p.model_dump())
+    if not _store_address_complete(address_data):
+        raise HTTPException(400,"أكمل الدولة والمحافظة وسطرَي العنوان قبل الحفظ")
+    customer.shipping_address_data=address_data
+    customer.shipping_address=_store_address_text(address_data)
+    s.commit()
+    return {"ok":True,"shipping_address":customer.shipping_address,"shipping_address_data":address_data,"address_complete":True,"message":"تم حفظ عنوان الشحن بنجاح"}
 
 @app.post("/store/orders")
 def create_online_order(p:OnlineOrderPayload,s:Session=Depends(db),customer:StoreCustomer=Depends(current_store_customer)):
@@ -3256,6 +3294,9 @@ def create_online_order(p:OnlineOrderPayload,s:Session=Depends(db),customer:Stor
     except HTTPException: raise
     except Exception: raise HTTPException(400,"ملف إثبات الدفع غير صالح")
     if not raw or len(raw)>5*1024*1024: raise HTTPException(413,"الحد الأقصى لإثبات الدفع 5 ميغابايت")
+    if not _store_address_complete(customer.shipping_address_data):
+        raise HTTPException(400,"يجب تحديث عنوان الشحن في حسابك قبل إتمام الشراء")
+    customer.shipping_address=_store_address_text(customer.shipping_address_data)
     prices=store_latest_prices(s);store_categories=latest_inventory_store_categories(s);lines=[];currency=None;total=0;seen=set();has_full_vehicle=False
     for entry in p.items:
         if entry.product_id in seen: continue
@@ -3283,7 +3324,7 @@ def create_online_order(p:OnlineOrderPayload,s:Session=Depends(db),customer:Stor
     previous_profile={"full_name":customer.full_name,"shipping_address":customer.shipping_address,"phone_country_code":customer.phone_country_code,"phone_number":customer.phone_number}
     customer.first_name=p.first_name.strip();customer.last_name=p.last_name.strip();customer.full_name=(customer.first_name+" "+customer.last_name).strip()
     customer.shipping_address=p.shipping_address.strip();customer.phone_country_code=p.phone_country_code;customer.phone_number=p.phone_number.strip()
-    data={"first_name":customer.first_name,"last_name":customer.last_name,"full_name":customer.full_name,"email":customer.email,"shipping_address":customer.shipping_address,"phone_country_code":customer.phone_country_code,"phone_number":customer.phone_number,"full_phone":customer.phone_country_code+customer.phone_number,"payment_method":p.payment_method,"include_contract_identity":bool(contract_identity),"contract_identity":contract_identity}
+    data={"first_name":customer.first_name,"last_name":customer.last_name,"full_name":customer.full_name,"email":customer.email,"shipping_address":customer.shipping_address,"shipping_address_data":_store_address_data(customer.shipping_address_data),"phone_country_code":customer.phone_country_code,"phone_number":customer.phone_number,"full_phone":customer.phone_country_code+customer.phone_number,"payment_method":p.payment_method,"include_contract_identity":bool(contract_identity),"contract_identity":contract_identity}
     order=OnlinePurchaseOrder(customer_id=customer.id,customer_data=data,items=lines,total=round(total,2),currency=currency or "USD",payment_proof=p.payment_proof,proof_type=p.proof_type,status="pending")
     s.add(order);s.commit();s.refresh(order)
     if any(previous_profile[k]!=(customer.full_name if k=="full_name" else customer.shipping_address if k=="shipping_address" else customer.phone_country_code if k=="phone_country_code" else customer.phone_number) for k in previous_profile):
