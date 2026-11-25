@@ -3197,7 +3197,10 @@ def update_store_profile(p:StoreProfilePayload, s:Session=Depends(db), customer:
     elif p.shipping_address.strip() and not customer.shipping_address:
         customer.shipping_address=p.shipping_address.strip()
     new_phone_country_code=p.phone_country_code.strip()
-    new_phone_number=p.phone_number.strip()
+    new_phone_number="".join(ch for ch in p.phone_number.strip() if ch.isdigit())
+    if not new_phone_country_code.startswith("+") or not 5 <= len(new_phone_number) <= 15:
+        raise HTTPException(400,"يجب إدخال رقم هاتف المستلم مع رمز الدولة")
+    _store_phone_e164(new_phone_country_code,new_phone_number)
     if new_phone_number != customer.phone_number or new_phone_country_code != customer.phone_country_code:
         customer.phone_verified_at=None
     customer.phone_country_code=new_phone_country_code
@@ -3315,6 +3318,8 @@ def create_online_order(p:OnlineOrderPayload,s:Session=Depends(db),customer:Stor
     except HTTPException: raise
     except Exception: raise HTTPException(400,"ملف إثبات الدفع غير صالح")
     if not raw or len(raw)>5*1024*1024: raise HTTPException(413,"الحد الأقصى لإثبات الدفع 5 ميغابايت")
+    if not customer.full_name.strip() or not customer.phone_country_code.startswith("+") or not 5 <= len("".join(ch for ch in customer.phone_number if ch.isdigit())) <= 15:
+        raise HTTPException(400,"أكمل اسم المستلم ورقم هاتفه في إعدادات حسابك قبل إتمام الشراء")
     if not _store_address_complete(customer.shipping_address_data):
         raise HTTPException(400,"يجب تحديث عنوان الشحن في حسابك قبل إتمام الشراء")
     customer.shipping_address=_store_address_text(customer.shipping_address_data)
