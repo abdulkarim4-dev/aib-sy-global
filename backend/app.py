@@ -2759,6 +2759,8 @@ def require_strong_store_password(value:str):
 
 class StoreRegisterPayload(BaseModel):
     full_name: str = Field(min_length=2, max_length=160)
+    phone_country_code: str = Field(min_length=2, max_length=8)
+    phone_number: str = Field(min_length=5, max_length=32)
     email: str = Field(min_length=5, max_length=254)
     password: str = Field(min_length=8, max_length=256)
 class StoreLoginPayload(BaseModel):
@@ -2874,6 +2876,11 @@ def store_latest_prices(s:Session):
 @app.post("/store/auth/register")
 def store_register(p:StoreRegisterPayload, request:Request, s:Session=Depends(db)):
     require_strong_store_password(p.password)
+    phone_country_code=p.phone_country_code.strip()
+    phone_number="".join(ch for ch in p.phone_number.strip() if ch.isdigit())
+    if not phone_country_code.startswith("+") or not 5 <= len(phone_number) <= 15:
+        raise HTTPException(400,"أدخل اسم المستلم ورقم هاتف صحيحاً مع اختيار رمز الدولة")
+    _store_phone_e164(phone_country_code,phone_number)
     email=p.email.strip().lower()
     if "@" not in email or "." not in email.rsplit("@",1)[-1]:
         raise HTTPException(400,"يرجى إدخال بريد إلكتروني صحيح")
@@ -2882,10 +2889,13 @@ def store_register(p:StoreRegisterPayload, request:Request, s:Session=Depends(db
         raise HTTPException(409,"هذا البريد مسجل مسبقاً. سجّل الدخول بدلاً من إنشاء حساب جديد")
     now=datetime.now(timezone.utc)
     if not customer:
-        customer=StoreCustomer(email=email,full_name=p.full_name.strip(),password_hash=password_hash.hash(p.password),cart=[],active=False)
+        customer=StoreCustomer(email=email,full_name=p.full_name.strip(),phone_country_code=phone_country_code,phone_number=phone_number,password_hash=password_hash.hash(p.password),cart=[],active=False)
         s.add(customer);s.flush()
     else:
         customer.full_name=p.full_name.strip()
+        customer.phone_country_code=phone_country_code
+        customer.phone_number=phone_number
+        customer.phone_verified_at=None
         customer.password_hash=password_hash.hash(p.password)
         s.query(StoreEmailVerification).filter(StoreEmailVerification.customer_id==customer.id).delete(synchronize_session=False)
     latest=s.scalar(select(StoreEmailVerification).where(StoreEmailVerification.customer_id==customer.id).order_by(StoreEmailVerification.id.desc()))
@@ -3335,7 +3345,7 @@ def create_online_order(p:OnlineOrderPayload,s:Session=Depends(db),customer:Stor
     previous_profile={"full_name":customer.full_name,"shipping_address":customer.shipping_address,"phone_country_code":customer.phone_country_code,"phone_number":customer.phone_number}
     customer.first_name=p.first_name.strip();customer.last_name=p.last_name.strip();customer.full_name=(customer.first_name+" "+customer.last_name).strip()
     customer.shipping_address=_store_address_text(customer.shipping_address_data);customer.phone_country_code=p.phone_country_code;customer.phone_number=p.phone_number.strip()
-    data={"first_name":customer.first_name,"last_name":customer.last_name,"full_name":customer.full_name,"email":customer.email,"shipping_address":customer.shipping_address,"shipping_address_data":_store_address_data(customer.shipping_address_data),"phone_country_code":customer.phone_country_code,"phone_number":customer.phone_number,"full_phone":customer.phone_country_code+customer.phone_number,"payment_method":p.payment_method,"include_contract_identity":bool(contract_identity),"contract_identity":contract_identity}
+    data={"first_name":customer.first_name,"last_name":customer.last_name,"full_name":customer.full_name,"email":customer.email,"shipping_address":customer.shipping_address,"shipping_address_data":_store_address_data(customer.shipping_address_data),"phone_country_code":customer.phone_country_code,"phone_number":customer.phone_number,"full_phone":customer.phone_country_code+customer.phone_number,"recipient_name":customer.full_name,"recipient_phone_country_code":customer.phone_country_code,"recipient_phone":customer.phone_number,"recipient_full_phone":customer.phone_country_code+customer.phone_number,"payment_method":p.payment_method,"include_contract_identity":bool(contract_identity),"contract_identity":contract_identity}
     order=OnlinePurchaseOrder(customer_id=customer.id,customer_data=data,items=lines,total=round(total,2),currency=currency or "USD",payment_proof=p.payment_proof,proof_type=p.proof_type,status="pending")
     s.add(order);s.commit();s.refresh(order)
     if any(previous_profile[k]!=(customer.full_name if k=="full_name" else customer.shipping_address if k=="shipping_address" else customer.phone_country_code if k=="phone_country_code" else customer.phone_number) for k in previous_profile):
