@@ -2886,7 +2886,7 @@ def store_register(p:StoreRegisterPayload, request:Request, s:Session=Depends(db
         phone_number=full_phone[len(phone_country_code):]
     else:
         phone_number="".join(ch for ch in raw_phone if ch.isdigit())
-    if len(recipient_name)<2 or not re.fullmatch(r"\\+[1-9]\\d{0,3}",phone_country_code) or not 5 <= len(phone_number) <= 15:
+    if len(recipient_name)<2 or not re.fullmatch(r"\+[1-9]\d{0,3}",phone_country_code) or not 5 <= len(phone_number) <= 15:
         raise HTTPException(400,"أدخل اسم المستلم ورقم هاتف صحيحاً مع اختيار رمز الدولة")
     _store_phone_e164(phone_country_code,phone_number)
     email=p.email.strip().lower()
@@ -3213,7 +3213,7 @@ def update_store_profile(p:StoreProfilePayload, s:Session=Depends(db), customer:
         new_phone_number=full_phone[len(new_phone_country_code):]
     else:
         new_phone_number="".join(ch for ch in raw_phone if ch.isdigit())
-    if not re.fullmatch(r"\\+[1-9]\\d{0,3}",new_phone_country_code) or not 5 <= len(new_phone_number) <= 15:
+    if not re.fullmatch(r"\+[1-9]\d{0,3}",new_phone_country_code) or not 5 <= len(new_phone_number) <= 15:
         raise HTTPException(400,"يجب إدخال رقم هاتف المستلم مع رمز الدولة")
     _store_phone_e164(new_phone_country_code,new_phone_number)
     if new_phone_number != customer.phone_number or new_phone_country_code != customer.phone_country_code:
