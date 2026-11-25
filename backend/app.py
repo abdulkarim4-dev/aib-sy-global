@@ -3739,11 +3739,15 @@ def public_products(q:Optional[str]=None, category:Optional[str]=None, response:
         import difflib
         ranked=[]
         for product in rows:
+            product_vehicle=product.vehicle_details if isinstance(product.vehicle_details,dict) else {}
+            explicit=store_categories.get(product.sku,{})
+            explicit_vehicle=explicit.get("vehicle_details") if isinstance(explicit.get("vehicle_details"),dict) else {}
+            category_text=" ".join(str(explicit.get(key) or "") for key in ("store_category","store_family"))
+            vehicle_values=list(product_vehicle.values())+list(explicit_vehicle.values())
             searchable=_normalize_order_search(" ".join((
                 product.sku or "", product.name or "", product.model or "",
-                product.description or "",
-                " ".join(str(v) for v in (product.vehicle_details or {}).values()
-                         if v not in (None,""))
+                product.description or "", category_text,
+                " ".join(str(v) for v in vehicle_values if v not in (None,""))
             )))
             words=set(searchable.split())
             compact_search="".join(ch for ch in searchable if ch.isalnum())
@@ -3758,7 +3762,7 @@ def public_products(q:Optional[str]=None, category:Optional[str]=None, response:
                 candidates=[word for word in words if len(token)>=3 and abs(len(token)-len(word))<=2]
                 best=difflib.get_close_matches(token,candidates,n=1,cutoff=0.76)
                 if best:
-                    score+=max(1,int(best*4))
+                    score+=max(1,int(best[0]*4))
                     matched+=1
             if compact_query and compact_query in compact_search:
                 score+=20
