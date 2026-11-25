@@ -3733,6 +3733,12 @@ def public_products(q:Optional[str]=None, category:Optional[str]=None, response:
     if compact_query and compact_query not in search_stop_words:
         expanded_tokens.add(compact_query)
 
+    # Load catalogue metadata before ranking: the ranking loop reads
+    # store_categories for every product. Keep this query outside the loop.
+    catalog_started=time.perf_counter()
+    store_categories,latest_purchase=latest_store_catalog_data(s)
+    catalog_ms=(time.perf_counter()-catalog_started)*1000
+
     if not q:
         rows=rows[:300]
     if q and rows:
@@ -3774,9 +3780,6 @@ def public_products(q:Optional[str]=None, category:Optional[str]=None, response:
             ranked.append((score,matched,product))
         ranked.sort(key=lambda item:(item[0],item[1],item[2].sku),reverse=True)
         rows=[item[2] for item in ranked[:60]]
-    catalog_started=time.perf_counter()
-    store_categories,latest_purchase=latest_store_catalog_data(s)
-    catalog_ms=(time.perf_counter()-catalog_started)*1000
     out=[]
     for p in rows:
         name=(p.name+" "+(p.model or "")).lower()
