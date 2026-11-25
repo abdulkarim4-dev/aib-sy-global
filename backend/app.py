@@ -2912,7 +2912,7 @@ def confirm_store_registration(p:StoreEmailConfirmPayload, request:Request, resp
     s.query(StoreEmailVerification).filter(StoreEmailVerification.customer_id==customer.id).delete(synchronize_session=False)
     s.commit()
     set_store_session(response,customer)
-    return {"ok":True,"customer":{"id":customer.id,"email":customer.email,"full_name":customer.full_name}}
+    return {"ok":True,"customer":{"id":customer.id,"email":customer.email,"full_name":customer.full_name,"first_name":customer.first_name or "","last_name":customer.last_name or "","shipping_address":customer.shipping_address or "","shipping_address_data":_store_address_data(customer.shipping_address_data),"address_complete":_store_address_complete(customer.shipping_address_data),"phone_country_code":customer.phone_country_code or "+963","phone_number":customer.phone_number or "","phone_verified":bool(customer.phone_verified_at),"avatar_data":customer.avatar_data,"contract_identity":customer.contract_identity or {}}}
 
 @app.post("/store/auth/login")
 def store_login(p:StoreLoginPayload, request:Request, s:Session=Depends(db)):
@@ -2958,7 +2958,7 @@ def verify_store_login(p:StoreEmailConfirmPayload, request:Request, response:Res
     s.query(StoreLoginVerification).filter(StoreLoginVerification.customer_id==customer.id).delete(synchronize_session=False)
     s.commit()
     set_store_session(response,customer)
-    return {"ok":True,"customer":{"id":customer.id,"email":customer.email,"full_name":customer.full_name}}
+    return {"ok":True,"customer":{"id":customer.id,"email":customer.email,"full_name":customer.full_name,"first_name":customer.first_name or "","last_name":customer.last_name or "","shipping_address":customer.shipping_address or "","shipping_address_data":_store_address_data(customer.shipping_address_data),"address_complete":_store_address_complete(customer.shipping_address_data),"phone_country_code":customer.phone_country_code or "+963","phone_number":customer.phone_number or "","phone_verified":bool(customer.phone_verified_at),"avatar_data":customer.avatar_data,"contract_identity":customer.contract_identity or {}}}
 
 @app.post("/store/auth/password-reset/request")
 def request_store_password_reset(p:StorePasswordResetRequestPayload, request:Request, s:Session=Depends(db)):
