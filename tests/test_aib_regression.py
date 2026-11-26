@@ -42,6 +42,22 @@ class AIBRegressionTests(unittest.TestCase):
         self.assertIn("storeAuthMode==='register'", source)
         self.assertIn("closeButton.hidden=reg", source)
 
+    def test_existing_store_accounts_complete_address_then_recipient_in_sequence(self):
+        source = (ROOT / "frontend" / "shop.html").read_text(encoding="utf-8")
+        self.assertIn('id="storeRequiredProfileWizard"', source)
+        self.assertIn('id="storeRequiredAddressCard"', source)
+        self.assertIn('id="storeRequiredRecipientCard"', source)
+        self.assertIn('id="storeRequiredRecipientForm"', source)
+        self.assertIn("if(addressCard)addressCard.hidden=!addressMissing", source)
+        self.assertIn("if(recipientCard)recipientCard.hidden=addressMissing||!phoneMissing", source)
+        self.assertIn("openStoreAddressModal(true)", source)
+        self.assertIn("saveRequiredStoreRecipient", source)
+        self.assertIn("'/store/auth/profile'", source)
+        self.assertIn("renderStoreRequiredProfileWizard()", source)
+        self.assertIn("closeButton.hidden=addressMissing||phoneMissing", source)
+        self.assertIn("settings.hidden=addressMissing||phoneMissing", source)
+        self.assertIn("!isStoreAddressComplete(storeCustomer.shipping_address_data)||!storeCustomer.phone_number", source)
+
     def test_all_application_invoices_use_only_the_aib_issuer_identity(self):
         source = (ROOT / "frontend" / "index.html").read_text(encoding="utf-8")
         self.assertIn("const invoiceBrand='default'", source)
