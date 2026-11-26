@@ -781,8 +781,9 @@ def passkey_registration_verify(payload:dict,request:Request,s:Session=Depends(d
     challenge=payload.get("challenge")
     if not isinstance(challenge,str): raise HTTPException(400,"طلب تسجيل البصمة غير مكتمل.")
     row=_passkey_get_challenge(s,u,"registration",challenge)
+    credential_payload={key:value for key,value in payload.items() if key!="challenge"}
     try:
-        verified=verify_registration_response(credential=payload,expected_challenge=_passkey_unb64(row.challenge),expected_rp_id=rp_id,expected_origin=origin,require_user_verification=True)
+        verified=verify_registration_response(credential=credential_payload,expected_challenge=_passkey_unb64(row.challenge),expected_rp_id=rp_id,expected_origin=origin,require_user_verification=True)
     except Exception:
         s.rollback();raise HTTPException(400,"تعذر التحقق من بصمة الجهاز. حاول مجدداً.")
     credential_id=_passkey_b64(verified.credential_id)
@@ -814,8 +815,9 @@ def passkey_authentication_verify(payload:dict,request:Request,s:Session=Depends
     credential_id=_passkey_b64(_passkey_unb64(raw_id))
     saved=s.scalar(select(AccountingPasskey).where(AccountingPasskey.user_id==u.id,AccountingPasskey.credential_id==credential_id))
     if not saved: raise HTTPException(401,"هذه البصمة غير مسجلة لهذا الحساب.")
+    credential_payload={key:value for key,value in payload.items() if key!="challenge"}
     try:
-        verified=verify_authentication_response(credential=payload,expected_challenge=_passkey_unb64(row.challenge),expected_rp_id=rp_id,expected_origin=origin,credential_public_key=_passkey_unb64(saved.public_key),credential_current_sign_count=saved.sign_count,require_user_verification=True)
+        verified=verify_authentication_response(credential=credential_payload,expected_challenge=_passkey_unb64(row.challenge),expected_rp_id=rp_id,expected_origin=origin,credential_public_key=_passkey_unb64(saved.public_key),credential_current_sign_count=saved.sign_count,require_user_verification=True)
     except Exception:
         s.rollback();raise HTTPException(401,"تعذر التحقق من بصمة الجهاز.")
     saved.sign_count=verified.new_sign_count
