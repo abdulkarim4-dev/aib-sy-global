@@ -591,7 +591,7 @@ class AccountingLoginConfirmPayload(BaseModel):
     code:str=Field(min_length=6,max_length=6)
 
 class AccountingPinSetupPayload(BaseModel):
-    pin: str = Field(pattern=r"^\\d{4}$")
+    pin: str = Field(pattern=r"^\d{4}$")
 
 class AccountingLoginResendPayload(BaseModel):
     challenge_id:int
@@ -612,7 +612,7 @@ def login(form:OAuth2PasswordRequestForm=Depends(), pin:Optional[str]=Form(defau
         audit(s,u,"login_failed","user",u.id,{},request); s.commit(); raise HTTPException(401,"اسم المستخدم أو كلمة المرور غير صحيحة")
     if not u.active: raise HTTPException(403,"الحساب غير فعال")
     if u.accounting_pin_hash:
-        if not pin or not re.fullmatch(r"\\d{4}",pin):
+        if not pin or not re.fullmatch(r"\d{4}",pin):
             raise HTTPException(400,"أدخل رمز الدخول الشخصي المكوّن من أربعة أرقام.")
         if not password_hash.verify(pin,u.accounting_pin_hash):
             u.failed_logins+=1
