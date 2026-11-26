@@ -18,7 +18,7 @@ from sqlalchemy import create_engine, String, Boolean, DateTime, Integer, Foreig
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker, Session
 from webauthn import generate_registration_options, verify_registration_response, generate_authentication_options, verify_authentication_response
 from webauthn.helpers import options_to_json
-from webauthn.helpers.structs import AuthenticatorSelectionCriteria, UserVerificationRequirement, ResidentKeyRequirement, PublicKeyCredentialDescriptor
+from webauthn.helpers.structs import AuthenticatorSelectionCriteria, UserVerificationRequirement, ResidentKeyRequirement, PublicKeyCredentialDescriptor, AuthenticatorTransport
 
 class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://aib:aib_change_me@db:5432/aib"
@@ -802,7 +802,13 @@ def passkey_authentication_options(request:Request,s:Session=Depends(db),u:User=
     _,rp_id=_passkey_origin(request)
     credentials=s.scalars(select(AccountingPasskey).where(AccountingPasskey.user_id==u.id)).all()
     if not credentials: raise HTTPException(404,"لم يتم تفعيل البصمة لهذا الحساب على هذا الجهاز.")
-    opts=generate_authentication_options(rp_id=rp_id,allow_credentials=[PublicKeyCredentialDescriptor(id=_passkey_unb64(x.credential_id),transports=x.transports or None) for x in credentials],user_verification=UserVerificationRequirement.REQUIRED)
+    allowed_transports={item.value:item for item in AuthenticatorTransport}
+    descriptors=[]
+    for credential in credentials:
+        saved_transports=credential.transports if isinstance(credential.transports,list) else []
+        transports=[allowed_transports[value] for value in saved_transports if isinstance(value,str) and value in allowed_transports]
+        descriptors.append(PublicKeyCredentialDescriptor(id=_passkey_unb64(credential.credential_id),transports=transports or None))
+    opts=generate_authentication_options(rp_id=rp_id,allow_credentials=descriptors,user_verification=UserVerificationRequirement.REQUIRED)
     _passkey_new_challenge(s,u,"authentication",opts.challenge)
     return json.loads(options_to_json(opts))
 
