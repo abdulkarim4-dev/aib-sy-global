@@ -67,7 +67,11 @@ class AIBRegressionTests(unittest.TestCase):
 
     def test_store_signup_cannot_skip_recipient_or_address_steps(self):
         source = (ROOT / "frontend" / "shop.html").read_text(encoding="utf-8")
-        self.assertIn('id="storeFullName" type="text"', source)
+        self.assertIn('id="storeRecipientFirstName" type="text"', source)
+        self.assertIn('id="storeRecipientLastName" type="text"', source)
+        self.assertIn("storeRecipientFirstName').required=reg", source)
+        self.assertIn("storeRecipientLastName').required=reg", source)
+        self.assertIn("].filter(Boolean).join(' ')", source)
         self.assertIn('id="storeRecipientPhone" type="tel"', source)
         self.assertIn('id="storeSignupAddressField"', source)
         self.assertIn("shipping_address_data:pendingStoreRegistrationAddress", source)
