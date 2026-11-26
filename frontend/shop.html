@@ -1729,6 +1729,34 @@ body.customer-orders-page-open{overflow:hidden}
 @media(max-width:700px){.checkout-payment-section{padding:15px!important}.checkout-payment-options{grid-template-columns:1fr!important;gap:9px!important}.checkout-payment-option{min-height:78px!important;padding:11px 12px!important}.checkout-payment-option.active{padding:10px 11px!important}.payment-option-mark{width:43px!important;height:43px!important;flex-basis:43px!important}.payment-option-copy strong{font-size:13px!important}.payment-option-copy small{font-size:10px!important}}
 @media(min-width:701px) and (max-width:900px){.checkout-payment-options{grid-template-columns:repeat(2,minmax(0,1fr))!important}.checkout-payment-option:last-child{grid-column:1/-1}}
 </style>
+
+<style id="aib-search-input-visibility-fix">
+/* Make typed search text fully opaque and high-contrast on the light search field. */
+.search-field input,
+.search-field input:focus,
+.search-field input:hover {
+  background: transparent !important;
+  color: #17212b !important;
+  -webkit-text-fill-color: #17212b !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  caret-color: #176da5 !important;
+  text-shadow: none !important;
+  font-weight: 600 !important;
+}
+.search-field input::placeholder {
+  color: #687887 !important;
+  -webkit-text-fill-color: #687887 !important;
+  opacity: 1 !important;
+}
+.search-field input:-webkit-autofill,
+.search-field input:-webkit-autofill:hover,
+.search-field input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #17212b !important;
+  caret-color: #176da5 !important;
+}
+</style>
+
 </head><body><header class="wrap top"><button class="aib-menu-trigger" type="button" onclick="openAibStoreMenu()" aria-label="فتح قائمة المتجر" aria-controls="aibStoreDrawer" aria-expanded="false">
  <span></span><span></span><span></span>
 </button><div class="brand"><a class="brand-logo-link" href="/shop" aria-label="العودة إلى الصفحة الرئيسية للمتجر"><img src="/aib-logo.png?v=20261113-aib2" alt="AIB" width="145" height="58" decoding="async" fetchpriority="high"></a><div><b>AIB GROUP</b><small>المتجر الإلكتروني الرسمي</small></div></div><button class="store-account-button" id="storeAccountButton" type="button" onclick="openStoreAuth()" aria-label="حساب العميل">جارٍ التحقق من الحساب…</button><button class="cart-open" type="button" onclick="openCart()" aria-label="فتح سلة التسوق">🛒 <span>سلة التسوق</span><b id="cartCount">0</b></button></header>
