@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 import time
 from typing import Optional, Any
-import os, secrets, json, ast, base64, binascii, smtplib, hashlib, html, logging, re
+import os, secrets, json, ast, base64, binascii, smtplib, hashlib, html, logging, re, io
 from urllib.parse import urlencode
 from email.message import EmailMessage
 from urllib.request import Request as UrlRequest, urlopen
@@ -13,6 +13,9 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
+from PIL import Image, ImageOps
+import pillow_heif
+pillow_heif.register_heif_opener()
 from pwdlib import PasswordHash
 from sqlalchemy import create_engine, String, Boolean, DateTime, Integer, ForeignKey, JSON, Text, Numeric, UniqueConstraint, select, func, text, or_, case
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker, Session
@@ -1921,22 +1924,49 @@ def update_inventory_product_shipping(product_id:int, p:InventoryShippingPayload
 def update_inventory_product_images(product_id:int, p:InventoryImagesPayload, request:Request, s:Session=Depends(db), u:User=Depends(require_permission("inventory","edit"))):
     product=s.get(InventoryProduct,product_id)
     if not product or not product.active or (u.role!="owner" and product.owner_user_id!=u.id): raise HTTPException(404,"القطعة غير موجودة في مخزون حسابك")
+    normalized_images=[]
     total_bytes=0
     for image_data in p.images:
         if not isinstance(image_data,str) or "," not in image_data: raise HTTPException(400,"صيغة إحدى الصور غير صالحة")
         header,encoded=image_data.split(",",1)
-        if header not in ("data:image/jpeg;base64","data:image/png;base64","data:image/webp;base64"): raise HTTPException(400,"يسمح فقط بصور JPG أو PNG أو WEBP")
+        allowed=("data:image/jpeg;base64","data:image/png;base64","data:image/webp;base64")
+        is_heic=header in ("data:image/heic;base64","data:image/heif;base64","data:image/heic-sequence;base64","data:image/heif-sequence;base64")
+        if header not in allowed and not is_heic: raise HTTPException(400,"صيغة الصورة غير مدعومة. اختر JPG أو PNG أو WebP أو HEIC/HEIF من كاميرا الهاتف.")
         try: raw=base64.b64decode(encoded,validate=True)
         except (binascii.Error,ValueError): raise HTTPException(400,"بيانات إحدى الصور غير صالحة")
-        if not raw or len(raw)>4*1024*1024: raise HTTPException(413,"يجب ألا يتجاوز حجم الصورة الواحدة 4 ميغابايت بعد الضغط")
+        if not raw or len(raw)>20*1024*1024: raise HTTPException(413,"حجم الصورة الأصلية يجب ألا يتجاوز 20 ميغابايت")
+        if is_heic:
+            try:
+                with Image.open(io.BytesIO(raw)) as source:
+                    image=ImageOps.exif_transpose(source).convert("RGB")
+                    image.thumbnail((1800,1800),Image.Resampling.LANCZOS)
+                    output=io.BytesIO()
+                    quality=88
+                    image.save(output,format="JPEG",quality=quality,optimize=True)
+                    while output.tell()>4*1024*1024 and quality>40:
+                        quality-=8
+                        output=io.BytesIO()
+                        image.save(output,format="JPEG",quality=quality,optimize=True)
+                    raw=output.getvalue()
+                    if len(raw)>4*1024*1024: raise HTTPException(413,"تعذر ضغط صورة HEIC إلى 4 ميغابايت؛ اختر صورة أصغر.")
+                image_data="data:image/jpeg;base64,"+base64.b64encode(raw).decode("ascii")
+            except HTTPException:
+                raise
+            except Exception as exc:
+                logging.warning("HEIC inventory image conversion failed: %s",exc)
+                raise HTTPException(400,"تعذر فك صورة HEIC/HEIF. جرّب حفظها من تطبيق الكاميرا مرة أخرى.")
+        if not is_heic and header not in allowed: raise HTTPException(400,"يسمح فقط بصور JPG أو PNG أو WEBP أو HEIC/HEIF")
+        if len(raw)>4*1024*1024: raise HTTPException(413,"يجب ألا يتجاوز حجم الصورة الواحدة 4 ميغابايت بعد الضغط")
         total_bytes+=len(raw)
+        normalized_images.append(image_data)
     if total_bytes>80*1024*1024: raise HTTPException(413,"الحجم الإجمالي للصور يتجاوز 80 ميغابايت (20 صورة × 4 ميغابايت)")
-    product.images=p.images
-    audit(s,u,"inventory_images_updated","inventory_product",product.id,{"sku":product.sku,"image_count":len(p.images)},request)
+    product.images=normalized_images
+    audit(s,u,"inventory_images_updated","inventory_product",product.id,{"sku":product.sku,"image_count":len(normalized_images)},request)
     s.commit()
     _public_products_cache["value"].clear()
     _public_products_cache["at"].clear()
-    return {"ok":True,"count":len(product.images or [])}
+    return {"ok":True,"count":len(normalized_images)}
+
 
 VEHICLE_CONTRACT_CATEGORIES={"cars","trucks","heavy","agri"}
 def inventory_vehicle_seller_snapshot(s:Session,item:dict,fallback_user:User)->dict:
