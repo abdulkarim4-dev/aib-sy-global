@@ -41,14 +41,15 @@ class AIBRegressionTests(unittest.TestCase):
         with self.assertRaises(aib.HTTPException):
             aib._store_phone_e164("+123", "+963912345678")
 
-    def test_store_phone_inputs_show_example_and_no_helper_text(self):
+    def test_store_phone_inputs_show_country_specific_guidance(self):
         source = (ROOT / "frontend" / "shop.html").read_text(encoding="utf-8")
-        self.assertIn("input.placeholder='9 1 2 3 4 5 6 7 8'", source)
+        self.assertIn("option.dataset.countryName=row.arabic", source)
+        self.assertIn("input.placeholder=countryName?'رقم محلي لـ '+countryName+' بعد '+dialCode", source)
+        self.assertIn("input.setAttribute('aria-description',guidance)", source)
         self.assertIn(".replace(/^0+/, '')", source)
         self.assertIn("input.maxLength=max", source)
+        self.assertNotIn("input.placeholder='9 1 2 3 4 5 6 7 8'", source)
         self.assertNotIn("store-phone-length-hint", source)
-        self.assertNotIn("أدخل الرقم دون رمز الدولة", source)
-        self.assertNotIn('بدون رمز دولة (أدخل الرقم الدولي)', source)
 
     def test_all_store_phone_fields_share_complete_international_dial_code_list(self):
         import json
