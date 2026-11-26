@@ -286,9 +286,10 @@ async function unlockAccountingWithPasskey(){
  if(button)button.disabled=true;
  try{
   const options=await api('/auth/passkeys/authentication/options',{method:'POST',body:{}});
+  const challenge=options.challenge;
   const credential=await navigator.credentials.get({publicKey:preparePasskeyOptions(options)});
   if(!credential)throw new Error('لم تكتمل المصادقة الحيوية.');
-  const verified=await api('/auth/passkeys/authentication/verify',{method:'POST',body:passkeyCredentialPayload(credential,options.challenge,'authentication')});
+  const verified=await api('/auth/passkeys/authentication/verify',{method:'POST',body:passkeyCredentialPayload(credential,challenge,'authentication')});
   if(!verified.access_token)throw new Error('تعذر فتح جلسة المحاسبة.');
   token=verified.access_token;document.getElementById('pinGate').classList.add('hidden');showApp();
  }catch(error){const msg=document.getElementById('pinGateMsg');if(msg)msg.innerHTML='<div class="notice error">'+esc(error.message||'تعذرت المصادقة بالبصمة.')+'</div>'}
@@ -299,9 +300,10 @@ async function registerAccountingPasskey(){
  const button=document.getElementById('enableAccountingBiometric');if(button)button.disabled=true;
  try{
   const options=await api('/auth/passkeys/registration/options',{method:'POST'});
+  const challenge=options.challenge;
   const credential=await navigator.credentials.create({publicKey:preparePasskeyOptions(options)});
   if(!credential)throw new Error('لم يكتمل تسجيل البصمة.');
-  await api('/auth/passkeys/registration/verify',{method:'POST',body:passkeyCredentialPayload(credential,options.challenge,'registration')});
+  await api('/auth/passkeys/registration/verify',{method:'POST',body:passkeyCredentialPayload(credential,challenge,'registration')});
   await aibAlert('تم تفعيل فتح المحاسبة بالبصمة أو التعرف على الوجه على هذا الجهاز.','تم بنجاح');
  }catch(error){await aibAlert(error.message||'تعذر تفعيل المصادقة الحيوية.','تعذر التفعيل')}
  finally{if(button)button.disabled=false}
