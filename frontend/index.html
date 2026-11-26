@@ -185,6 +185,44 @@ input[type=checkbox]{accent-color:#2586c7}
 #enableAccountingBiometric.biometric-setup-btn{display:inline-flex!important;align-items:center;justify-content:center;gap:6px;flex:0 0 auto!important;width:auto!important;min-width:0!important;max-width:190px!important;min-height:0!important;height:38px!important;padding:7px 11px!important;margin:0!important;font-size:13px!important;line-height:1.2!important;border-radius:10px!important;white-space:nowrap!important;box-shadow:none!important}
 #enableAccountingBiometric.biometric-setup-btn span:first-child{font-size:15px;line-height:1;color:#8fcfff}
 @media(max-width:700px){.topbar{align-items:center;gap:8px;padding:9px 12px}.top-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.top-actions #enableAccountingBiometric.biometric-setup-btn{height:34px!important;padding:6px 9px!important;font-size:12px!important;max-width:150px!important}}
+
+/* Compact professional accounting header */
+#app > .topbar{
+ display:flex!important;align-items:center!important;justify-content:space-between!important;
+ gap:14px!important;padding:7px 18px!important;min-height:62px!important;height:auto!important;
+ flex-wrap:nowrap!important;overflow:visible!important
+}
+#app > .topbar > .brand{display:flex!important;align-items:center!important;gap:9px!important;min-width:0!important;flex:0 1 auto!important}
+#app > .topbar .brand-logo-link{width:104px!important;height:46px!important;flex:0 0 104px!important}
+#app > .topbar .brand-logo-link img{width:100%!important;height:100%!important;max-height:46px!important;object-fit:contain!important}
+#app > .topbar .brand strong{font-size:15px!important;line-height:1.1!important}
+#app > .topbar .brand span{font-size:10px!important;margin-top:2px!important;white-space:nowrap}
+#app > .topbar .top-actions{display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:7px!important;flex:0 0 auto!important;flex-wrap:nowrap!important;min-width:0!important}
+#app > .topbar .user-pill{font-size:11px!important;padding:5px 8px!important;max-width:155px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis}
+#app > .topbar .top-actions > button{height:34px!important;min-height:34px!important;padding:5px 10px!important;border-radius:9px!important;font-size:12px!important;line-height:1!important;white-space:nowrap!important;box-shadow:none!important}
+#app > .topbar #enableAccountingBiometric.biometric-setup-btn{height:34px!important;max-width:none!important;padding:5px 9px!important}
+@media(max-width:700px){
+ #app > .topbar{gap:7px!important;padding:6px 9px!important;min-height:54px!important}
+ #app > .topbar > .brand{gap:5px!important}
+ #app > .topbar .brand-logo-link{width:68px!important;height:36px!important;flex-basis:68px!important}
+ #app > .topbar .brand-logo-link img{max-height:36px!important}
+ #app > .topbar .brand strong{font-size:11px!important;letter-spacing:.3px!important}
+ #app > .topbar .brand span{font-size:8px!important}
+ #app > .topbar .top-actions{gap:4px!important}
+ #app > .topbar .user-pill{display:none!important}
+ #app > .topbar .top-actions > button{height:31px!important;min-height:31px!important;padding:4px 7px!important;font-size:11px!important}
+ #app > .topbar #enableAccountingBiometric.biometric-setup-btn{height:31px!important;padding:4px 7px!important;font-size:10px!important}
+}
+@media(max-width:390px){
+ #app > .topbar{padding-inline:6px!important;gap:4px!important}
+ #app > .topbar .brand-logo-link{width:56px!important;flex-basis:56px!important}
+ #app > .topbar .brand strong{font-size:10px!important}
+ #app > .topbar .brand span{display:none!important}
+ #app > .topbar .top-actions{gap:3px!important}
+ #app > .topbar .top-actions > button{padding-inline:5px!important;font-size:10px!important}
+ #app > .topbar #enableAccountingBiometric.biometric-setup-btn{padding-inline:5px!important}
+}
+
 </style>
 </head><body>
 <svg aria-hidden="true" width="0" height="0" style="position:absolute;overflow:hidden"><filter id="aib-remove-white" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  -1 -1 -1 0 3"/></filter></svg>
