@@ -3162,10 +3162,21 @@ html body .catalog-tools .catalog-head-actions .store-filter-toggle:active{trans
   const guidance=countryName
    ? 'أدخل الرقم المحلي في '+countryName+' بعد رمز الدولة '+dialCode+'، دون إعادة كتابة الرمز أو الصفر المحلي الأول.'
    : 'أدخل الرقم المحلي بعد رمز الدولة '+dialCode+'، دون إعادة كتابة الرمز أو الصفر المحلي الأول.';
-  input.placeholder=countryName?'رقم محلي لـ '+countryName+' بعد '+dialCode:'رقم محلي بعد '+dialCode;
+  input.placeholder='أدخل الرقم المحلي';
   input.title=guidance+' الحد الأقصى المسموح '+max+' رقمًا.';
   input.setAttribute('aria-label',guidance);
   input.setAttribute('aria-description',guidance);
+  let hint=document.getElementById(input.id+'CountryGuidance');
+  if(!hint){
+   hint=document.createElement('p');
+   hint.id=input.id+'CountryGuidance';
+   hint.className='aib-phone-country-guidance';
+   hint.style.cssText='display:block;flex:0 0 100%;width:100%;box-sizing:border-box;grid-column:1/-1;margin:7px 0 0;color:#c4d3df;font-size:12px;line-height:1.9;white-space:normal;overflow-wrap:anywhere;text-align:right;direction:rtl;';
+   const host=input.closest('.checkout-phone')||input.parentElement;
+   const anchor=host&&host.classList.contains('checkout-phone')?host:input.parentElement;
+   anchor.insertAdjacentElement('afterend',hint);
+  }
+  hint.textContent=guidance+' الحد الأقصى لهذا الحقل '+max+' رقماً.';
   const clean=digits(input.value).replace(/^0+/, '').slice(0,max);
   if(input.value!==clean)input.value=clean;
  }
