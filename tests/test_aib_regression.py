@@ -307,8 +307,11 @@ class AIBRegressionTests(unittest.TestCase):
     def test_store_phone_guidance_changes_with_selected_country(self):
         shop = (ROOT / "frontend" / "shop.html").read_text(encoding="utf-8")
         self.assertIn("option.dataset.countryName=row.arabic", shop)
-        self.assertIn("input.placeholder=countryName?'رقم محلي لـ '+countryName+' بعد '+dialCode", shop)
+        self.assertIn("input.placeholder='أدخل الرقم المحلي'", shop)
         self.assertIn("input.setAttribute('aria-description',guidance)", shop)
+        self.assertIn("hint.className='aib-phone-country-guidance'", shop)
+        self.assertIn("hint.textContent=guidance+' الحد الأقصى لهذا الحقل '+max+' رقماً.'", shop)
+        self.assertIn("white-space:normal;overflow-wrap:anywhere", shop)
         self.assertNotIn("input.placeholder='9 1 2 3 4 5 6 7 8'", shop)
 
 
