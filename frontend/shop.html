@@ -1783,7 +1783,7 @@ body.customer-orders-page-open{overflow:hidden}
 <div class="aib-settings-two"><label>نوع الوثيقة<select id="aibIdentityDocType"><option value="">اختر نوع الوثيقة</option><option value="هوية شخصية">هوية شخصية</option><option value="جواز سفر">جواز سفر</option></select></label><label>رقم الوثيقة<input id="aibIdentityDocNo" maxlength="80"></label></div>
 <div class="aib-settings-two"><label>جهة الإصدار / الأمانة<input id="aibIdentityIssuer" maxlength="160"></label><label>القيد<input id="aibIdentityRegistry" maxlength="120"></label></div>
 <div class="aib-settings-two"><label>الإقامة<input id="aibIdentityResidence" maxlength="160"></label><label>عنوان العميل في العقد<input id="aibIdentityAddress" maxlength="500"></label></div>
-<label>رقم الهاتف</label><div class="aib-settings-two"><select id="aibProfileDial" required><option value="">بدون رمز دولة (أدخل الرقم الدولي)</option><option value="+963">سوريا +963</option><option value="+43">النمسا +43</option><option value="+49">ألمانيا +49</option><option value="+90">تركيا +90</option><option value="+41">سويسرا +41</option><option value="+971">الإمارات +971</option><option value="+966">السعودية +966</option><option value="+1">أمريكا +1</option><option value="+44">بريطانيا +44</option></select><input id="aibProfilePhone" type="tel" required minlength="5" maxlength="32" placeholder="رقم هاتف المستلم"></div>
+<label>رقم الهاتف</label><div class="aib-settings-two"><select id="aibProfileDial" required><option value="+963">سوريا +963</option><option value="+43">النمسا +43</option><option value="+49">ألمانيا +49</option><option value="+90">تركيا +90</option><option value="+41">سويسرا +41</option><option value="+971">الإمارات +971</option><option value="+966">السعودية +966</option><option value="+1">أمريكا +1</option><option value="+44">بريطانيا +44</option></select><input id="aibProfilePhone" type="tel" required minlength="5" maxlength="32" placeholder="رقم هاتف المستلم"></div>
 <button class="cart-checkout" type="submit">حفظ بيانات الحساب</button></form>
 <div class="aib-settings-divider"></div>
 <form class="aib-settings-form" onsubmit="changeAibStorePassword(event)"><strong>تغيير كلمة المرور</strong>
@@ -3112,35 +3112,26 @@ html body .catalog-tools .catalog-head-actions .store-filter-toggle:active{trans
  function digits(value){return String(value||'').replace(/\D/g,'')}
  function configure(dial,input){
   if(!dial||!input)return;
-  let hint=document.getElementById(input.id+'LengthHint');
-  if(!hint){hint=document.createElement('small');hint.id=input.id+'LengthHint';hint.className='store-phone-length-hint';hint.style.cssText='display:block;margin-top:6px;color:#91b9d2;font-size:11px;line-height:1.8';input.insertAdjacentElement('afterend',hint)}
   const max=Math.max(1,15-digits(dial.value).length);
   input.maxLength=max;
   input.inputMode='numeric';
   input.autocomplete='tel-national';
-  input.placeholder='أدخل الرقم المحلي فقط دون رمز الدولة';
-  const clean=digits(input.value).slice(0,max);
+  input.placeholder='9 1 2 3 4 5 6 7 8';
+  const clean=digits(input.value).replace(/^0+/, '').slice(0,max);
   if(input.value!==clean)input.value=clean;
-  hint.textContent='أدخل الرقم دون رمز الدولة ('+dial.value+')؛ الحد الأقصى '+max+' أرقام. مثال: اكتب الرقم المحلي فقط.';
-  input.setAttribute('aria-describedby',hint.id);
  }
  function init(){
   pairs.forEach(([dialId,inputId])=>{
    const dial=document.getElementById(dialId),input=document.getElementById(inputId);
    if(!dial||!input)return;
+   dial.required=true;
    configure(dial,input);
    dial.addEventListener('change',()=>configure(dial,input));
    input.addEventListener('input',()=>configure(dial,input));
    input.addEventListener('paste',()=>setTimeout(()=>configure(dial,input),0));
-   input.addEventListener('blur',()=>{
-    const max=Math.max(1,15-digits(dial.value).length),count=digits(input.value).length;
-    input.setCustomValidity(count>max?'تجاوزت الحد الأقصى المسموح لرمز الدولة المحدد.':'');
-   });
-   input.addEventListener('input',()=>input.setCustomValidity(''));
   });
  }
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
 </script>
-<style>.store-phone-length-hint{direction:rtl;text-align:right}</style>
 </body></html>

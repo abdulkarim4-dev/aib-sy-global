@@ -32,19 +32,23 @@ class AIBRegressionTests(unittest.TestCase):
         self.assertEqual(aib._store_phone_e164(payload.phone_country_code,payload.phone_number),"+905321234567")
         self.assertTrue(aib._store_address_complete(payload.shipping_address_data))
 
-    def test_store_phone_respects_e164_maximum_length(self):
+    def test_store_phone_removes_trunk_zero_and_respects_e164_maximum_length(self):
+        self.assertEqual(aib._store_phone_e164("+963", "0912345678"), "+963912345678")
+        self.assertEqual(aib._store_phone_e164("+90", "05321234567"), "+905321234567")
         self.assertEqual(aib._store_phone_e164("+963", "123456789012"), "+963123456789012")
         with self.assertRaises(aib.HTTPException):
             aib._store_phone_e164("+963", "1234567890123")
         with self.assertRaises(aib.HTTPException):
-            aib._store_phone_e164("", "+1234567890123456")
+            aib._store_phone_e164("+123", "+963912345678")
 
-    def test_store_phone_inputs_show_country_specific_digit_limit_guidance(self):
+    def test_store_phone_inputs_show_example_and_no_helper_text(self):
         source = (ROOT / "frontend" / "shop.html").read_text(encoding="utf-8")
-        self.assertIn("15-digits(dial.value).length", source.replace(" ", ""))
-        self.assertIn("store-phone-length-hint", source)
-        self.assertIn("أدخل الرقم دون رمز الدولة", source)
+        self.assertIn("input.placeholder='9 1 2 3 4 5 6 7 8'", source)
+        self.assertIn(".replace(/^0+/, '')", source)
         self.assertIn("input.maxLength=max", source)
+        self.assertNotIn("store-phone-length-hint", source)
+        self.assertNotIn("أدخل الرقم دون رمز الدولة", source)
+        self.assertNotIn('بدون رمز دولة (أدخل الرقم الدولي)', source)
 
     def test_store_signup_cannot_skip_recipient_or_address_steps(self):
         source = (ROOT / "frontend" / "shop.html").read_text(encoding="utf-8")

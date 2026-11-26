@@ -3136,14 +3136,26 @@ def store_me(customer:StoreCustomer=Depends(current_store_customer)):
 _store_phone_codes = {}
 def _store_phone_e164(country_code: str, phone_number: str) -> str:
     raw = "".join(ch for ch in str(phone_number or "").strip() if ch.isdigit() or ch == "+")
+    dial = str(country_code or "").strip()
     if raw.startswith("+"):
         number = "+" + "".join(ch for ch in raw[1:] if ch.isdigit())
-    elif country_code:
-        number = country_code.strip() + "".join(ch for ch in raw if ch.isdigit())
+        if dial:
+            if not number.startswith(dial):
+                raise HTTPException(400,"اختر رمز الدولة المطابق لرقم الهاتف")
+            national = number[len(dial):]
+            national = national.lstrip("0")
+            number = dial + national
+    elif dial:
+        national = "".join(ch for ch in raw if ch.isdigit()).lstrip("0")
+        number = dial + national
     else:
-        raise HTTPException(400,"رمز الدولة اختياري، لكن عند تركه فارغاً أدخل الرقم بصيغته الدولية مع + ورمز الدولة")
+        raise HTTPException(400,"اختر رمز الدولة أولاً")
+    if not re.fullmatch(r"\+[1-9]\d{0,3}", dial) and dial:
+        raise HTTPException(400,"رمز الدولة غير صحيح")
     if not number.startswith("+") or not 8 <= len(number) <= 16 or len(number) - 1 > 15:
-        raise HTTPException(400,"رقم الهاتف غير صحيح. الحد الأقصى للصيغة الدولية هو 15 رقماً شاملاً رمز الدولة")
+        raise HTTPException(400,"رقم الهاتف غير صحيح. أدخل الرقم دون الصفر الأول بعد رمز الدولة وبحد أقصى 15 رقماً دولياً")
+    if dial and number.startswith(dial + "0"):
+        raise HTTPException(400,"لا تكتب الصفر بعد رمز الدولة")
     return number
 
 @app.post("/store/auth/phone/send-code")
