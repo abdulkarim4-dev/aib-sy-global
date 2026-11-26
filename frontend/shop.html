@@ -1763,6 +1763,75 @@ body.customer-orders-page-open{overflow:hidden}
 }
 </style>
 
+
+<style id="aib-language-independent-category-media">
+/* Keep category photography and tile geometry identical in Arabic, Turkish and LTR languages. */
+#categorySection .category-zone .cats,
+.category-zone .cats,
+#specialCategorySection .cats {
+  display:grid!important;
+  grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  grid-auto-rows:156px!important;
+  align-items:stretch!important;
+  gap:12px!important;
+}
+.category-zone .cats button.cat,
+#specialCategorySection .cats button.cat {
+  position:relative!important;
+  display:flex!important;
+  width:100%!important;
+  height:156px!important;
+  min-height:156px!important;
+  max-height:156px!important;
+  min-width:0!important;
+  box-sizing:border-box!important;
+  overflow:hidden!important;
+  background-size:cover!important;
+  background-position:center center!important;
+  background-repeat:no-repeat!important;
+  border-radius:12px!important;
+}
+#specialCategorySection .cats button.cat .aib-generator-photo {
+  position:absolute!important;
+  inset:0!important;
+  width:100%!important;
+  height:100%!important;
+  object-fit:cover!important;
+  object-position:center!important;
+  z-index:0!important;
+}
+.category-zone .cats button.cat::after,
+#specialCategorySection .cats button.cat::after {
+  pointer-events:none!important;
+}
+.category-zone .cats button.cat>span,
+#specialCategorySection .cats button.cat>span {
+  position:relative!important;
+  z-index:2!important;
+  max-width:100%!important;
+  overflow-wrap:anywhere!important;
+}
+@media(max-width:800px){
+  .category-zone .cats,
+  #specialCategorySection .cats {
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    grid-auto-rows:136px!important;
+  }
+  .category-zone .cats button.cat,
+  #specialCategorySection .cats button.cat {
+    height:136px!important;
+    min-height:136px!important;
+    max-height:136px!important;
+  }
+}
+@media(max-width:420px){
+  .category-zone .cats,
+  #specialCategorySection .cats {gap:8px!important;grid-auto-rows:124px!important}
+  .category-zone .cats button.cat,
+  #specialCategorySection .cats button.cat {height:124px!important;min-height:124px!important;max-height:124px!important}
+}
+</style>
+
 </head><body><header class="wrap top"><button class="aib-menu-trigger" type="button" onclick="openAibStoreMenu()" aria-label="فتح قائمة المتجر" aria-controls="aibStoreDrawer" aria-expanded="false">
  <span></span><span></span><span></span>
 </button><div class="brand"><a class="brand-logo-link" href="/shop" aria-label="العودة إلى الصفحة الرئيسية للمتجر"><img src="/aib-logo.png?v=20261113-aib2" alt="AIB" width="145" height="58" decoding="async" fetchpriority="high"></a><div><b>AIB GROUP</b><small>المتجر الإلكتروني الرسمي</small></div></div><button class="store-account-button" id="storeAccountButton" type="button" onclick="openStoreAuth()" aria-label="حساب العميل">جارٍ التحقق من الحساب…</button><button class="cart-open" type="button" onclick="openCart()" aria-label="فتح سلة التسوق">🛒 <span>سلة التسوق</span><b id="cartCount">0</b></button></header>
