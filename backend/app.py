@@ -404,8 +404,8 @@ def current_user(request:Request, token:Optional[str]=Depends(oauth), s:Session=
         if not owner or not owner.active or owner.deleted or owner.role!="owner" or u.role=="owner":
             raise HTTPException(401,"جلسة الدخول بالنيابة غير صالحة")
         u._impersonated_by_owner_id=owner.id
-    if u.accounting_pin_hash and not impersonator_id and request.url.path!="/auth/pin/setup":
-        if jwt.decode(token,settings.jwt_secret,algorithms=["HS256"]).get("accounting_pin_verified") is not True:
+    if not impersonator_id and request.url.path!="/auth/pin/setup":
+        if payload.get("accounting_pin_verified") is not True:
             raise HTTPException(401,"يلزم إدخال رمز الدخول الشخصي من أربعة أرقام مجدداً.")
     if u.must_change_password and not impersonator_id and request.url.path not in {"/auth/me","/auth/first-login-password","/auth/pin/setup"}:
         raise HTTPException(403,"يجب تغيير كلمة المرور المؤقتة قبل استخدام الحساب")
