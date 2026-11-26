@@ -1849,6 +1849,40 @@ def delete_inventory_product(product_id:int,request:Request,s:Session=Depends(db
 class InventoryImagesPayload(BaseModel):
     images: list[str] = Field(default_factory=list, max_length=20)
 
+class InventoryImageConvertPayload(BaseModel):
+    image: str = Field(min_length=32, max_length=28*1024*1024)
+
+@app.post("/inventory/images/convert")
+def convert_inventory_image(p:InventoryImageConvertPayload, u:User=Depends(require_permission("inventory","edit"))):
+    if not isinstance(p.image,str) or "," not in p.image:
+        raise HTTPException(400,"بيانات الصورة غير صالحة")
+    header,encoded=p.image.split(",",1)
+    if header not in ("data:image/jpeg;base64","data:image/png;base64","data:image/webp;base64","data:image/heic;base64","data:image/heif;base64","data:image/heic-sequence;base64","data:image/heif-sequence;base64","data:image/avif;base64","data:image/gif;base64","data:image/bmp;base64"):
+        raise HTTPException(400,"صيغة الصورة غير مدعومة")
+    try:
+        raw=base64.b64decode(encoded,validate=True)
+        if not raw or len(raw)>20*1024*1024:
+            raise HTTPException(413,"حجم الصورة الأصلية يجب ألا يتجاوز 20 ميغابايت")
+        with Image.open(io.BytesIO(raw)) as source:
+            image=ImageOps.exif_transpose(source).convert("RGB")
+            image.thumbnail((1800,1800),Image.Resampling.LANCZOS)
+            output=io.BytesIO()
+            quality=88
+            image.save(output,format="JPEG",quality=quality,optimize=True)
+            while output.tell()>4*1024*1024 and quality>40:
+                quality-=8
+                output=io.BytesIO()
+                image.save(output,format="JPEG",quality=quality,optimize=True)
+            converted=output.getvalue()
+            if len(converted)>4*1024*1024:
+                raise HTTPException(413,"تعذر ضغط الصورة إلى الحجم المسموح")
+        return {"image":"data:image/jpeg;base64,"+base64.b64encode(converted).decode("ascii"),"content_type":"image/jpeg"}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logging.warning("Inventory image preview conversion failed: %s",exc)
+        raise HTTPException(400,"تعذر فتح الصورة أو تحويلها. جرّب اختيارها من معرض الهاتف مرة أخرى.")
+
 @app.get("/inventory/products/{product_id}/images")
 def get_inventory_product_images(product_id:int, s:Session=Depends(db), u:User=Depends(require_permission("inventory","view"))):
     product=s.get(InventoryProduct,product_id)
