@@ -3109,7 +3109,7 @@ html body .catalog-tools .catalog-head-actions .store-filter-toggle:active{trans
   ['aibProfileDial','aibProfilePhone'],
   ['coDial','coPhone']
  ];
- function digits(value){return String(value||'').replace(/\\D/g,'')}
+ function digits(value){return String(value||'').replace(/\D/g,'')}
  function configure(dial,input){
   if(!dial||!input)return;
   let hint=document.getElementById(input.id+'LengthHint');
