@@ -770,6 +770,20 @@ def _passkey_get_challenge(s:Session,u:User,purpose:str,challenge:str|None=None)
     row.used_at=now
     return row
 
+@app.get("/auth/passkeys/status")
+def passkey_status(s:Session=Depends(db),u:User=Depends(current_user)):
+    count=s.scalar(select(func.count(AccountingPasskey.id)).where(AccountingPasskey.user_id==u.id)) or 0
+    return {"enabled":count>0,"count":count}
+
+@app.post("/auth/passkeys/disable")
+def passkey_disable(request:Request,s:Session=Depends(db),u:User=Depends(current_user)):
+    rows=s.scalars(select(AccountingPasskey).where(AccountingPasskey.user_id==u.id)).all()
+    for row in rows:
+        s.delete(row)
+    audit(s,u,"accounting_passkey_disabled","user",u.id,{"removed":len(rows)},request)
+    s.commit()
+    return {"ok":True,"enabled":False,"removed":len(rows)}
+
 @app.post("/auth/passkeys/registration/options")
 def passkey_registration_options(request:Request,s:Session=Depends(db),u:User=Depends(current_user)):
     origin,rp_id=_passkey_origin(request)
