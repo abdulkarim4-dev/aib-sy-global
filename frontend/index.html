@@ -249,7 +249,7 @@ async function completeAccountingLogin(d){
    const confirm=await aibPrompt('أعد إدخال الرمز لتأكيده.',{title:'تأكيد رمز الدخول',placeholder:'أربعة أرقام',password:true});
    if(confirm===null)continue;
    if(String(confirm)!==String(pin)){await aibAlert('الرمزان غير متطابقين. حاول مرة أخرى.');continue}
-   try{await api('/auth/pin/setup',{method:'POST',body:{pin:String(pin)}});break}catch(err){await aibAlert(err.message,'تعذر حفظ الرمز')}
+   try{const setup=await api('/auth/pin/setup',{method:'POST',body:{pin:String(pin)}});if(setup.access_token)token=setup.access_token;break}catch(err){await aibAlert(err.message,'تعذر حفظ الرمز')}
   }
  }
  document.getElementById('accountingPin').value='';
