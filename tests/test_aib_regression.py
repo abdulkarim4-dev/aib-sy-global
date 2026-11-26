@@ -14,12 +14,33 @@ import app as aib
 
 
 class AIBRegressionTests(unittest.TestCase):
-    def test_store_registration_requires_recipient_phone(self):
+    def test_store_registration_requires_recipient_phone_and_shipping_address(self):
+        address = {
+            "country": "تركيا",
+            "province": "أنقرة",
+            "region": "كيجي أورن",
+            "district": "إتليك",
+            "address_line1": "شارع الاختبار 10",
+            "address_line2": "الطابق الأول",
+        }
         with self.assertRaises(Exception):
             aib.StoreRegisterPayload(full_name="اسم المستلم",email="buyer@example.com",password="StrongPass123")
-        payload=aib.StoreRegisterPayload(full_name="اسم المستلم",phone_country_code="+90",phone_number="5321234567",email="buyer@example.com",password="StrongPass123")
+        with self.assertRaises(Exception):
+            aib.StoreRegisterPayload(full_name="اسم المستلم",phone_country_code="+90",phone_number="5321234567",email="buyer@example.com",password="StrongPass123")
+        payload=aib.StoreRegisterPayload(full_name="اسم المستلم",phone_country_code="+90",phone_number="5321234567",shipping_address_data=address,email="buyer@example.com",password="StrongPass123")
         self.assertEqual(payload.phone_country_code,"+90")
         self.assertEqual(aib._store_phone_e164(payload.phone_country_code,payload.phone_number),"+905321234567")
+        self.assertTrue(aib._store_address_complete(payload.shipping_address_data))
+
+    def test_store_signup_cannot_skip_recipient_or_address_steps(self):
+        source = (ROOT / "frontend" / "shop.html").read_text(encoding="utf-8")
+        self.assertIn('id="storeFullName" type="text"', source)
+        self.assertIn('id="storeRecipientPhone" type="tel"', source)
+        self.assertIn('id="storeSignupAddressField"', source)
+        self.assertIn("shipping_address_data:pendingStoreRegistrationAddress", source)
+        self.assertIn("!pendingStoreRegistrationAddress", source)
+        self.assertIn("storeAuthMode==='register'", source)
+        self.assertIn("closeButton.hidden=reg", source)
 
     def test_all_application_invoices_use_only_the_aib_issuer_identity(self):
         source = (ROOT / "frontend" / "index.html").read_text(encoding="utf-8")
