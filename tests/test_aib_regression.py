@@ -50,6 +50,23 @@ class AIBRegressionTests(unittest.TestCase):
         self.assertNotIn("أدخل الرقم دون رمز الدولة", source)
         self.assertNotIn('بدون رمز دولة (أدخل الرقم الدولي)', source)
 
+    def test_all_store_phone_fields_share_complete_international_dial_code_list(self):
+        import json
+        import re
+        source = (ROOT / "frontend" / "shop.html").read_text(encoding="utf-8")
+        match = re.search(r"const AIB_COUNTRY_DIAL_CODES=(\\[.*?\\]);", source, re.S)
+        self.assertIsNotNone(match)
+        countries = json.loads(match.group(1))
+        self.assertGreaterEqual(len(countries), 230)
+        self.assertEqual(len({row["code"] for row in countries}), len(countries))
+        self.assertIn({"name": "Germany", "code": "DE", "dial": "+49"}, countries)
+        self.assertIn({"name": "Turkey", "code": "TR", "dial": "+90"}, countries)
+        self.assertIn({"name": "Cayman Islands", "code": "KY", "dial": "+1345"}, countries)
+        self.assertIn("Intl.DisplayNames(['ar'],{type:'region'})", source)
+        for element_id in ("storePhoneCountry", "storeRequiredRecipientDial", "aibProfileDial", "coDial"):
+            self.assertIn("id='" + element_id + "'", source)
+            self.assertIn(element_id, source)
+
     def test_store_signup_cannot_skip_recipient_or_address_steps(self):
         source = (ROOT / "frontend" / "shop.html").read_text(encoding="utf-8")
         self.assertIn('id="storeFullName" type="text"', source)
