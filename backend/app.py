@@ -50,6 +50,7 @@ class User(Base):
     email: Mapped[Optional[str]]=mapped_column(String(254), nullable=True, unique=True, index=True)
     email_verified: Mapped[bool]=mapped_column(Boolean, default=False, nullable=False)
     password_hash: Mapped[str]=mapped_column(String(300))
+    accounting_pin_hash: Mapped[Optional[str]]=mapped_column(String(300), nullable=True)
     role: Mapped[str]=mapped_column(String(20), default="employee")
     owner_commission_rate: Mapped[Any]=mapped_column(Numeric(7,3), default=1.5, nullable=False)
     company_name: Mapped[str]=mapped_column(String(200), default="", nullable=False)
@@ -475,6 +476,7 @@ def startup():
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS owner_commission_rate NUMERIC(7,3) NOT NULL DEFAULT 1.5"))
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted BOOLEAN NOT NULL DEFAULT FALSE"))
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT FALSE"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS accounting_pin_hash VARCHAR(300)"))
         conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_email_unique ON users (email) WHERE email IS NOT NULL"))
         conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS description TEXT NOT NULL DEFAULT ''"))
         conn.execute(text("ALTER TABLE inventory_products ADD COLUMN IF NOT EXISTS images JSONB NOT NULL DEFAULT '[]'::jsonb"))
@@ -588,6 +590,9 @@ class AccountingLoginConfirmPayload(BaseModel):
     challenge_id:int
     code:str=Field(min_length=6,max_length=6)
 
+class AccountingPinSetupPayload(BaseModel):
+    pin: str = Field(pattern=r"^\\d{4}$")
+
 class AccountingLoginResendPayload(BaseModel):
     challenge_id:int
 
@@ -595,7 +600,7 @@ def accounting_login_user_payload(u:User):
     return {"id":u.id,"username":u.username,"name":u.full_name,"email":u.email,"role":u.role,"permissions":u.permissions or {},"must_change_password":bool(u.must_change_password)}
 
 @app.post("/auth/login")
-def login(form:OAuth2PasswordRequestForm=Depends(), request:Request=None, s:Session=Depends(db)):
+def login(form:OAuth2PasswordRequestForm=Depends(), pin:Optional[str]=Form(default=None), request:Request=None, s:Session=Depends(db)):
     u=s.scalar(select(User).where(or_(User.username==form.username, (User.email==form.username) & (User.email_verified==True))))
     now=datetime.now(timezone.utc)
     if not u:
@@ -606,10 +611,20 @@ def login(form:OAuth2PasswordRequestForm=Depends(), request:Request=None, s:Sess
         if u.failed_logins>=3: u.locked_until=now+timedelta(minutes=5); u.failed_logins=0
         audit(s,u,"login_failed","user",u.id,{},request); s.commit(); raise HTTPException(401,"اسم المستخدم أو كلمة المرور غير صحيحة")
     if not u.active: raise HTTPException(403,"الحساب غير فعال")
+    if u.accounting_pin_hash:
+        if not pin or not re.fullmatch(r"\\d{4}",pin):
+            raise HTTPException(400,"أدخل رمز الدخول الشخصي المكوّن من أربعة أرقام.")
+        if not password_hash.verify(pin,u.accounting_pin_hash):
+            u.failed_logins+=1
+            if u.failed_logins>=3: u.locked_until=now+timedelta(minutes=5); u.failed_logins=0
+            audit(s,u,"accounting_pin_failed","user",u.id,{},request); s.commit()
+            raise HTTPException(401,"رمز الدخول غير صحيح")
+    elif pin:
+        raise HTTPException(400,"يجب إعداد رمز الدخول الشخصي أولاً.")
     u.failed_logins=0; u.locked_until=None
-    audit(s,u,"login","user",u.id,{"method":"password","email_otp_skipped":True},request)
+    audit(s,u,"login","user",u.id,{"method":"password_and_pin" if u.accounting_pin_hash else "password_pin_setup"},request)
     s.commit()
-    return {"access_token":token_for(u,email_otp_verified=True),"token_type":"bearer","user":accounting_login_user_payload(u)}
+    return {"access_token":token_for(u,email_otp_verified=True),"token_type":"bearer","user":accounting_login_user_payload(u),"pin_setup_required":not bool(u.accounting_pin_hash)}
 
 @app.post("/auth/password-reset/request")
 def request_accounting_password_reset(p:AccountingPasswordResetRequestPayload,request:Request,s:Session=Depends(db)):
@@ -709,6 +724,15 @@ def confirm_accounting_login(p:AccountingLoginConfirmPayload,request:Request,s:S
     s.query(AccountingLoginVerification).filter(AccountingLoginVerification.user_id==u.id,AccountingLoginVerification.used_at.is_(None),AccountingLoginVerification.id!=row.id).update({AccountingLoginVerification.used_at:now},synchronize_session=False)
     audit(s,u,"login","user",u.id,{"method":"email_otp"},request); s.commit()
     return {"access_token":token_for(u,email_otp_verified=True),"token_type":"bearer","user":accounting_login_user_payload(u)}
+
+@app.post("/auth/pin/setup")
+def setup_accounting_pin(p:AccountingPinSetupPayload,request:Request,s:Session=Depends(db),u:User=Depends(current_user)):
+    if u.accounting_pin_hash:
+        raise HTTPException(409,"رمز الدخول مضبوط مسبقاً. استخدمه عند تسجيل الدخول.")
+    u.accounting_pin_hash=password_hash.hash(p.pin)
+    audit(s,u,"accounting_pin_created","user",u.id,{},request)
+    s.commit()
+    return {"ok":True,"message":"تم إعداد رمز الدخول الشخصي بنجاح."}
 
 @app.get("/auth/me")
 def me(request:Request,u:User=Depends(current_user)):
