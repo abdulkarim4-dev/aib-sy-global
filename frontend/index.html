@@ -462,6 +462,105 @@ input[type=checkbox]{accent-color:#2586c7}
 @media(prefers-reduced-motion:reduce){#app .stat,#app .nav button,#app .btn{transition:none!important}}
 </style>
 
+
+<style id="aib-unified-modal-window-theme">
+/* Consistent AIB application styling for every modal, confirmation and prompt. */
+:root{
+ --aib-modal-bg:#ffffff;--aib-modal-page:#f4f6f8;--aib-modal-line:#e1e7ec;
+ --aib-modal-text:#26323c;--aib-modal-muted:#71808d;--aib-modal-blue:#287fb5;
+ --aib-modal-blue-dark:#17618f;--aib-modal-shadow:0 22px 65px rgba(12,24,36,.20);
+}
+.modal,.aib-dialog,[role="dialog"]:not(.aib-dialog){
+ background:rgba(20,29,38,.48)!important;
+ -webkit-backdrop-filter:blur(5px)!important;backdrop-filter:blur(5px)!important;
+ padding:clamp(10px,3vw,22px)!important;
+}
+.modal .modal-box,.modal-box,.aib-dialog-card,
+[role="dialog"]:not(.aib-dialog) > .dialog-content,
+[role="dialog"]:not(.aib-dialog) > .modal-content{
+ background:var(--aib-modal-bg)!important;background-image:none!important;
+ color:var(--aib-modal-text)!important;border:1px solid var(--aib-modal-line)!important;
+ border-radius:17px!important;box-shadow:var(--aib-modal-shadow)!important;
+ -webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+ text-shadow:none!important;
+}
+.modal .modal-box{
+ width:min(760px,100%);max-height:min(90dvh,900px);overflow:auto;
+ padding:20px!important;
+}
+.modal .modal-head,.modal-head{
+ display:flex;align-items:center;gap:12px;
+ border-bottom:1px solid #edf0f3!important;padding:0 0 12px!important;margin:0 0 15px!important;
+}
+.modal .modal-head h3,.modal-head h3,.aib-dialog-title{
+ color:var(--aib-modal-text)!important;font-size:19px!important;font-weight:850!important;
+ text-shadow:none!important;margin:0!important;
+}
+.aib-dialog-card{
+ width:min(460px,100%)!important;padding:22px!important;text-align:right!important;direction:rtl;
+}
+.aib-dialog-mark{
+ width:46px!important;height:4px!important;border-radius:9px!important;margin:0 0 16px!important;
+ background:linear-gradient(90deg,#f0784b,#328fcf)!important;box-shadow:none!important;
+}
+.aib-dialog-message{
+ color:#536270!important;font-size:14px!important;line-height:1.9!important;
+ text-shadow:none!important;margin:12px 0 20px!important;
+}
+.aib-dialog-input{
+ background:#fff!important;color:var(--aib-modal-text)!important;
+ border:1px solid #dce3e9!important;border-radius:10px!important;
+ box-shadow:inset 0 1px 2px rgba(20,35,50,.025)!important;
+}
+.aib-dialog-input:focus{
+ border-color:#70acd0!important;box-shadow:0 0 0 3px rgba(37,134,199,.12)!important;outline:none!important;
+}
+.aib-dialog-input::placeholder{color:#9aa6b0!important}
+.aib-dialog-actions{display:flex;gap:9px;flex-wrap:wrap}
+.aib-dialog-actions button,.modal .modal-box button{
+ border-radius:10px!important;font-weight:750!important;min-height:38px;
+}
+.aib-dialog-actions .aib-confirm-main{
+ background:linear-gradient(135deg,#328fcf,#17618f)!important;color:#fff!important;
+ border:1px solid #2b80b7!important;box-shadow:0 4px 12px rgba(28,112,164,.15)!important;
+}
+.aib-dialog-actions .aib-confirm-danger{
+ background:#fff4f3!important;color:#b43d37!important;border:1px solid #f0d0cd!important;
+}
+.modal .modal-box input:not([type=checkbox]):not([type=radio]):not([type=file]),
+.modal .modal-box select,.modal .modal-box textarea{
+ background:#fff!important;color:var(--aib-modal-text)!important;
+ border:1px solid #dce3e9!important;border-radius:10px!important;
+}
+.modal .modal-box input:focus,.modal .modal-box select:focus,.modal .modal-box textarea:focus{
+ border-color:#70acd0!important;box-shadow:0 0 0 3px rgba(37,134,199,.12)!important;outline:none!important;
+}
+.modal .modal-box label{color:#536270!important;font-weight:700}
+.modal .modal-box h3,.modal .modal-box h4{color:var(--aib-modal-text)!important}
+.modal .modal-box p,.modal .modal-box small{color:var(--aib-modal-muted)}
+.modal .modal-box .notice,.modal .modal-box .alert{
+ border-radius:10px!important;box-shadow:none!important;
+}
+.modal .modal-box .notice.error,.modal .modal-box .alert-danger{
+ background:#fff3f2!important;color:#a43d37!important;border:1px solid #f0d2cf!important;
+}
+.modal .modal-box .notice.good,.modal .modal-box .alert-success{
+ background:#eff8f2!important;color:#26734a!important;border:1px solid #d1e9d9!important;
+}
+.aib-dialog-actions button:focus-visible,.modal .modal-box button:focus-visible{
+ outline:3px solid rgba(37,134,199,.25)!important;outline-offset:2px;
+}
+@media(max-width:600px){
+ .modal,.aib-dialog,[role="dialog"]:not(.aib-dialog){padding:10px!important}
+ .modal .modal-box{padding:14px!important;border-radius:14px!important;max-height:92dvh}
+ .aib-dialog-card{padding:18px!important;border-radius:14px!important}
+ .aib-dialog-actions button{flex:1;min-width:0!important}
+}
+@media(prefers-reduced-motion:no-preference){
+ .modal .modal-box,.aib-dialog-card{animation:aibModalEnter .18s ease-out both}
+ @keyframes aibModalEnter{from{opacity:0;transform:translateY(7px) scale(.99)}to{opacity:1;transform:translateY(0) scale(1)}}
+}
+</style>
 </head><body>
 <svg aria-hidden="true" width="0" height="0" style="position:absolute;overflow:hidden"><filter id="aib-remove-white" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  -1 -1 -1 0 3"/></filter></svg>
 <div id="login" class="login-wrap hidden"><section class="login-card"><div class="brand login-brand"><a class="brand-logo-link" href="/" aria-label="العودة إلى الصفحة الرئيسية"><img src="/aib-logo.png?v=20261113-aib2" alt="AIB"></a><div><strong>AIB GROUP</strong><span>نظام الإدارة والمحاسبة</span></div></div><h1 data-i="loginTitle">تسجيل الدخول</h1><p data-i="loginSub">منصة مجموعة AIB التجارية الآمنة</p><div id="loginMsg"></div><form id="loginForm"><div class="field"><label data-i="username">اسم المستخدم</label><input id="username" autocomplete="username" required></div><div class="field"><label data-i="password">كلمة المرور</label><div style="display:flex;gap:8px;align-items:center"><input id="password" type="password" autocomplete="current-password" required style="flex:1"><button class="btn secondary" id="togglePassword" type="button" onclick="togglePasswordVisibility()" data-i="showPassword">إظهار</button></div></div><button class="btn full" type="submit" data-i="loginBtn">دخول آمن</button></form><div id="forgotPasswordWrap" class="hidden" style="margin-top:14px"><form id="forgotPasswordForm" class="card" style="padding:14px"><h3 style="margin:0 0 8px">نسيت كلمة المرور؟</h3><p class="small muted" style="margin:0 0 10px">أدخل البريد الإلكتروني المسجل في حسابك لإرسال رابط آمن لإعادة التعيين.</p><div class="field"><label for="resetEmail">البريد الإلكتروني</label><input id="resetEmail" type="email" autocomplete="email" required placeholder="name@example.com"></div><button class="btn full" type="submit">إرسال رابط إعادة التعيين</button><button class="btn secondary full" type="button" id="cancelForgotPassword" style="margin-top:8px">العودة لتسجيل الدخول</button></form></div><div id="resetPasswordWrap" class="hidden" style="margin-top:14px"><form id="resetPasswordForm" class="card" style="padding:14px"><h3 style="margin:0 0 8px">تعيين كلمة مرور جديدة</h3><div class="field"><label for="resetNewPassword">كلمة المرور الجديدة</label><input id="resetNewPassword" type="password" minlength="8" autocomplete="new-password" required></div><div class="field"><label for="resetConfirmPassword">تأكيد كلمة المرور</label><input id="resetConfirmPassword" type="password" minlength="8" autocomplete="new-password" required></div><p class="small muted">يجب أن تتضمن 8 خانات على الأقل وحرفاً كبيراً وصغيراً ورقماً ورمزاً.</p><button class="btn full" type="submit">حفظ كلمة المرور الجديدة</button></form></div><div class="toolbar" style="justify-content:center;margin-top:16px"><button class="btn secondary" onclick="toggleLang()">العربية / English</button></div><div class="foot">AIB • Secure Business Workspace</div></section></div>
