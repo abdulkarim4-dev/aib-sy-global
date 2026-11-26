@@ -7,7 +7,7 @@ from email.message import EmailMessage
 from urllib.request import Request as UrlRequest, urlopen
 from urllib.error import HTTPError, URLError
 import jwt
-from fastapi import FastAPI, Depends, HTTPException, Request, status
+from fastapi import FastAPI, Depends, HTTPException, Request, status, Form
 from fastapi.responses import RedirectResponse, Response
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
