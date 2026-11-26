@@ -3142,8 +3142,8 @@ def _store_phone_e164(country_code: str, phone_number: str) -> str:
         number = country_code.strip() + "".join(ch for ch in raw if ch.isdigit())
     else:
         raise HTTPException(400,"رمز الدولة اختياري، لكن عند تركه فارغاً أدخل الرقم بصيغته الدولية مع + ورمز الدولة")
-    if not number.startswith("+") or not 8 <= len(number) <= 16:
-        raise HTTPException(400,"رقم الهاتف غير صحيح. استخدم الصيغة الدولية")
+    if not number.startswith("+") or not 8 <= len(number) <= 16 or len(number) - 1 > 15:
+        raise HTTPException(400,"رقم الهاتف غير صحيح. الحد الأقصى للصيغة الدولية هو 15 رقماً شاملاً رمز الدولة")
     return number
 
 @app.post("/store/auth/phone/send-code")
