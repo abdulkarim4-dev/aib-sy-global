@@ -49,6 +49,14 @@ class AIBRegressionTests(unittest.TestCase):
         self.assertIn("oldHint.remove()", source)
         self.assertNotIn("hint.textContent=guidance", source)
 
+    def test_country_phone_selectors_put_calling_code_first_and_keep_it_visible(self):
+        source = (ROOT / "frontend" / "shop.html").read_text(encoding="utf-8")
+        self.assertIn("option.textContent=row.dial+' · '+", source)
+        self.assertIn("direction:ltr!important;text-align:left!important", source)
+        self.assertIn("font-variant-numeric:tabular-nums!important", source)
+        for element_id in ("storePhoneCountry", "storeRequiredRecipientDial", "aibProfileDial", "coDial"):
+            self.assertIn("#" + element_id, source)
+
     def test_all_store_phone_fields_share_complete_international_dial_code_list(self):
         import json
         import re
