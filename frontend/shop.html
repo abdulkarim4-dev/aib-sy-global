@@ -3101,4 +3101,46 @@ html body .catalog-tools .catalog-head-actions .store-filter-toggle:active{trans
 }
 </style>
 
+<script>
+(function(){
+ const pairs=[
+  ['storePhoneCountry','storeRecipientPhone'],
+  ['storeRequiredRecipientDial','storeRequiredRecipientPhone'],
+  ['aibProfileDial','aibProfilePhone'],
+  ['coDial','coPhone']
+ ];
+ function digits(value){return String(value||'').replace(/\\D/g,'')}
+ function configure(dial,input){
+  if(!dial||!input)return;
+  let hint=document.getElementById(input.id+'LengthHint');
+  if(!hint){hint=document.createElement('small');hint.id=input.id+'LengthHint';hint.className='store-phone-length-hint';hint.style.cssText='display:block;margin-top:6px;color:#91b9d2;font-size:11px;line-height:1.8';input.insertAdjacentElement('afterend',hint)}
+  const max=Math.max(1,15-digits(dial.value).length);
+  input.maxLength=max;
+  input.inputMode='numeric';
+  input.autocomplete='tel-national';
+  input.placeholder='أدخل الرقم المحلي فقط دون رمز الدولة';
+  const clean=digits(input.value).slice(0,max);
+  if(input.value!==clean)input.value=clean;
+  hint.textContent='أدخل الرقم دون رمز الدولة ('+dial.value+')؛ الحد الأقصى '+max+' أرقام. مثال: اكتب الرقم المحلي فقط.';
+  input.setAttribute('aria-describedby',hint.id);
+ }
+ function init(){
+  pairs.forEach(([dialId,inputId])=>{
+   const dial=document.getElementById(dialId),input=document.getElementById(inputId);
+   if(!dial||!input)return;
+   configure(dial,input);
+   dial.addEventListener('change',()=>configure(dial,input));
+   input.addEventListener('input',()=>configure(dial,input));
+   input.addEventListener('paste',()=>setTimeout(()=>configure(dial,input),0));
+   input.addEventListener('blur',()=>{
+    const max=Math.max(1,15-digits(dial.value).length),count=digits(input.value).length;
+    input.setCustomValidity(count>max?'تجاوزت الحد الأقصى المسموح لرمز الدولة المحدد.':'');
+   });
+   input.addEventListener('input',()=>input.setCustomValidity(''));
+  });
+ }
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+})();
+</script>
+<style>.store-phone-length-hint{direction:rtl;text-align:right}</style>
 </body></html>
