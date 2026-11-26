@@ -808,7 +808,17 @@ body.modal-open{overflow:hidden}
 /* Keep category and category-page panels completely out of search results, even when component CSS sets display. */
 #categorySection[hidden],#categoryPageHeader[hidden]{display:none!important}
 
-.product-video-link{display:block;width:100%;margin:8px 0 4px;padding:10px 12px;border:1px solid #b8d5e8;border-radius:10px;background:#eef6fb;color:#185b86;font-weight:800;cursor:pointer}.detail-product-video{margin-top:14px;padding:12px;border:1px solid #dce5ec;border-radius:14px;background:#f7fafc}.detail-product-video h3{margin:0 0 10px;font-size:15px}.detail-product-video iframe,.detail-product-video video{display:block;width:100%;aspect-ratio:16/9;max-height:420px;border:0;border-radius:10px;background:#111}.detail-product-video a{display:inline-flex;padding:10px 14px;border-radius:9px;background:#eaf3f9;color:#185b86;font-weight:700}.compact-meta{font-size:10px!important;color:#6e7d89!important;margin:3px 0!important;line-height:1.45;white-space:normal;overflow-wrap:anywhere}</style><style id="aib-unified-white-theme">
+.product-video-link{display:block;width:100%;margin:8px 0 4px;padding:10px 12px;border:1px solid #b8d5e8;border-radius:10px;background:#eef6fb;color:#185b86;font-weight:800;cursor:pointer}.detail-product-video{margin-top:14px;padding:12px;border:1px solid #dce5ec;border-radius:14px;background:#f7fafc}.detail-product-video h3{margin:0 0 10px;font-size:15px}.detail-product-video iframe,.detail-product-video video{display:block;width:100%;aspect-ratio:16/9;max-height:420px;border:0;border-radius:10px;background:#111}.detail-product-video a{display:inline-flex;padding:10px 14px;border-radius:9px;background:#eaf3f9;color:#185b86;font-weight:700}.compact-meta{font-size:10px!important;color:#6e7d89!important;margin:3px 0!important;line-height:1.45;white-space:normal;overflow-wrap:anywhere}
+/* Keep international calling codes visible in the selected country field. */
+#storePhoneCountry,#storeRequiredRecipientDial,#aibProfileDial,#coDial{
+ direction:ltr!important;text-align:left!important;unicode-bidi:plaintext!important;
+ font-family:Tahoma,Arial,sans-serif!important;font-weight:800!important;
+ font-variant-numeric:tabular-nums!important;letter-spacing:.2px;
+}
+#storePhoneCountry option,#storeRequiredRecipientDial option,#aibProfileDial option,#coDial option{
+ direction:ltr;text-align:left;font-weight:700;font-variant-numeric:tabular-nums;
+}
+</style><style id="aib-unified-white-theme">
 /* AIB unified premium white theme — shared visual layer */
 :root{
  color-scheme:light;
@@ -3127,7 +3137,7 @@ html body .catalog-tools .catalog-head-actions .store-filter-toggle:active{trans
    const option=document.createElement('option');
    option.value=row.dial;
    const name=row.arabic===row.name?row.name:row.arabic+' ('+row.name+')';
-   option.textContent=(flag(row.code)?flag(row.code)+' ':'')+name+' '+row.dial;
+   option.textContent=row.dial+' · '+(flag(row.code)?flag(row.code)+' ':'')+row.arabic;
    option.dataset.country=row.code;
    option.dataset.countryCode=row.code;
    option.dataset.countryName=row.arabic;
