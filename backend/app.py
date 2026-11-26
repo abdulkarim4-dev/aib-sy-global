@@ -428,7 +428,7 @@ def current_user(request:Request, token:Optional[str]=Depends(oauth), s:Session=
         if not owner or not owner.active or owner.deleted or owner.role!="owner" or u.role=="owner":
             raise HTTPException(401,"جلسة الدخول بالنيابة غير صالحة")
         u._impersonated_by_owner_id=owner.id
-    if not impersonator_id and payload.get("accounting_pin_verified") is not True and request.url.path not in {"/auth/me","/auth/pin/setup","/auth/pin/unlock","/auth/first-login-password"}:
+    if not impersonator_id and payload.get("accounting_pin_verified") is not True and request.url.path not in {"/auth/me","/auth/pin/setup","/auth/pin/unlock","/auth/first-login-password","/auth/passkeys/authentication/options","/auth/passkeys/authentication/verify"}:
         raise HTTPException(401,"أدخل رمز الدخول الشخصي للمتابعة.")
     if u.must_change_password and not impersonator_id and request.url.path not in {"/auth/me","/auth/first-login-password","/auth/pin/setup"}:
         raise HTTPException(403,"يجب تغيير كلمة المرور المؤقتة قبل استخدام الحساب")
