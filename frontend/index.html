@@ -246,7 +246,7 @@ async function completeAccountingLogin(d){
   while(true){
    const pin=await aibPrompt('لأول دخول، أنشئ رمزاً شخصياً من أربعة أرقام. استخدم رمزاً لا تشاركه مع الآخرين.',{title:'إعداد رمز الدخول',placeholder:'أربعة أرقام',password:true});
    if(pin===null){logout();return}
-   if(!/^\\d{4}$/.test(String(pin))){await aibAlert('يجب أن يتكون الرمز من أربعة أرقام بالضبط.');continue}
+   if(!/^\d{4}$/.test(String(pin))){await aibAlert('يجب أن يتكون الرمز من أربعة أرقام بالضبط.');continue}
    const confirm=await aibPrompt('أعد إدخال الرمز لتأكيده.',{title:'تأكيد رمز الدخول',placeholder:'أربعة أرقام',password:true});
    if(confirm===null)continue;
    if(String(confirm)!==String(pin)){await aibAlert('الرمزان غير متطابقين. حاول مرة أخرى.');continue}
@@ -266,7 +266,7 @@ function showPinGate(){
 document.getElementById('pinGateForm').addEventListener('submit',async e=>{
  e.preventDefault();const msg=document.getElementById('pinGateMsg'),field=document.getElementById('pinGateInput');
  const pin=field.value.trim();msg.innerHTML='';
- if(!/^\\d{4}$/.test(pin)){msg.innerHTML='<div class="notice error">أدخل أربعة أرقام بالضبط.</div>';return}
+ if(!/^\d{4}$/.test(pin)){msg.innerHTML='<div class="notice error">أدخل أربعة أرقام بالضبط.</div>';return}
  const btn=e.submitter||e.currentTarget.querySelector('button[type="submit"]');btn.disabled=true;
  try{
   const result=await api('/auth/pin/unlock',{method:'POST',body:{pin}});
