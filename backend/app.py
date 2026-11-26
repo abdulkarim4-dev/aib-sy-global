@@ -16,6 +16,9 @@ from pydantic_settings import BaseSettings
 from pwdlib import PasswordHash
 from sqlalchemy import create_engine, String, Boolean, DateTime, Integer, ForeignKey, JSON, Text, Numeric, UniqueConstraint, select, func, text, or_, case
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker, Session
+from webauthn import generate_registration_options, verify_registration_response, generate_authentication_options, verify_authentication_response
+from webauthn.helpers import options_to_json
+from webauthn.helpers.structs import AuthenticatorSelectionCriteria, UserVerificationRequirement, ResidentKeyRequirement, PublicKeyCredentialDescriptor
 
 class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://aib:aib_change_me@db:5432/aib"
@@ -81,6 +84,27 @@ class AccountingLoginVerification(Base):
     code_hash: Mapped[str]=mapped_column(String(300))
     expires_at: Mapped[datetime]=mapped_column(DateTime(timezone=True))
     attempts: Mapped[int]=mapped_column(Integer,default=0,nullable=False)
+    used_at: Mapped[Optional[datetime]]=mapped_column(DateTime(timezone=True),nullable=True)
+    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True),default=lambda:datetime.now(timezone.utc))
+
+class AccountingPasskey(Base):
+    __tablename__="accounting_passkeys"
+    id: Mapped[int]=mapped_column(primary_key=True)
+    user_id: Mapped[int]=mapped_column(ForeignKey("users.id"),index=True)
+    credential_id: Mapped[str]=mapped_column(String(1024),unique=True,index=True)
+    public_key: Mapped[str]=mapped_column(Text)
+    sign_count: Mapped[int]=mapped_column(Integer,default=0,nullable=False)
+    transports: Mapped[list]=mapped_column(JSON,default=list,nullable=False)
+    device_name: Mapped[str]=mapped_column(String(120),default="هذا الجهاز",nullable=False)
+    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True),default=lambda:datetime.now(timezone.utc))
+
+class AccountingPasskeyChallenge(Base):
+    __tablename__="accounting_passkey_challenges"
+    id: Mapped[int]=mapped_column(primary_key=True)
+    user_id: Mapped[int]=mapped_column(ForeignKey("users.id"),index=True)
+    challenge: Mapped[str]=mapped_column(String(512))
+    purpose: Mapped[str]=mapped_column(String(24),index=True)
+    expires_at: Mapped[datetime]=mapped_column(DateTime(timezone=True))
     used_at: Mapped[Optional[datetime]]=mapped_column(DateTime(timezone=True),nullable=True)
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True),default=lambda:datetime.now(timezone.utc))
 
@@ -716,6 +740,88 @@ def confirm_accounting_login(p:AccountingLoginConfirmPayload,request:Request,s:S
     s.query(AccountingLoginVerification).filter(AccountingLoginVerification.user_id==u.id,AccountingLoginVerification.used_at.is_(None),AccountingLoginVerification.id!=row.id).update({AccountingLoginVerification.used_at:now},synchronize_session=False)
     audit(s,u,"login","user",u.id,{"method":"email_otp"},request); s.commit()
     return {"access_token":token_for(u,email_otp_verified=True),"token_type":"bearer","user":accounting_login_user_payload(u)}
+
+
+def _passkey_b64(data:bytes)->str:
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
+def _passkey_unb64(value:str)->bytes:
+    return base64.urlsafe_b64decode(value+"="*((4-len(value)%4)%4))
+def _passkey_origin(request:Request)->tuple[str,str]:
+    origin=request.headers.get("origin","").rstrip("/")
+    from urllib.parse import urlparse
+    parsed=urlparse(origin)
+    host=(request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.netloc).split(",")[0].strip().split(":")[0].lower()
+    if parsed.scheme!="https" or not parsed.hostname or parsed.hostname.lower()!=host:
+        raise HTTPException(400,"مصادقة البصمة تتطلب اتصالاً آمناً من نفس الموقع.")
+    return origin,parsed.hostname.lower()
+def _passkey_new_challenge(s:Session,u:User,purpose:str,challenge:bytes):
+    now=datetime.now(timezone.utc)
+    s.query(AccountingPasskeyChallenge).filter(AccountingPasskeyChallenge.user_id==u.id,AccountingPasskeyChallenge.used_at.is_(None)).update({AccountingPasskeyChallenge.used_at:now},synchronize_session=False)
+    row=AccountingPasskeyChallenge(user_id=u.id,challenge=_passkey_b64(challenge),purpose=purpose,expires_at=now+timedelta(minutes=5))
+    s.add(row);s.commit()
+    return row
+def _passkey_get_challenge(s:Session,u:User,purpose:str,challenge:str):
+    row=s.scalar(select(AccountingPasskeyChallenge).where(AccountingPasskeyChallenge.user_id==u.id,AccountingPasskeyChallenge.purpose==purpose,AccountingPasskeyChallenge.challenge==challenge,AccountingPasskeyChallenge.used_at.is_(None)).order_by(AccountingPasskeyChallenge.id.desc()).limit(1))
+    now=datetime.now(timezone.utc)
+    if not row or row.expires_at<now: raise HTTPException(400,"انتهت صلاحية طلب البصمة. حاول مجدداً.")
+    row.used_at=now
+    return row
+
+@app.post("/auth/passkeys/registration/options")
+def passkey_registration_options(request:Request,s:Session=Depends(db),u:User=Depends(current_user)):
+    origin,rp_id=_passkey_origin(request)
+    credentials=s.scalars(select(AccountingPasskey).where(AccountingPasskey.user_id==u.id)).all()
+    opts=generate_registration_options(rp_id=rp_id,rp_name="AIB GROUP",user_id=str(u.id).encode(),user_name=u.username,user_display_name=u.full_name,exclude_credentials=[PublicKeyCredentialDescriptor(id=_passkey_unb64(x.credential_id)) for x in credentials],authenticator_selection=AuthenticatorSelectionCriteria(resident_key=ResidentKeyRequirement.PREFERRED,user_verification=UserVerificationRequirement.REQUIRED))
+    _passkey_new_challenge(s,u,"registration",opts.challenge)
+    return json.loads(options_to_json(opts))
+
+@app.post("/auth/passkeys/registration/verify")
+def passkey_registration_verify(payload:dict,request:Request,s:Session=Depends(db),u:User=Depends(current_user)):
+    origin,rp_id=_passkey_origin(request)
+    challenge=payload.get("challenge")
+    if not isinstance(challenge,str): raise HTTPException(400,"طلب تسجيل البصمة غير مكتمل.")
+    row=_passkey_get_challenge(s,u,"registration",challenge)
+    try:
+        verified=verify_registration_response(credential=payload,expected_challenge=_passkey_unb64(row.challenge),expected_rp_id=rp_id,expected_origin=origin,require_user_verification=True)
+    except Exception:
+        s.rollback();raise HTTPException(400,"تعذر التحقق من بصمة الجهاز. حاول مجدداً.")
+    credential_id=_passkey_b64(verified.credential_id)
+    existing=s.scalar(select(AccountingPasskey).where(AccountingPasskey.credential_id==credential_id))
+    if existing and existing.user_id!=u.id: raise HTTPException(409,"وسيلة البصمة مرتبطة بحساب آخر.")
+    if not existing:
+        transports=(payload.get("response") or {}).get("transports") or []
+        s.add(AccountingPasskey(user_id=u.id,credential_id=credential_id,public_key=_passkey_b64(verified.credential_public_key),sign_count=verified.sign_count,transports=transports,device_name="هذا الجهاز"))
+    audit(s,u,"accounting_passkey_registered","user",u.id,{},request);s.commit()
+    return {"ok":True,"message":"تم تفعيل بصمة هذا الجهاز للمحاسبة."}
+
+@app.post("/auth/passkeys/authentication/options")
+def passkey_authentication_options(request:Request,s:Session=Depends(db),u:User=Depends(current_user)):
+    _,rp_id=_passkey_origin(request)
+    credentials=s.scalars(select(AccountingPasskey).where(AccountingPasskey.user_id==u.id)).all()
+    if not credentials: raise HTTPException(404,"لم يتم تفعيل البصمة لهذا الحساب على هذا الجهاز.")
+    opts=generate_authentication_options(rp_id=rp_id,allow_credentials=[PublicKeyCredentialDescriptor(id=_passkey_unb64(x.credential_id),transports=x.transports or None) for x in credentials],user_verification=UserVerificationRequirement.REQUIRED)
+    _passkey_new_challenge(s,u,"authentication",opts.challenge)
+    return json.loads(options_to_json(opts))
+
+@app.post("/auth/passkeys/authentication/verify")
+def passkey_authentication_verify(payload:dict,request:Request,s:Session=Depends(db),u:User=Depends(current_user)):
+    origin,rp_id=_passkey_origin(request)
+    response=payload.get("response") or {}
+    raw_id=payload.get("rawId") or payload.get("id")
+    challenge=payload.get("challenge")
+    if not isinstance(challenge,str) or not isinstance(raw_id,str): raise HTTPException(400,"استجابة البصمة غير مكتملة.")
+    row=_passkey_get_challenge(s,u,"authentication",challenge)
+    credential_id=_passkey_b64(_passkey_unb64(raw_id))
+    saved=s.scalar(select(AccountingPasskey).where(AccountingPasskey.user_id==u.id,AccountingPasskey.credential_id==credential_id))
+    if not saved: raise HTTPException(401,"هذه البصمة غير مسجلة لهذا الحساب.")
+    try:
+        verified=verify_authentication_response(credential=payload,expected_challenge=_passkey_unb64(row.challenge),expected_rp_id=rp_id,expected_origin=origin,credential_public_key=_passkey_unb64(saved.public_key),credential_current_sign_count=saved.sign_count,require_user_verification=True)
+    except Exception:
+        s.rollback();raise HTTPException(401,"تعذر التحقق من بصمة الجهاز.")
+    saved.sign_count=verified.new_sign_count
+    u.failed_logins=0;u.locked_until=None
+    audit(s,u,"accounting_passkey_unlocked","user",u.id,{},request);s.commit()
+    return {"access_token":token_for(u,email_otp_verified=True,pin_verified=True),"token_type":"bearer"}
 
 @app.post("/auth/pin/unlock")
 def unlock_accounting_pin(p:AccountingPinSetupPayload,request:Request,s:Session=Depends(db),u:User=Depends(current_user)):
