@@ -589,6 +589,65 @@ Object.assign(dict.en,{
 "تمت إضافة المنتج إلى سلة التسوق بنجاح":"Product added to cart successfully"
 });
 
+
+/* Checkout, payment and cart labels: keep every supported locale consistent. */
+Object.assign(dict.en,{
+"اختر طريقة الدفع":"Choose a payment method","وسائل دفع موثوقة — اختر الوسيلة لعرض بيانات التحويل الخاصة بها.":"Secure payment methods — choose one to view transfer details.",
+"التحويل إلى بنك البركة":"Transfer to Al Baraka Bank","بنك سوريا والخليج – فرع حلب":"Bank of Syria and the Gulf – Aleppo branch",
+"فرع الفرقان · رقم الحساب":"Al-Furqan branch · Account number","اسم العميل · رقم العميل":"Customer name · Customer number",
+"مبلغ المنتجات في طلبك":"Your product order amount","المبلغ المطلوب تحويله · ":"Amount to transfer · ","عدد القطع":"Number of items",
+"الإجمالي":"Total","يُحدد بعد تأكيد الأسعار":"To be confirmed after prices are verified",
+"بعض المنتجات لم يُحدد سعرها بعد، ولا تدخل في المبلغ المعروض حتى يتم تأكيد سعرها.":"Some products are not priced yet and are excluded from the displayed amount until confirmed.",
+"المبلغ للمنتجات فقط، ولا يشمل الشحن أو الرسوم الإضافية. عند تعدد العملات يظهر إجمالي مستقل لكل عملة.":"Products only; shipping and additional fees are excluded. Separate totals are shown for each currency.",
+"اختر طريقة الدفع":"Choose a payment method","إثبات الدفع (صورة أو PDF)":"Payment proof (image or PDF)",
+"الحد الأقصى 5 ميغابايت. لن يُقبل الطلب دون إثبات الدفع.":"Maximum 5 MB. The request cannot be submitted without payment proof.",
+"عنوان الشحن المحفوظ":"Saved shipping address","رقم الجوال":"Mobile number","أكمل بيانات الشحن ورقم الهاتف":"Complete shipping details and phone number"
+});
+Object.assign(dict.tr,{
+"اختر طريقة الدفع":"Ödeme yöntemini seçin","وسائل دفع موثوقة — اختر الوسيلة لعرض بيانات التحويل الخاصة بها.":"Güvenli ödeme yöntemleri — havale bilgilerini görmek için bir yöntem seçin.",
+"التحويل إلى بنك البركة":"Al Baraka Bankasına havale","بنك سوريا والخليج – فرع حلب":"Suriye ve Körfez Bankası – Halep Şubesi",
+"فرع الفرقان · رقم الحساب":"El Furkan Şubesi · Hesap numarası","اسم العميل · رقم العميل":"Müşteri adı · Müşteri numarası",
+"مبلغ المنتجات في طلبك":"Siparişinizdeki ürünlerin tutarı","المبلغ المطلوب تحويله · ":"Gönderilecek tutar · ","عدد القطع":"Ürün adedi",
+"الإجمالي":"Toplam","يُحدد بعد تأكيد الأسعار":"Fiyatlar onaylandıktan sonra belirlenecek",
+"بعض المنتجات لم يُحدد سعرها بعد، ولا تدخل في المبلغ المعروض حتى يتم تأكيد سعرها.":"Bazı ürünlerin fiyatı henüz belirlenmedi; onaylanana kadar gösterilen tutara dahil edilmez.",
+"المبلغ للمنتجات فقط، ولا يشمل الشحن أو الرسوم الإضافية. عند تعدد العملات يظهر إجمالي مستقل لكل عملة.":"Tutar yalnızca ürünler içindir; kargo ve ek ücretler dahil değildir. Birden fazla para birimi varsa her biri ayrı gösterilir.",
+"إثبات الدفع (صورة أو PDF)":"Ödeme kanıtı (resim veya PDF)","الحد الأقصى 5 ميغابايت. لن يُقبل الطلب دون إثبات الدفع.":"En fazla 5 MB. Ödeme kanıtı olmadan sipariş kabul edilmez.",
+"عنوان الشحن المحفوظ":"Kayıtlı teslimat adresi","رقم الجوال":"Cep telefonu numarası"
+});
+Object.assign(dict.de,{
+"اختر طريقة الدفع":"Zahlungsmethode auswählen","وسائل دفع موثوقة — اختر الوسيلة لعرض بيانات التحويل الخاصة بها.":"Sichere Zahlungsmethoden — wählen Sie eine Methode, um die Überweisungsdaten anzuzeigen.",
+"التحويل إلى بنك البركة":"Überweisung an die Al-Baraka-Bank","بنك سوريا والخليج – فرع حلب":"Bank von Syrien und dem Golf – Filiale Aleppo",
+"فرع الفرقان · رقم الحساب":"Filiale Al-Furqan · Kontonummer","اسم العميل · رقم العميل":"Kundenname · Kundennummer",
+"مبلغ المنتجات في طلبك":"Warenwert Ihrer Bestellung","المبلغ المطلوب تحويله · ":"Zu überweisender Betrag · ","عدد القطع":"Artikelanzahl",
+"الإجمالي":"Gesamtbetrag","يُحدد بعد تأكيد الأسعار":"Nach Preisbestätigung festgelegt",
+"بعض المنتجات لم يُحدد سعرها بعد، ولا تدخل في المبلغ المعروض حتى يتم تأكيد سعرها.":"Für einige Produkte wurde noch kein Preis festgelegt. Sie werden bis zur Bestätigung nicht eingerechnet.",
+"المبلغ للمنتجات فقط، ولا يشمل الشحن أو الرسوم الإضافية. عند تعدد العملات يظهر إجمالي مستقل لكل عملة.":"Der Betrag gilt nur für die Produkte und enthält keine Versand- oder Zusatzkosten. Bei mehreren Währungen wird jede Summe separat angezeigt.",
+"إثبات الدفع (صورة أو PDF)":"Zahlungsnachweis (Bild oder PDF)","الحد الأقصى 5 ميغابايت. لن يُقبل الطلب دون إثبات الدفع.":"Maximal 5 MB. Ohne Zahlungsnachweis kann die Bestellung nicht gesendet werden.",
+"عنوان الشحن المحفوظ":"Gespeicherte Lieferadresse","رقم الجوال":"Mobiltelefonnummer"
+});
+Object.assign(dict.fr,{
+"اختر طريقة الدفع":"Choisissez un mode de paiement","وسائل دفع موثوقة — اختر الوسيلة لعرض بيانات التحويل الخاصة بها.":"Modes de paiement sécurisés — choisissez un mode pour afficher les coordonnées de virement.",
+"التحويل إلى بنك البركة":"Virement vers Al Baraka Bank","بنك سوريا والخليج – فرع حلب":"Banque de Syrie et du Golfe – agence d’Alep",
+"فرع الفرقان · رقم الحساب":"Agence Al-Furqan · Numéro de compte","اسم العميل · رقم العميل":"Nom du client · Numéro client",
+"مبلغ المنتجات في طلبك":"Montant des produits de votre commande","المبلغ المطلوب تحويله · ":"Montant à transférer · ","عدد القطع":"Nombre d’articles",
+"الإجمالي":"Total","يُحدد بعد تأكيد الأسعار":"À confirmer après validation des prix",
+"بعض المنتجات لم يُحدد سعرها بعد، ولا تدخل في المبلغ المعروض حتى يتم تأكيد سعرها.":"Certains produits n’ont pas encore de prix et sont exclus du montant affiché jusqu’à confirmation.",
+"المبلغ للمنتجات فقط، ولا يشمل الشحن أو الرسوم الإضافية. عند تعدد العملات يظهر إجمالي مستقل لكل عملة.":"Ce montant concerne uniquement les produits, hors livraison et frais supplémentaires. Chaque devise est totalisée séparément.",
+"إثبات الدفع (صورة أو PDF)":"Justificatif de paiement (image ou PDF)","الحد الأقصى 5 ميغابايت. لن يُقبل الطلب دون إثبات الدفع.":"5 Mo maximum. La commande ne peut pas être envoyée sans justificatif de paiement.",
+"عنوان الشحن المحفوظ":"Adresse de livraison enregistrée","رقم الجوال":"Numéro de téléphone portable"
+});
+Object.assign(dict.ru,{
+"اختر طريقة الدفع":"Выберите способ оплаты","وسائل دفع موثوقة — اختر الوسيلة لعرض بيانات التحويل الخاصة بها.":"Надёжные способы оплаты — выберите способ, чтобы увидеть реквизиты перевода.",
+"التحويل إلى بنك البركة":"Перевод в Al Baraka Bank","بنك سوريا والخليج – فرع حلب":"Банк Сирии и Персидского залива — филиал в Алеппо",
+"فرع الفرقان · رقم الحساب":"Филиал Аль-Фуркан · Номер счёта","اسم العميل · رقم العميل":"Имя клиента · Номер клиента",
+"مبلغ المنتجات في طلبك":"Стоимость товаров в заказе","المبلغ المطلوب تحويله · ":"Сумма к переводу · ","عدد القطع":"Количество товаров",
+"الإجمالي":"Итого","يُحدد بعد تأكيد الأسعار":"Будет определено после подтверждения цен",
+"بعض المنتجات لم يُحدد سعرها بعد، ولا تدخل في المبلغ المعروض حتى يتم تأكيد سعرها.":"Цены некоторых товаров ещё не определены; они не включены в сумму до подтверждения.",
+"المبلغ للمنتجات فقط، ولا يشمل الشحن أو الرسوم الإضافية. عند تعدد العملات يظهر إجمالي مستقل لكل عملة.":"Сумма указана только за товары, без доставки и дополнительных сборов. Итоги для разных валют показываются отдельно.",
+"إثبات الدفع (صورة أو PDF)":"Подтверждение оплаты (изображение или PDF)","الحد الأقصى 5 ميغابايت. لن يُقبل الطلب دون إثبات الدفع.":"Максимум 5 МБ. Заказ нельзя отправить без подтверждения оплаты.",
+"عنوان الشحن المحفوظ":"Сохранённый адрес доставки","رقم الجوال":"Номер мобильного телефона"
+});
+
 const langs=Object.keys(dict);
 function detect(){const prefs=(navigator.languages&&navigator.languages.length?navigator.languages:[navigator.language||"en"]).map(x=>(x||"").toLowerCase());for(const p of prefs){const base=p.split("-")[0];if(base==="ar")return "ar";if(langs.includes(base))return base;}return "en";}
 const languageKey="aib_customer_language";
