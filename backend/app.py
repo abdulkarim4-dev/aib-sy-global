@@ -404,9 +404,8 @@ def current_user(request:Request, token:Optional[str]=Depends(oauth), s:Session=
         if not owner or not owner.active or owner.deleted or owner.role!="owner" or u.role=="owner":
             raise HTTPException(401,"جلسة الدخول بالنيابة غير صالحة")
         u._impersonated_by_owner_id=owner.id
-    if not impersonator_id and request.url.path!="/auth/pin/setup":
-        if payload.get("accounting_pin_verified") is not True:
-            raise HTTPException(401,"يلزم إدخال رمز الدخول الشخصي من أربعة أرقام مجدداً.")
+    if not impersonator_id and payload.get("accounting_pin_verified") is not True and request.url.path not in {"/auth/me","/auth/pin/setup","/auth/pin/unlock","/auth/first-login-password"}:
+        raise HTTPException(401,"أدخل رمز الدخول الشخصي للمتابعة.")
     if u.must_change_password and not impersonator_id and request.url.path not in {"/auth/me","/auth/first-login-password","/auth/pin/setup"}:
         raise HTTPException(403,"يجب تغيير كلمة المرور المؤقتة قبل استخدام الحساب")
     return u
@@ -603,7 +602,7 @@ def accounting_login_user_payload(u:User):
     return {"id":u.id,"username":u.username,"name":u.full_name,"email":u.email,"role":u.role,"permissions":u.permissions or {},"must_change_password":bool(u.must_change_password)}
 
 @app.post("/auth/login")
-def login(form:OAuth2PasswordRequestForm=Depends(), pin:Optional[str]=Form(default=None), request:Request=None, s:Session=Depends(db)):
+def login(form:OAuth2PasswordRequestForm=Depends(), request:Request=None, s:Session=Depends(db)):
     u=s.scalar(select(User).where(or_(User.username==form.username, (User.email==form.username) & (User.email_verified==True))))
     now=datetime.now(timezone.utc)
     if not u:
@@ -614,20 +613,10 @@ def login(form:OAuth2PasswordRequestForm=Depends(), pin:Optional[str]=Form(defau
         if u.failed_logins>=3: u.locked_until=now+timedelta(minutes=5); u.failed_logins=0
         audit(s,u,"login_failed","user",u.id,{},request); s.commit(); raise HTTPException(401,"اسم المستخدم أو كلمة المرور غير صحيحة")
     if not u.active: raise HTTPException(403,"الحساب غير فعال")
-    if u.accounting_pin_hash:
-        if not pin or not re.fullmatch(r"\d{4}",pin):
-            raise HTTPException(400,"أدخل رمز الدخول الشخصي المكوّن من أربعة أرقام.")
-        if not password_hash.verify(pin,u.accounting_pin_hash):
-            u.failed_logins+=1
-            if u.failed_logins>=3: u.locked_until=now+timedelta(minutes=5); u.failed_logins=0
-            audit(s,u,"accounting_pin_failed","user",u.id,{},request); s.commit()
-            raise HTTPException(401,"رمز الدخول غير صحيح")
-    elif pin:
-        raise HTTPException(400,"يجب إعداد رمز الدخول الشخصي أولاً.")
     u.failed_logins=0; u.locked_until=None
-    audit(s,u,"login","user",u.id,{"method":"password_and_pin" if u.accounting_pin_hash else "password_pin_setup"},request)
+    audit(s,u,"login","user",u.id,{"method":"password_device_session"},request)
     s.commit()
-    return {"access_token":token_for(u,email_otp_verified=True,pin_verified=bool(u.accounting_pin_hash)),"token_type":"bearer","user":accounting_login_user_payload(u),"pin_setup_required":not bool(u.accounting_pin_hash)}
+    return {"access_token":token_for(u,email_otp_verified=True,pin_verified=False),"token_type":"bearer","user":accounting_login_user_payload(u),"pin_setup_required":not bool(u.accounting_pin_hash)}
 
 @app.post("/auth/password-reset/request")
 def request_accounting_password_reset(p:AccountingPasswordResetRequestPayload,request:Request,s:Session=Depends(db)):
@@ -728,6 +717,21 @@ def confirm_accounting_login(p:AccountingLoginConfirmPayload,request:Request,s:S
     audit(s,u,"login","user",u.id,{"method":"email_otp"},request); s.commit()
     return {"access_token":token_for(u,email_otp_verified=True),"token_type":"bearer","user":accounting_login_user_payload(u)}
 
+@app.post("/auth/pin/unlock")
+def unlock_accounting_pin(p:AccountingPinSetupPayload,request:Request,s:Session=Depends(db),u:User=Depends(current_user)):
+    now=datetime.now(timezone.utc)
+    if u.locked_until and u.locked_until>now:
+        raise HTTPException(423,"الحساب مقفل مؤقتاً، حاول لاحقاً")
+    if not u.accounting_pin_hash or not password_hash.verify(p.pin,u.accounting_pin_hash):
+        u.failed_logins+=1
+        if u.failed_logins>=3:
+            u.locked_until=now+timedelta(minutes=5);u.failed_logins=0
+        audit(s,u,"accounting_pin_failed","user",u.id,{},request);s.commit()
+        raise HTTPException(401,"رمز الدخول غير صحيح")
+    u.failed_logins=0;u.locked_until=None
+    audit(s,u,"accounting_pin_unlocked","user",u.id,{},request);s.commit()
+    return {"access_token":token_for(u,email_otp_verified=True,pin_verified=True),"token_type":"bearer"}
+
 @app.post("/auth/pin/setup")
 def setup_accounting_pin(p:AccountingPinSetupPayload,request:Request,s:Session=Depends(db),u:User=Depends(current_user)):
     if u.accounting_pin_hash:
@@ -735,7 +739,7 @@ def setup_accounting_pin(p:AccountingPinSetupPayload,request:Request,s:Session=D
     u.accounting_pin_hash=password_hash.hash(p.pin)
     audit(s,u,"accounting_pin_created","user",u.id,{},request)
     s.commit()
-    return {"ok":True,"message":"تم إعداد رمز الدخول الشخصي بنجاح.","access_token":token_for(u,email_otp_verified=True,pin_verified=True)}
+    return {"ok":True,"message":"تم إعداد رمز الدخول الشخصي بنجاح.","access_token":token_for(u,email_otp_verified=True,pin_verified=False)}
 
 @app.get("/auth/me")
 def me(request:Request,u:User=Depends(current_user)):
