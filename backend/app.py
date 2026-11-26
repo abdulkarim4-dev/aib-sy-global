@@ -760,10 +760,13 @@ def _passkey_new_challenge(s:Session,u:User,purpose:str,challenge:bytes):
     row=AccountingPasskeyChallenge(user_id=u.id,challenge=_passkey_b64(challenge),purpose=purpose,expires_at=now+timedelta(minutes=5))
     s.add(row);s.commit()
     return row
-def _passkey_get_challenge(s:Session,u:User,purpose:str,challenge:str):
-    row=s.scalar(select(AccountingPasskeyChallenge).where(AccountingPasskeyChallenge.user_id==u.id,AccountingPasskeyChallenge.purpose==purpose,AccountingPasskeyChallenge.challenge==challenge,AccountingPasskeyChallenge.used_at.is_(None)).order_by(AccountingPasskeyChallenge.id.desc()).limit(1))
+def _passkey_get_challenge(s:Session,u:User,purpose:str,challenge:str|None=None):
+    query=select(AccountingPasskeyChallenge).where(AccountingPasskeyChallenge.user_id==u.id,AccountingPasskeyChallenge.purpose==purpose,AccountingPasskeyChallenge.used_at.is_(None)).order_by(AccountingPasskeyChallenge.id.desc())
+    if challenge:
+        query=query.where(AccountingPasskeyChallenge.challenge==challenge)
+    row=s.scalar(query.limit(1))
     now=datetime.now(timezone.utc)
-    if not row or row.expires_at<now: raise HTTPException(400,"انتهت صلاحية طلب البصمة. حاول مجدداً.")
+    if not row or row.expires_at<now: raise HTTPException(400,"انتهت صلاحية طلب البصمة. ابدأ التسجيل مجدداً.")
     row.used_at=now
     return row
 
@@ -779,8 +782,7 @@ def passkey_registration_options(request:Request,s:Session=Depends(db),u:User=De
 def passkey_registration_verify(payload:dict,request:Request,s:Session=Depends(db),u:User=Depends(current_user)):
     origin,rp_id=_passkey_origin(request)
     challenge=payload.get("challenge")
-    if not isinstance(challenge,str): raise HTTPException(400,"طلب تسجيل البصمة غير مكتمل.")
-    row=_passkey_get_challenge(s,u,"registration",challenge)
+    row=_passkey_get_challenge(s,u,"registration",challenge if isinstance(challenge,str) else None)
     credential_payload={key:value for key,value in payload.items() if key!="challenge"}
     try:
         verified=verify_registration_response(credential=credential_payload,expected_challenge=_passkey_unb64(row.challenge),expected_rp_id=rp_id,expected_origin=origin,require_user_verification=True)
@@ -810,8 +812,8 @@ def passkey_authentication_verify(payload:dict,request:Request,s:Session=Depends
     response=payload.get("response") or {}
     raw_id=payload.get("rawId") or payload.get("id")
     challenge=payload.get("challenge")
-    if not isinstance(challenge,str) or not isinstance(raw_id,str): raise HTTPException(400,"استجابة البصمة غير مكتملة.")
-    row=_passkey_get_challenge(s,u,"authentication",challenge)
+    if not isinstance(raw_id,str): raise HTTPException(400,"استجابة البصمة غير مكتملة.")
+    row=_passkey_get_challenge(s,u,"authentication",challenge if isinstance(challenge,str) else None)
     credential_id=_passkey_b64(_passkey_unb64(raw_id))
     saved=s.scalar(select(AccountingPasskey).where(AccountingPasskey.user_id==u.id,AccountingPasskey.credential_id==credential_id))
     if not saved: raise HTTPException(401,"هذه البصمة غير مسجلة لهذا الحساب.")
