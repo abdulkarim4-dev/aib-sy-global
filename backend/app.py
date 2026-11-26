@@ -2761,6 +2761,7 @@ class StoreRegisterPayload(BaseModel):
     full_name: str = Field(min_length=2, max_length=160)
     phone_country_code: str = Field(min_length=2, max_length=8)
     phone_number: str = Field(min_length=5, max_length=32)
+    shipping_address_data: dict[str,str]
     email: str = Field(min_length=5, max_length=254)
     password: str = Field(min_length=8, max_length=256)
 class StoreLoginPayload(BaseModel):
@@ -2889,6 +2890,9 @@ def store_register(p:StoreRegisterPayload, request:Request, s:Session=Depends(db
     if len(recipient_name)<2 or not re.fullmatch(r"\+[1-9]\d{0,3}",phone_country_code) or not 5 <= len(phone_number) <= 15:
         raise HTTPException(400,"أدخل اسم المستلم ورقم هاتف صحيحاً مع اختيار رمز الدولة")
     _store_phone_e164(phone_country_code,phone_number)
+    address_data=_store_address_data(p.shipping_address_data)
+    if not _store_address_complete(address_data):
+        raise HTTPException(400,"يجب إدخال عنوان الشحن كاملاً قبل إنشاء الحساب")
     email=p.email.strip().lower()
     if "@" not in email or "." not in email.rsplit("@",1)[-1]:
         raise HTTPException(400,"يرجى إدخال بريد إلكتروني صحيح")
@@ -2906,6 +2910,8 @@ def store_register(p:StoreRegisterPayload, request:Request, s:Session=Depends(db
         customer.phone_verified_at=None
         customer.password_hash=password_hash.hash(p.password)
         s.query(StoreEmailVerification).filter(StoreEmailVerification.customer_id==customer.id).delete(synchronize_session=False)
+    customer.shipping_address_data=address_data
+    customer.shipping_address=_store_address_text(address_data)
     latest=s.scalar(select(StoreEmailVerification).where(StoreEmailVerification.customer_id==customer.id).order_by(StoreEmailVerification.id.desc()))
     if latest and latest.created_at>now-timedelta(seconds=60):
         raise HTTPException(429,"يرجى الانتظار دقيقة قبل طلب رمز جديد")
