@@ -380,11 +380,11 @@ def audit(s:Session, user:Optional[User], action:str, entity:str, entity_id:Opti
     if impersonator_id:
         audit_details["impersonated_by_owner_id"]=impersonator_id
     s.add(AuditEvent(user_id=user.id if user else None, action=action, entity=entity, entity_id=entity_id, details=audit_details, ip_address=request.client.host if request and request.client else ""))
-def token_for(user:User,email_otp_verified:bool=False,impersonated_by_owner_id:Optional[int]=None):
+def token_for(user:User,email_otp_verified:bool=False,impersonated_by_owner_id:Optional[int]=None,pin_verified:bool=False):
     # Accounting sessions remain valid across browser restarts and do not expire
     # automatically; the user signs out explicitly from the accounting app.
     now=datetime.now(timezone.utc)
-    claims={"sub":str(user.id),"iat":now,"email_otp_verified":bool(email_otp_verified)}
+    claims={"sub":str(user.id),"iat":now,"email_otp_verified":bool(email_otp_verified),"accounting_pin_verified":bool(pin_verified)}
     if impersonated_by_owner_id:
         claims["impersonated_by_owner_id"]=int(impersonated_by_owner_id)
     return jwt.encode(claims,settings.jwt_secret,algorithm="HS256")
@@ -404,7 +404,10 @@ def current_user(request:Request, token:Optional[str]=Depends(oauth), s:Session=
         if not owner or not owner.active or owner.deleted or owner.role!="owner" or u.role=="owner":
             raise HTTPException(401,"جلسة الدخول بالنيابة غير صالحة")
         u._impersonated_by_owner_id=owner.id
-    if u.must_change_password and not impersonator_id and request.url.path not in {"/auth/me","/auth/first-login-password"}:
+    if u.accounting_pin_hash and not impersonator_id and request.url.path!="/auth/pin/setup":
+        if jwt.decode(token,settings.jwt_secret,algorithms=["HS256"]).get("accounting_pin_verified") is not True:
+            raise HTTPException(401,"يلزم إدخال رمز الدخول الشخصي من أربعة أرقام مجدداً.")
+    if u.must_change_password and not impersonator_id and request.url.path not in {"/auth/me","/auth/first-login-password","/auth/pin/setup"}:
         raise HTTPException(403,"يجب تغيير كلمة المرور المؤقتة قبل استخدام الحساب")
     return u
 def require_store_same_origin(request:Request):
@@ -624,7 +627,7 @@ def login(form:OAuth2PasswordRequestForm=Depends(), pin:Optional[str]=Form(defau
     u.failed_logins=0; u.locked_until=None
     audit(s,u,"login","user",u.id,{"method":"password_and_pin" if u.accounting_pin_hash else "password_pin_setup"},request)
     s.commit()
-    return {"access_token":token_for(u,email_otp_verified=True),"token_type":"bearer","user":accounting_login_user_payload(u),"pin_setup_required":not bool(u.accounting_pin_hash)}
+    return {"access_token":token_for(u,email_otp_verified=True,pin_verified=bool(u.accounting_pin_hash)),"token_type":"bearer","user":accounting_login_user_payload(u),"pin_setup_required":not bool(u.accounting_pin_hash)}
 
 @app.post("/auth/password-reset/request")
 def request_accounting_password_reset(p:AccountingPasswordResetRequestPayload,request:Request,s:Session=Depends(db)):
@@ -732,7 +735,7 @@ def setup_accounting_pin(p:AccountingPinSetupPayload,request:Request,s:Session=D
     u.accounting_pin_hash=password_hash.hash(p.pin)
     audit(s,u,"accounting_pin_created","user",u.id,{},request)
     s.commit()
-    return {"ok":True,"message":"تم إعداد رمز الدخول الشخصي بنجاح."}
+    return {"ok":True,"message":"تم إعداد رمز الدخول الشخصي بنجاح.","access_token":token_for(u,email_otp_verified=True,pin_verified=True)}
 
 @app.get("/auth/me")
 def me(request:Request,u:User=Depends(current_user)):
