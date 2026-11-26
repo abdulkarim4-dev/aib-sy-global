@@ -3129,6 +3129,7 @@ html body .catalog-tools .catalog-head-actions .store-filter-toggle:active{trans
    const name=row.arabic===row.name?row.name:row.arabic+' ('+row.name+')';
    option.textContent=(flag(row.code)?flag(row.code)+' ':'')+name+' '+row.dial;
    option.dataset.country=row.code;
+   option.dataset.countryName=row.arabic;
    fragment.appendChild(option);
   });
   select.replaceChildren(fragment);
@@ -3155,7 +3156,16 @@ html body .catalog-tools .catalog-head-actions .store-filter-toggle:active{trans
   input.maxLength=max;
   input.inputMode='numeric';
   input.autocomplete='tel-national';
-  input.placeholder='9 1 2 3 4 5 6 7 8';
+  const selected=dial.options&&dial.selectedIndex>=0?dial.options[dial.selectedIndex]:null;
+  const countryName=selected&&selected.dataset?selected.dataset.countryName:'';
+  const dialCode=dial.value||'';
+  const guidance=countryName
+   ? 'أدخل الرقم المحلي في '+countryName+' بعد رمز الدولة '+dialCode+'، دون إعادة كتابة الرمز أو الصفر المحلي الأول.'
+   : 'أدخل الرقم المحلي بعد رمز الدولة '+dialCode+'، دون إعادة كتابة الرمز أو الصفر المحلي الأول.';
+  input.placeholder=countryName?'رقم محلي لـ '+countryName+' بعد '+dialCode:'رقم محلي بعد '+dialCode;
+  input.title=guidance+' الحد الأقصى المسموح '+max+' رقمًا.';
+  input.setAttribute('aria-label',guidance);
+  input.setAttribute('aria-description',guidance);
   const clean=digits(input.value).replace(/^0+/, '').slice(0,max);
   if(input.value!==clean)input.value=clean;
  }
