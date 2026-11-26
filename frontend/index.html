@@ -224,6 +224,77 @@ input[type=checkbox]{accent-color:#2586c7}
 }
 
 </style>
+
+<style id="aib-premium-accounting-login">
+/* AIB premium accounting sign-in */
+#login.login-wrap{
+ position:relative;isolation:isolate;min-height:100svh;padding:28px 18px;
+ display:grid;place-items:center;overflow:hidden;
+ background:
+  radial-gradient(ellipse at 12% 12%,rgba(41,126,180,.15),transparent 34%),
+  radial-gradient(ellipse at 92% 88%,rgba(232,111,72,.10),transparent 30%),
+  linear-gradient(145deg,#f7f9fb 0%,#edf2f6 52%,#f8fafc 100%)!important;
+}
+#login.login-wrap:before,#login.login-wrap:after{
+ content:"";position:absolute;z-index:-1;border:1px solid rgba(45,112,155,.10);
+ border-radius:50%;pointer-events:none
+}
+#login.login-wrap:before{width:520px;height:520px;top:-310px;left:-180px;box-shadow:0 0 0 34px rgba(45,112,155,.025),0 0 0 72px rgba(45,112,155,.018)}
+#login.login-wrap:after{width:440px;height:440px;bottom:-300px;right:-150px;box-shadow:0 0 0 30px rgba(220,112,77,.025),0 0 0 64px rgba(220,112,77,.018)}
+#login .login-card{
+ width:min(460px,100%);padding:clamp(24px,5vw,42px);
+ border:1px solid #dce4eb!important;border-radius:26px;
+ background:rgba(255,255,255,.96)!important;
+ box-shadow:0 26px 80px rgba(25,48,67,.13),0 4px 14px rgba(25,48,67,.05)!important;
+ backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)
+}
+#login .login-brand{gap:7px;margin:0 auto 25px;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center}
+#login .login-brand .brand-logo-link{width:150px;height:88px;display:flex;align-items:center;justify-content:center}
+#login .login-brand .brand-logo-link img{width:100%;height:100%;max-height:88px;object-fit:contain;filter:drop-shadow(0 5px 10px rgba(24,55,78,.12));mix-blend-mode:normal}
+#login .login-brand>div strong{display:block;color:#1e2b36!important;font-size:19px;letter-spacing:1.5px}
+#login .login-brand>div span{display:block;color:#71808d!important;font-size:12px;margin-top:5px}
+#login .login-card h1{color:#172b3b!important;font-size:25px;font-weight:900;letter-spacing:-.3px;margin:0 0 8px}
+#login .login-card>p{color:#72808c!important;font-size:13px;margin:0 0 25px}
+#login #loginMsg:empty{display:none}
+#login .field{gap:8px;margin:15px 0}
+#login .field label{color:#34495a!important;font-size:13px;font-weight:700}
+#login .field input{
+ min-height:49px;padding:13px 14px;border:1px solid #d8e1e8!important;
+ border-radius:13px;background:#f9fbfd!important;color:#1c2b37!important;
+ box-shadow:inset 0 1px 2px rgba(22,43,59,.025)!important;transition:border-color .18s,box-shadow .18s,background .18s
+}
+#login .field input:focus{background:#fff!important;border-color:#328ac2!important;box-shadow:0 0 0 4px rgba(50,138,194,.13)!important}
+#login .field input::placeholder{color:#9aa7b1!important}
+#login #togglePassword{min-height:46px;padding:8px 13px;border-radius:12px;background:#eef4f8!important;border:1px solid #d9e4eb!important;color:#315b78!important;box-shadow:none!important;white-space:nowrap}
+#login #loginForm>button[type=submit]{
+ min-height:51px;margin-top:8px;border-radius:14px;
+ background:linear-gradient(115deg,#237fb8,#18577f)!important;
+ border:1px solid #1d6897!important;color:#fff!important;
+ box-shadow:0 9px 20px rgba(29,104,151,.22)!important;font-size:15px;font-weight:800
+}
+#login #loginForm>button[type=submit]:hover{filter:brightness(1.07);transform:translateY(-1px)}
+#login #forgotPasswordWrap .card,#login #resetPasswordWrap .card{
+ background:#f8fafc!important;border:1px solid #e1e8ee!important;border-radius:16px;box-shadow:none!important
+}
+#login .toolbar{margin-top:19px!important}
+#login .toolbar .btn{min-height:40px;border-radius:12px;background:#f4f7f9!important;border:1px solid #dfe6ec!important;color:#42596b!important;box-shadow:none!important}
+#login .foot{padding:20px 0 0;color:#94a0a9!important;letter-spacing:.35px}
+#login .notice{border-radius:12px}
+@media(max-width:520px){
+ #login.login-wrap{padding:16px 13px}
+ #login .login-card{padding:25px 20px;border-radius:22px}
+ #login .login-brand{margin-bottom:21px}
+ #login .login-brand .brand-logo-link{width:128px;height:76px}
+ #login .login-brand .brand-logo-link img{max-height:76px}
+ #login .login-card h1{font-size:23px}
+ #login .field input{min-height:47px}
+}
+@media(prefers-reduced-motion:no-preference){
+ #login .login-card{animation:aibLoginRise .42s cubic-bezier(.2,.75,.25,1) both}
+ @keyframes aibLoginRise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+}
+</style>
+
 </head><body>
 <svg aria-hidden="true" width="0" height="0" style="position:absolute;overflow:hidden"><filter id="aib-remove-white" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  -1 -1 -1 0 3"/></filter></svg>
 <div id="login" class="login-wrap hidden"><section class="login-card"><div class="brand login-brand"><a class="brand-logo-link" href="/" aria-label="العودة إلى الصفحة الرئيسية"><img src="/aib-logo.png?v=20261113-aib2" alt="AIB"></a><div><strong>AIB GROUP</strong><span>نظام الإدارة والمحاسبة</span></div></div><h1 data-i="loginTitle">تسجيل الدخول</h1><p data-i="loginSub">منصة مجموعة AIB التجارية الآمنة</p><div id="loginMsg"></div><form id="loginForm"><div class="field"><label data-i="username">اسم المستخدم</label><input id="username" autocomplete="username" required></div><div class="field"><label data-i="password">كلمة المرور</label><div style="display:flex;gap:8px;align-items:center"><input id="password" type="password" autocomplete="current-password" required style="flex:1"><button class="btn secondary" id="togglePassword" type="button" onclick="togglePasswordVisibility()" data-i="showPassword">إظهار</button></div></div><button class="btn full" type="submit" data-i="loginBtn">دخول آمن</button></form><div id="forgotPasswordWrap" class="hidden" style="margin-top:14px"><form id="forgotPasswordForm" class="card" style="padding:14px"><h3 style="margin:0 0 8px">نسيت كلمة المرور؟</h3><p class="small muted" style="margin:0 0 10px">أدخل البريد الإلكتروني المسجل في حسابك لإرسال رابط آمن لإعادة التعيين.</p><div class="field"><label for="resetEmail">البريد الإلكتروني</label><input id="resetEmail" type="email" autocomplete="email" required placeholder="name@example.com"></div><button class="btn full" type="submit">إرسال رابط إعادة التعيين</button><button class="btn secondary full" type="button" id="cancelForgotPassword" style="margin-top:8px">العودة لتسجيل الدخول</button></form></div><div id="resetPasswordWrap" class="hidden" style="margin-top:14px"><form id="resetPasswordForm" class="card" style="padding:14px"><h3 style="margin:0 0 8px">تعيين كلمة مرور جديدة</h3><div class="field"><label for="resetNewPassword">كلمة المرور الجديدة</label><input id="resetNewPassword" type="password" minlength="8" autocomplete="new-password" required></div><div class="field"><label for="resetConfirmPassword">تأكيد كلمة المرور</label><input id="resetConfirmPassword" type="password" minlength="8" autocomplete="new-password" required></div><p class="small muted">يجب أن تتضمن 8 خانات على الأقل وحرفاً كبيراً وصغيراً ورقماً ورمزاً.</p><button class="btn full" type="submit">حفظ كلمة المرور الجديدة</button></form></div><div class="toolbar" style="justify-content:center;margin-top:16px"><button class="btn secondary" onclick="toggleLang()">العربية / English</button></div><div class="foot">AIB • Secure Business Workspace</div></section></div>
