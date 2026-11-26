@@ -245,7 +245,7 @@ async function completeAccountingLogin(d){
   while(true){
    const pin=await aibPrompt('لأول دخول، أنشئ رمزاً شخصياً من أربعة أرقام. استخدم رمزاً لا تشاركه مع الآخرين.',{title:'إعداد رمز الدخول',placeholder:'أربعة أرقام',password:true});
    if(pin===null){logout();return}
-   if(!/^\\d{4}$/.test(String(pin))){await aibAlert('يجب أن يتكون الرمز من أربعة أرقام بالضبط.');continue}
+   if(!/^\d{4}$/.test(String(pin))){await aibAlert('يجب أن يتكون الرمز من أربعة أرقام بالضبط.');continue}
    const confirm=await aibPrompt('أعد إدخال الرمز لتأكيده.',{title:'تأكيد رمز الدخول',placeholder:'أربعة أرقام',password:true});
    if(confirm===null)continue;
    if(String(confirm)!==String(pin)){await aibAlert('الرمزان غير متطابقين. حاول مرة أخرى.');continue}
