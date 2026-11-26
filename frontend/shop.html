@@ -3129,6 +3129,7 @@ html body .catalog-tools .catalog-head-actions .store-filter-toggle:active{trans
    const name=row.arabic===row.name?row.name:row.arabic+' ('+row.name+')';
    option.textContent=(flag(row.code)?flag(row.code)+' ':'')+name+' '+row.dial;
    option.dataset.country=row.code;
+   option.dataset.countryCode=row.code;
    option.dataset.countryName=row.arabic;
    fragment.appendChild(option);
   });
@@ -3143,6 +3144,7 @@ html body .catalog-tools .catalog-head-actions .store-filter-toggle:active{trans
 
 <script>
 (function(){
+ const AIB_PHONE_FIRST_DIGITS={"AC":"4","AD":"3","AE":"5","AF":"7","AG":"2","AI":"2","AL":"6","AM":"7","AO":"9","AR":"9","AS":"6","AT":"6","AU":"4","AW":"5","AX":"4","AZ":"4","BA":"6","BB":"2","BD":"1","BE":"4","BF":"7","BG":"4","BH":"3","BI":"7","BJ":"0","BL":"6","BM":"4","BN":"7","BO":"7","BQ":"3","BR":"1","BS":"2","BT":"1","BW":"7","BY":"2","BZ":"6","CA":"5","CC":"4","CD":"9","CF":"7","CG":"0","CH":"7","CI":"0","CK":"7","CL":"2","CM":"6","CN":"1","CO":"3","CR":"8","CU":"5","CV":"9","CW":"9","CX":"4","CY":"9","CZ":"6","DE":"1","DJ":"7","DK":"3","DM":"7","DO":"8","DZ":"5","EC":"9","EE":"5","EG":"1","EH":"6","ER":"7","ES":"6","ET":"9","FI":"4","FJ":"7","FK":"5","FM":"3","FO":"2","FR":"6","GA":"0","GB":"7","GD":"4","GE":"5","GF":"6","GG":"7","GH":"2","GI":"5","GL":"2","GM":"3","GN":"6","GP":"6","GQ":"2","GR":"6","GT":"5","GU":"6","GW":"9","GY":"6","HK":"5","HN":"9","HR":"9","HT":"3","HU":"2","ID":"8","IE":"8","IL":"5","IM":"7","IN":"8","IO":"3","IQ":"7","IR":"9","IS":"6","IT":"3","JE":"7","JM":"8","JO":"7","JP":"9","KE":"7","KG":"7","KH":"9","KI":"7","KM":"3","KN":"8","KP":"1","KR":"1","KW":"5","KY":"3","KZ":"7","LA":"2","LB":"7","LC":"7","LI":"6","LK":"7","LR":"7","LS":"5","LT":"6","LU":"6","LV":"2","LY":"9","MA":"6","MC":"6","MD":"6","ME":"6","MF":"6","MG":"3","MH":"2","MK":"7","ML":"6","MM":"9","MN":"8","MO":"6","MP":"6","MQ":"6","MR":"2","MS":"6","MT":"9","MU":"5","MV":"7","MW":"9","MX":"2","MY":"1","MZ":"8","NA":"8","NC":"7","NE":"9","NF":"3","NG":"8","NI":"8","NL":"6","NO":"4","NP":"9","NR":"5","NU":"8","NZ":"2","OM":"9","PA":"6","PE":"9","PF":"8","PG":"7","PH":"9","PK":"3","PL":"5","PM":"5","PR":"7","PS":"5","PT":"9","PW":"6","PY":"9","QA":"3","RE":"6","RO":"7","RS":"6","RU":"9","RW":"7","SA":"5","SB":"7","SC":"2","SD":"9","SE":"7","SG":"8","SH":"5","SI":"3","SJ":"4","SK":"9","SL":"2","SM":"6","SN":"7","SO":"7","SR":"7","SS":"9","ST":"9","SV":"7","SX":"7","SY":"9","SZ":"7","TA":"8","TC":"6","TD":"6","TG":"9","TH":"8","TJ":"9","TK":"7","TL":"7","TM":"6","TN":"2","TO":"7","TR":"5","TT":"8","TV":"9","TW":"9","TZ":"6","UA":"5","UG":"7","US":"2","UY":"9","UZ":"9","VA":"3","VC":"7","VE":"4","VG":"2","VI":"3","VN":"9","VU":"5","WF":"8","WS":"7","XK":"4","YE":"7","YT":"6","ZA":"7","ZM":"9","ZW":"7"};
  const pairs=[
   ['storePhoneCountry','storeRecipientPhone'],
   ['storeRequiredRecipientDial','storeRequiredRecipientPhone'],
@@ -3157,26 +3159,14 @@ html body .catalog-tools .catalog-head-actions .store-filter-toggle:active{trans
   input.inputMode='numeric';
   input.autocomplete='tel-national';
   const selected=dial.options&&dial.selectedIndex>=0?dial.options[dial.selectedIndex]:null;
-  const countryName=selected&&selected.dataset?selected.dataset.countryName:'';
-  const dialCode=dial.value||'';
-  const guidance=countryName
-   ? 'أدخل الرقم المحلي في '+countryName+' بعد رمز الدولة '+dialCode+'، دون إعادة كتابة الرمز أو الصفر المحلي الأول.'
-   : 'أدخل الرقم المحلي بعد رمز الدولة '+dialCode+'، دون إعادة كتابة الرمز أو الصفر المحلي الأول.';
-  input.placeholder='أدخل الرقم المحلي';
-  input.title=guidance+' الحد الأقصى المسموح '+max+' رقمًا.';
-  input.setAttribute('aria-label',guidance);
-  input.setAttribute('aria-description',guidance);
-  let hint=document.getElementById(input.id+'CountryGuidance');
-  if(!hint){
-   hint=document.createElement('p');
-   hint.id=input.id+'CountryGuidance';
-   hint.className='aib-phone-country-guidance';
-   hint.style.cssText='display:block;flex:0 0 100%;width:100%;box-sizing:border-box;grid-column:1/-1;margin:7px 0 0;color:#c4d3df;font-size:12px;line-height:1.9;white-space:normal;overflow-wrap:anywhere;text-align:right;direction:rtl;';
-   const host=input.closest('.checkout-phone')||input.parentElement;
-   const anchor=host&&host.classList.contains('checkout-phone')?host:input.parentElement;
-   anchor.insertAdjacentElement('afterend',hint);
-  }
-  hint.textContent=guidance+' الحد الأقصى لهذا الحقل '+max+' رقماً.';
+  const countryCode=selected&&selected.dataset?selected.dataset.countryCode:'';
+  const firstDigit=AIB_PHONE_FIRST_DIGITS[countryCode]||'';
+  input.placeholder=firstDigit;
+  input.removeAttribute('title');
+  input.removeAttribute('aria-description');
+  input.setAttribute('aria-label',firstDigit||'رقم الهاتف');
+  const oldHint=document.getElementById(input.id+'CountryGuidance');
+  if(oldHint)oldHint.remove();
   const clean=digits(input.value).replace(/^0+/, '').slice(0,max);
   if(input.value!==clean)input.value=clean;
  }
