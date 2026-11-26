@@ -14,6 +14,13 @@ import app as aib
 
 
 class AIBRegressionTests(unittest.TestCase):
+    def test_store_registration_requires_recipient_phone(self):
+        with self.assertRaises(Exception):
+            aib.StoreRegisterPayload(full_name="اسم المستلم",email="buyer@example.com",password="StrongPass123")
+        payload=aib.StoreRegisterPayload(full_name="اسم المستلم",phone_country_code="+90",phone_number="5321234567",email="buyer@example.com",password="StrongPass123")
+        self.assertEqual(payload.phone_country_code,"+90")
+        self.assertEqual(aib._store_phone_e164(payload.phone_country_code,payload.phone_number),"+905321234567")
+
     def test_all_application_invoices_use_only_the_aib_issuer_identity(self):
         source = (ROOT / "frontend" / "index.html").read_text(encoding="utf-8")
         self.assertIn("const invoiceBrand='default'", source)

@@ -2759,6 +2759,8 @@ def require_strong_store_password(value:str):
 
 class StoreRegisterPayload(BaseModel):
     full_name: str = Field(min_length=2, max_length=160)
+    phone_country_code: str = Field(min_length=2, max_length=8)
+    phone_number: str = Field(min_length=5, max_length=32)
     email: str = Field(min_length=5, max_length=254)
     password: str = Field(min_length=8, max_length=256)
 class StoreLoginPayload(BaseModel):
@@ -2874,6 +2876,19 @@ def store_latest_prices(s:Session):
 @app.post("/store/auth/register")
 def store_register(p:StoreRegisterPayload, request:Request, s:Session=Depends(db)):
     require_strong_store_password(p.password)
+    recipient_name=p.full_name.strip()
+    phone_country_code=p.phone_country_code.strip()
+    raw_phone=p.phone_number.strip()
+    if raw_phone.startswith("+"):
+        full_phone=_store_phone_e164("",raw_phone)
+        if not full_phone.startswith(phone_country_code):
+            raise HTTPException(400,"اختر رمز الدولة المطابق لرقم الهاتف أو أدخل الرقم المحلي دون الرمز")
+        phone_number=full_phone[len(phone_country_code):]
+    else:
+        phone_number="".join(ch for ch in raw_phone if ch.isdigit())
+    if len(recipient_name)<2 or not re.fullmatch(r"\+[1-9]\d{0,3}",phone_country_code) or not 5 <= len(phone_number) <= 15:
+        raise HTTPException(400,"أدخل اسم المستلم ورقم هاتف صحيحاً مع اختيار رمز الدولة")
+    _store_phone_e164(phone_country_code,phone_number)
     email=p.email.strip().lower()
     if "@" not in email or "." not in email.rsplit("@",1)[-1]:
         raise HTTPException(400,"يرجى إدخال بريد إلكتروني صحيح")
@@ -2882,10 +2897,13 @@ def store_register(p:StoreRegisterPayload, request:Request, s:Session=Depends(db
         raise HTTPException(409,"هذا البريد مسجل مسبقاً. سجّل الدخول بدلاً من إنشاء حساب جديد")
     now=datetime.now(timezone.utc)
     if not customer:
-        customer=StoreCustomer(email=email,full_name=p.full_name.strip(),password_hash=password_hash.hash(p.password),cart=[],active=False)
+        customer=StoreCustomer(email=email,full_name=recipient_name,phone_country_code=phone_country_code,phone_number=phone_number,password_hash=password_hash.hash(p.password),cart=[],active=False)
         s.add(customer);s.flush()
     else:
-        customer.full_name=p.full_name.strip()
+        customer.full_name=recipient_name
+        customer.phone_country_code=phone_country_code
+        customer.phone_number=phone_number
+        customer.phone_verified_at=None
         customer.password_hash=password_hash.hash(p.password)
         s.query(StoreEmailVerification).filter(StoreEmailVerification.customer_id==customer.id).delete(synchronize_session=False)
     latest=s.scalar(select(StoreEmailVerification).where(StoreEmailVerification.customer_id==customer.id).order_by(StoreEmailVerification.id.desc()))
@@ -3129,7 +3147,18 @@ def send_store_phone_code(p:StorePhoneCodePayload, customer:StoreCustomer=Depend
     sender=os.getenv("TWILIO_PHONE_NUMBER","").strip()
     if not (sid and token and sender):
         raise HTTPException(503,"خدمة الرسائل النصية غير مهيأة بعد. أضف TWILIO_ACCOUNT_SID وTWILIO_AUTH_TOKEN وTWILIO_PHONE_NUMBER في Render")
-    phone=_store_phone_e164(p.phone_country_code,p.phone_number)
+    phone_country_code=p.phone_country_code.strip()
+    raw_phone=p.phone_number.strip()
+    if raw_phone.startswith("+"):
+        full_phone=_store_phone_e164("",raw_phone)
+        if not full_phone.startswith(phone_country_code):
+            raise HTTPException(400,"اختر رمز الدولة المطابق لرقم الهاتف")
+        phone_number=full_phone[len(phone_country_code):]
+    else:
+        phone_number="".join(ch for ch in raw_phone if ch.isdigit())
+    if not re.fullmatch(r"\+[1-9]\d{0,3}",phone_country_code) or not 5 <= len(phone_number) <= 15:
+        raise HTTPException(400,"رقم الهاتف غير صحيح")
+    phone=_store_phone_e164(phone_country_code,phone_number)
     now=datetime.now(timezone.utc)
     previous=_store_phone_codes.get(customer.id)
     if previous and (now-previous["sent_at"]).total_seconds()<60:
@@ -3149,7 +3178,7 @@ def send_store_phone_code(p:StorePhoneCodePayload, customer:StoreCustomer=Depend
         raise HTTPException(502,detail)
     except (URLError,TimeoutError):
         raise HTTPException(504,"انتهت مهلة إرسال رسالة التحقق. حاول مجدداً")
-    _store_phone_codes[customer.id]={"hash":hashlib.sha256(code.encode()).hexdigest(),"sent_at":now,"expires_at":now+timedelta(minutes=5),"phone":phone,"attempts":0}
+    _store_phone_codes[customer.id]={"hash":hashlib.sha256(code.encode()).hexdigest(),"sent_at":now,"expires_at":now+timedelta(minutes=5),"phone":phone,"phone_country_code":phone_country_code,"phone_number":phone_number,"attempts":0}
     return {"ok":True,"message":"تم إرسال رمز التحقق برسالة SMS، صالح لمدة 5 دقائق"}
 
 @app.post("/store/auth/phone/confirm")
@@ -3164,8 +3193,8 @@ def confirm_store_phone(p:StorePhoneConfirmPayload,s:Session=Depends(db),custome
         raise HTTPException(429,"تم تجاوز محاولات التحقق. اطلب رمزاً جديداً")
     if not secrets.compare_digest(item["hash"],hashlib.sha256(p.code.encode()).hexdigest()):
         raise HTTPException(400,"رمز التحقق غير صحيح")
-    customer.phone_country_code=""
-    customer.phone_number=item["phone"]
+    customer.phone_country_code=item["phone_country_code"]
+    customer.phone_number=item["phone_number"]
     customer.phone_verified_at=datetime.now(timezone.utc)
     s.commit()
     _store_phone_codes.pop(customer.id,None)
@@ -3187,7 +3216,17 @@ def update_store_profile(p:StoreProfilePayload, s:Session=Depends(db), customer:
     elif p.shipping_address.strip() and not customer.shipping_address:
         customer.shipping_address=p.shipping_address.strip()
     new_phone_country_code=p.phone_country_code.strip()
-    new_phone_number=p.phone_number.strip()
+    raw_phone=p.phone_number.strip()
+    if raw_phone.startswith("+"):
+        full_phone=_store_phone_e164("",raw_phone)
+        if not full_phone.startswith(new_phone_country_code):
+            raise HTTPException(400,"اختر رمز الدولة المطابق لرقم الهاتف أو أدخل الرقم المحلي دون الرمز")
+        new_phone_number=full_phone[len(new_phone_country_code):]
+    else:
+        new_phone_number="".join(ch for ch in raw_phone if ch.isdigit())
+    if not re.fullmatch(r"\+[1-9]\d{0,3}",new_phone_country_code) or not 5 <= len(new_phone_number) <= 15:
+        raise HTTPException(400,"يجب إدخال رقم هاتف المستلم مع رمز الدولة")
+    _store_phone_e164(new_phone_country_code,new_phone_number)
     if new_phone_number != customer.phone_number or new_phone_country_code != customer.phone_country_code:
         customer.phone_verified_at=None
     customer.phone_country_code=new_phone_country_code
@@ -3305,6 +3344,8 @@ def create_online_order(p:OnlineOrderPayload,s:Session=Depends(db),customer:Stor
     except HTTPException: raise
     except Exception: raise HTTPException(400,"ملف إثبات الدفع غير صالح")
     if not raw or len(raw)>5*1024*1024: raise HTTPException(413,"الحد الأقصى لإثبات الدفع 5 ميغابايت")
+    if not customer.full_name.strip() or not customer.phone_country_code.startswith("+") or not 5 <= len("".join(ch for ch in customer.phone_number if ch.isdigit())) <= 15:
+        raise HTTPException(400,"أكمل اسم المستلم ورقم هاتفه في إعدادات حسابك قبل إتمام الشراء")
     if not _store_address_complete(customer.shipping_address_data):
         raise HTTPException(400,"يجب تحديث عنوان الشحن في حسابك قبل إتمام الشراء")
     customer.shipping_address=_store_address_text(customer.shipping_address_data)
@@ -3335,7 +3376,7 @@ def create_online_order(p:OnlineOrderPayload,s:Session=Depends(db),customer:Stor
     previous_profile={"full_name":customer.full_name,"shipping_address":customer.shipping_address,"phone_country_code":customer.phone_country_code,"phone_number":customer.phone_number}
     customer.first_name=p.first_name.strip();customer.last_name=p.last_name.strip();customer.full_name=(customer.first_name+" "+customer.last_name).strip()
     customer.shipping_address=_store_address_text(customer.shipping_address_data);customer.phone_country_code=p.phone_country_code;customer.phone_number=p.phone_number.strip()
-    data={"first_name":customer.first_name,"last_name":customer.last_name,"full_name":customer.full_name,"email":customer.email,"shipping_address":customer.shipping_address,"shipping_address_data":_store_address_data(customer.shipping_address_data),"phone_country_code":customer.phone_country_code,"phone_number":customer.phone_number,"full_phone":customer.phone_country_code+customer.phone_number,"payment_method":p.payment_method,"include_contract_identity":bool(contract_identity),"contract_identity":contract_identity}
+    data={"first_name":customer.first_name,"last_name":customer.last_name,"full_name":customer.full_name,"email":customer.email,"shipping_address":customer.shipping_address,"shipping_address_data":_store_address_data(customer.shipping_address_data),"phone_country_code":customer.phone_country_code,"phone_number":customer.phone_number,"full_phone":customer.phone_country_code+customer.phone_number,"recipient_name":customer.full_name,"recipient_phone_country_code":customer.phone_country_code,"recipient_phone":customer.phone_number,"recipient_full_phone":customer.phone_country_code+customer.phone_number,"payment_method":p.payment_method,"include_contract_identity":bool(contract_identity),"contract_identity":contract_identity}
     order=OnlinePurchaseOrder(customer_id=customer.id,customer_data=data,items=lines,total=round(total,2),currency=currency or "USD",payment_proof=p.payment_proof,proof_type=p.proof_type,status="pending")
     s.add(order);s.commit();s.refresh(order)
     if any(previous_profile[k]!=(customer.full_name if k=="full_name" else customer.shipping_address if k=="shipping_address" else customer.phone_country_code if k=="phone_country_code" else customer.phone_number) for k in previous_profile):
