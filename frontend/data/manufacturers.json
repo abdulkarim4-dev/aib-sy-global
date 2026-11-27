@@ -1,5 +1,5 @@
 {
-  "version": "2026.11.27",
+  "version": "2026.11.27-forklift",
   "manufacturers": [
     {
       "name": "212",
@@ -577,7 +577,8 @@
       "key": "bobcat",
       "families": [
         "agri",
-        "heavy"
+        "heavy",
+        "forklift"
       ]
     },
     {
@@ -813,7 +814,8 @@
       "families": [
         "truck",
         "agri",
-        "heavy"
+        "heavy",
+        "forklift"
       ]
     },
     {
@@ -1251,7 +1253,8 @@
       "name": "Doosan",
       "key": "doosan",
       "families": [
-        "heavy"
+        "heavy",
+        "forklift"
       ]
     },
     {
@@ -2121,7 +2124,8 @@
       "families": [
         "car",
         "truck",
-        "heavy"
+        "heavy",
+        "forklift"
       ]
     },
     {
@@ -2344,7 +2348,8 @@
       "families": [
         "truck",
         "agri",
-        "heavy"
+        "heavy",
+        "forklift"
       ]
     },
     {
@@ -2529,7 +2534,8 @@
       "key": "komatsu",
       "families": [
         "agri",
-        "heavy"
+        "heavy",
+        "forklift"
       ]
     },
     {
@@ -3343,7 +3349,8 @@
       "key": "nissan",
       "families": [
         "car",
-        "truck"
+        "truck",
+        "forklift"
       ]
     },
     {
@@ -3897,7 +3904,8 @@
       "key": "sany",
       "families": [
         "truck",
-        "heavy"
+        "heavy",
+        "forklift"
       ]
     },
     {
@@ -4617,7 +4625,8 @@
       "key": "toyota",
       "families": [
         "car",
-        "truck"
+        "truck",
+        "forklift"
       ]
     },
     {
@@ -5089,7 +5098,8 @@
       "name": "XCMG",
       "key": "xcmg",
       "families": [
-        "heavy"
+        "heavy",
+        "forklift"
       ]
     },
     {
@@ -5386,6 +5396,111 @@
       "name": "Zero Motorcycles",
       "families": [
         "motorcycle"
+      ]
+    },
+    {
+      "name": "Hyster",
+      "key": "hyster",
+      "families": [
+        "forklift"
+      ]
+    },
+    {
+      "name": "Yale",
+      "key": "yale",
+      "families": [
+        "forklift"
+      ]
+    },
+    {
+      "name": "Linde",
+      "key": "linde",
+      "families": [
+        "forklift"
+      ]
+    },
+    {
+      "name": "Jungheinrich",
+      "key": "jungheinrich",
+      "families": [
+        "forklift"
+      ]
+    },
+    {
+      "name": "Crown",
+      "key": "crown",
+      "families": [
+        "forklift"
+      ]
+    },
+    {
+      "name": "Mitsubishi Forklift",
+      "key": "mitsubishi-forklift",
+      "families": [
+        "forklift"
+      ]
+    },
+    {
+      "name": "Hangcha",
+      "key": "hangcha",
+      "families": [
+        "forklift"
+      ]
+    },
+    {
+      "name": "Heli",
+      "key": "heli",
+      "families": [
+        "forklift"
+      ]
+    },
+    {
+      "name": "Lonking",
+      "key": "lonking",
+      "families": [
+        "forklift"
+      ]
+    },
+    {
+      "name": "EP Equipment",
+      "key": "ep-equipment",
+      "families": [
+        "forklift"
+      ]
+    },
+    {
+      "name": "STILL",
+      "key": "still",
+      "families": [
+        "forklift"
+      ]
+    },
+    {
+      "name": "Clark",
+      "key": "clark",
+      "families": [
+        "forklift"
+      ]
+    },
+    {
+      "name": "TCM",
+      "key": "tcm",
+      "families": [
+        "forklift"
+      ]
+    },
+    {
+      "name": "Manitou",
+      "key": "manitou",
+      "families": [
+        "forklift"
+      ]
+    },
+    {
+      "name": "Kalmar",
+      "key": "kalmar",
+      "families": [
+        "forklift"
       ]
     }
   ]

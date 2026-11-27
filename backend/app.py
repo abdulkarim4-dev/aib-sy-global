@@ -1192,7 +1192,7 @@ def manufacturer_scope_tokens()->set[str]:
     except Exception:
         return set()
 
-USER_BUSINESS_SCOPES={"fuel:gasoline","fuel:diesel","fuel:electric","fuel:hybrid","fuel:cng","fuel:lpg","fuel:other","condition:new","condition:used","car","truck","heavy","agri","motorcycle","special","cars","car_parts","car_engines","car_engine_parts","trucks","truck_parts","truck_engines","truck_engine_parts","heavy_parts","heavy_engines","heavy_engine_parts","agri_parts","agri_engines","agri_engine_parts","motorcycles","motorcycle_parts","motorcycle_engines","motorcycle_engine_parts","trailer","trailers","car_trailers","caravans","cargo_trailers","flatbed_trailers","equipment_trailers","tanker_trailers","dump_trailers","livestock_trailers","other_trailers","generators","hydraulic_compressors","water_pumps","road_equipment","special_parts","special_engines"}
+USER_BUSINESS_SCOPES={"fuel:gasoline","fuel:diesel","fuel:electric","fuel:hybrid","fuel:cng","fuel:lpg","fuel:other","condition:new","condition:used","car","truck","heavy","agri","motorcycle","forklift","special","cars","car_parts","car_engines","car_engine_parts","trucks","truck_parts","truck_engines","truck_engine_parts","heavy_parts","heavy_engines","heavy_engine_parts","agri_parts","agri_engines","agri_engine_parts","motorcycles","motorcycle_parts","motorcycle_engines","motorcycle_engine_parts","forklifts","forklift_parts","forklift_engines","forklift_engine_parts","trailer","trailers","car_trailers","caravans","cargo_trailers","flatbed_trailers","equipment_trailers","tanker_trailers","dump_trailers","livestock_trailers","other_trailers","generators","hydraulic_compressors","water_pumps","road_equipment","special_parts","special_engines"}
 class UserCreate(BaseModel):
     username:str=Field(min_length=3,max_length=80)
     full_name:str=Field(min_length=2,max_length=160)
@@ -1548,7 +1548,7 @@ def prepare_record_inventory(s:Session, section:str, raw_data:dict, allow_legacy
         item["sku"]=sku
         family=str(item.get("store_family") or "").strip()
         category=str(item.get("store_category") or "").strip()
-        allowed={"car":{"cars","car_parts","car_engines","car_engine_parts"},"truck":{"trucks","truck_parts","truck_engines","truck_engine_parts"},"heavy":{"heavy","heavy_parts","heavy_engines","heavy_engine_parts"},"agri":{"agri","agri_parts","agri_engines","agri_engine_parts"},"motorcycle":{"motorcycles","motorcycle_parts","motorcycle_engines","motorcycle_engine_parts"},"special":{"generators","hydraulic_compressors","water_pumps","road_equipment","special_parts","special_engines"}}
+        allowed={"car":{"cars","car_parts","car_engines","car_engine_parts"},"truck":{"trucks","truck_parts","truck_engines","truck_engine_parts"},"heavy":{"heavy","heavy_parts","heavy_engines","heavy_engine_parts"},"agri":{"agri","agri_parts","agri_engines","agri_engine_parts"},"motorcycle":{"motorcycles","motorcycle_parts","motorcycle_engines","motorcycle_engine_parts"},"forklift":{"forklifts","forklift_parts","forklift_engines","forklift_engine_parts"},"special":{"generators","hydraulic_compressors","water_pumps","road_equipment","special_parts","special_engines"}}
         if section in {"purchase","deposit"} and name and (not family or not category):
             raise HTTPException(400,"يجب اختيار القسم الرئيسي والقسم الفرعي للمنتج عند الشراء أو وضع الأمانة")
         if family or category:
@@ -1642,7 +1642,7 @@ def latest_store_catalog_data(s:Session)->tuple[dict,dict]:
         return cached
     latest_categories={}
     latest_prices={}
-    allowed={"car":{"cars","car_parts","car_engines","car_engine_parts"},"truck":{"trucks","truck_parts","truck_engines","truck_engine_parts"},"heavy":{"heavy","heavy_parts","heavy_engines","heavy_engine_parts"},"agri":{"agri","agri_parts","agri_engines","agri_engine_parts"},"motorcycle":{"motorcycles","motorcycle_parts","motorcycle_engines","motorcycle_engine_parts"},"special":{"generators","hydraulic_compressors","water_pumps","road_equipment","special_parts","special_engines"}}
+    allowed={"car":{"cars","car_parts","car_engines","car_engine_parts"},"truck":{"trucks","truck_parts","truck_engines","truck_engine_parts"},"heavy":{"heavy","heavy_parts","heavy_engines","heavy_engine_parts"},"agri":{"agri","agri_parts","agri_engines","agri_engine_parts"},"motorcycle":{"motorcycles","motorcycle_parts","motorcycle_engines","motorcycle_engine_parts"},"forklift":{"forklifts","forklift_parts","forklift_engines","forklift_engine_parts"},"special":{"generators","hydraulic_compressors","water_pumps","road_equipment","special_parts","special_engines"}}
     rows=s.scalars(select(Record).where(
         Record.deleted.is_(False),
         Record.section.in_(["purchase","carPurchase","deposit"])
@@ -1700,7 +1700,7 @@ def create_inventory_product(p:InventoryProductCreate,request:Request,s:Session=
         if "condition:"+p.condition not in scopes: raise HTTPException(403,"حالة القطعة أو السيارة هذه غير مسموح لك بالنشر بها. اطلب من المالك تفعيلها في صلاحيات المستخدم.")
     allowed={"car":{"cars","car_parts","car_engines","car_engine_parts"},"truck":{"trucks","truck_parts","truck_engines","truck_engine_parts"},"heavy":{"heavy","heavy_parts","heavy_engines","heavy_engine_parts"},"agri":{"agri","agri_parts","agri_engines","agri_engine_parts"},"motorcycle":{"motorcycles","motorcycle_parts","motorcycle_engines","motorcycle_engine_parts"},"special":{"generators","hydraulic_compressors","water_pumps","road_equipment","special_parts","special_engines"}}
     if p.store_category not in allowed.get(p.store_family,set()): raise HTTPException(400,"اختر قسم المتجر بشكل صحيح")
-    vehicle_categories={"car":"cars","truck":"trucks","heavy":"heavy","agri":"agri","motorcycle":"motorcycles"}
+    vehicle_categories={"car":"cars","truck":"trucks","heavy":"heavy","agri":"agri","motorcycle":"motorcycles","forklift":"forklifts"}
     is_complete_vehicle=p.store_category==vehicle_categories.get(p.store_family)
     manufacturer=p.manufacturer.strip()
     catalog_manufacturers={str(item.get("key")):str(item.get("name")) for item in json.loads((FRONTEND_DIR / "data" / "manufacturers.json").read_text(encoding="utf-8")).get("manufacturers",[]) if item.get("key") and item.get("name")}
@@ -2052,7 +2052,7 @@ def update_inventory_product_images(product_id:int, p:InventoryImagesPayload, re
     return {"ok":True,"count":len(normalized_images)}
 
 
-VEHICLE_CONTRACT_CATEGORIES={"cars","trucks","heavy","agri","motorcycles"}
+VEHICLE_CONTRACT_CATEGORIES={"cars","trucks","heavy","agri","motorcycles","forklifts"}
 def inventory_vehicle_seller_snapshot(s:Session,item:dict,fallback_user:User)->dict:
     sku=str(item.get("sku") or "").strip().upper()
     product=s.scalar(select(InventoryProduct).where(InventoryProduct.sku==sku)) if sku else None
@@ -3656,7 +3656,7 @@ def create_online_order(p:OnlineOrderPayload,s:Session=Depends(db),customer:Stor
         if currency and currency!=price["currency"]: raise HTTPException(409,"لا يمكن جمع عملات مختلفة في طلب واحد")
         currency=price["currency"];unit=float(price["sale_price"]);total+=unit*qty
         catalog=store_categories.get(product.sku,{})
-        if catalog.get("store_category") in {"cars","trucks","heavy","agri"}: has_full_vehicle=True
+        if catalog.get("store_category") in {"cars","trucks","heavy","agri","motorcycles","forklifts"}: has_full_vehicle=True
         lines.append({"product_id":product.id,"sku":product.sku,"description":product.name,"model":product.model or "","quantity":qty,"price":unit,"store_family":catalog.get("store_family",""),"store_category":catalog.get("store_category",""),"vehicle_details":catalog.get("vehicle_details",{})})
     if not lines: raise HTTPException(400,"السلة فارغة")
     if p.contract_identity and not has_full_vehicle: raise HTTPException(400,"بيانات العقد متاحة فقط عند شراء مركبة كاملة")
