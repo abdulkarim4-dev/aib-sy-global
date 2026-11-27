@@ -3451,5 +3451,13 @@ html body .catalog-tools .catalog-head-actions .store-filter-toggle:active{trans
 @media(max-width:420px){
  .category-zone .cats button.cat>span:last-child{font-size:clamp(8.5px,2.35vw,10px)!important}
 }
+
+
+/* Ensure each category photo fills the complete category tile width. */
+@media(max-width:800px){
+ .category-zone .cats{width:100%!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;justify-items:stretch!important;}
+ .category-zone .cats button.cat{display:flex!important;position:relative!important;width:100%!important;min-width:0!important;max-width:100%!important;box-sizing:border-box!important;justify-self:stretch!important;}
+ .category-zone .cats button.cat>img.aib-locked-category-photo{position:absolute!important;left:0!important;right:0!important;top:0!important;bottom:0!important;width:100%!important;height:100%!important;min-width:100%!important;max-width:none!important;object-fit:cover!important;}
+}
 </style>
 </body></html>
