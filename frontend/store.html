@@ -338,34 +338,56 @@ body{background-image:radial-gradient(ellipse at 88% -8%,rgba(55,133,181,.10),tr
 
 </style>
 <style id="aib-mobile-category-layout-fix">
-/* Keep the existing category cards unchanged; improve Arabic category-name fit only. */
+/* Compact mobile category tiles and keep every Arabic label on one line. */
 @media(max-width:600px){
+  #categories .cats{
+    display:grid!important;
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:9px!important;
+    padding:6px 2px 12px!important;
+    margin:0!important;
+    overflow:visible!important;
+    scroll-snap-type:none!important;
+  }
+  #categories .cats .cat{
+    display:block!important;
+    flex:initial!important;
+    width:100%!important;
+    min-width:0!important;
+    height:clamp(112px,31vw,132px)!important;
+    margin:0!important;
+    border-radius:12px!important;
+    scroll-snap-align:none!important;
+  }
+  #categories .cats .cat img{
+    width:100%!important;
+    height:100%!important;
+    object-fit:cover!important;
+  }
   #categories .cats .cat span{
     display:block!important;
-    right:8px!important;
-    left:8px!important;
-    bottom:8px!important;
+    right:5px!important;
+    left:5px!important;
+    bottom:6px!important;
     width:auto!important;
-    padding:9px 7px!important;
+    padding:6px 4px!important;
     border:0!important;
-    border-radius:9px!important;
-    background:rgba(8,20,30,.48)!important;
+    border-radius:7px!important;
+    background:rgba(8,20,30,.62)!important;
     color:#fff!important;
-    font-size:clamp(14px,4vw,16px)!important;
+    font-size:clamp(9.5px,2.8vw,11.5px)!important;
     font-weight:900!important;
-    line-height:1.55!important;
+    line-height:1.25!important;
     text-align:center!important;
-    white-space:normal!important;
-    word-break:normal!important;
+    white-space:nowrap!important;
+    word-break:keep-all!important;
     overflow-wrap:normal!important;
     hyphens:none!important;
-    text-shadow:0 1px 5px rgba(0,0,0,.9)!important;
+    overflow:hidden!important;
+    text-overflow:clip!important;
+    text-shadow:0 1px 4px rgba(0,0,0,.95)!important;
     box-shadow:none!important;
-    backdrop-filter:blur(3px)!important;
   }
-}
-@media(max-width:360px){
-  #categories .cats .cat span{font-size:13px!important;padding:7px 4px!important}
 }
 </style>
 
