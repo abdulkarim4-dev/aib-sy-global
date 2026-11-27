@@ -1,5 +1,5 @@
 {
-  "version": "2026.11.22",
+  "version": "2026.11.27",
   "manufacturers": [
     {
       "name": "212",
@@ -2012,7 +2012,8 @@
       "name": "Honda",
       "key": "honda",
       "families": [
-        "car"
+        "car",
+        "motorcycle"
       ]
     },
     {
@@ -2543,7 +2544,8 @@
       "name": "KTM",
       "key": "ktm",
       "families": [
-        "car"
+        "car",
+        "motorcycle"
       ]
     },
     {
@@ -3553,7 +3555,8 @@
       "name": "Piaggio",
       "key": "piaggio",
       "families": [
-        "car"
+        "car",
+        "motorcycle"
       ]
     },
     {
@@ -4393,7 +4396,8 @@
       "name": "Suzuki",
       "key": "suzuki",
       "families": [
-        "car"
+        "car",
+        "motorcycle"
       ]
     },
     {
@@ -4627,7 +4631,8 @@
       "name": "Triumph",
       "key": "triumph",
       "families": [
-        "car"
+        "car",
+        "motorcycle"
       ]
     },
     {
@@ -5255,6 +5260,132 @@
       "key": "zoomlion",
       "families": [
         "heavy"
+      ]
+    },
+    {
+      "key": "aprilia",
+      "name": "Aprilia",
+      "families": [
+        "motorcycle"
+      ]
+    },
+    {
+      "key": "bajaj",
+      "name": "Bajaj",
+      "families": [
+        "motorcycle"
+      ]
+    },
+    {
+      "key": "benelli",
+      "name": "Benelli",
+      "families": [
+        "motorcycle"
+      ]
+    },
+    {
+      "key": "bmw-motorrad",
+      "name": "BMW Motorrad",
+      "families": [
+        "motorcycle"
+      ]
+    },
+    {
+      "key": "cfmoto",
+      "name": "CFMoto",
+      "families": [
+        "motorcycle"
+      ]
+    },
+    {
+      "key": "ducati",
+      "name": "Ducati",
+      "families": [
+        "motorcycle"
+      ]
+    },
+    {
+      "key": "harley-davidson",
+      "name": "Harley-Davidson",
+      "families": [
+        "motorcycle"
+      ]
+    },
+    {
+      "key": "hero",
+      "name": "Hero",
+      "families": [
+        "motorcycle"
+      ]
+    },
+    {
+      "key": "husqvarna",
+      "name": "Husqvarna",
+      "families": [
+        "motorcycle"
+      ]
+    },
+    {
+      "key": "indian-motorcycle",
+      "name": "Indian Motorcycle",
+      "families": [
+        "motorcycle"
+      ]
+    },
+    {
+      "key": "kawasaki",
+      "name": "Kawasaki",
+      "families": [
+        "motorcycle"
+      ]
+    },
+    {
+      "key": "kymco",
+      "name": "Kymco",
+      "families": [
+        "motorcycle"
+      ]
+    },
+    {
+      "key": "moto-guzzi",
+      "name": "Moto Guzzi",
+      "families": [
+        "motorcycle"
+      ]
+    },
+    {
+      "key": "royal-enfield",
+      "name": "Royal Enfield",
+      "families": [
+        "motorcycle"
+      ]
+    },
+    {
+      "key": "sym",
+      "name": "SYM",
+      "families": [
+        "motorcycle"
+      ]
+    },
+    {
+      "key": "tvs",
+      "name": "TVS",
+      "families": [
+        "motorcycle"
+      ]
+    },
+    {
+      "key": "vespa",
+      "name": "Vespa",
+      "families": [
+        "motorcycle"
+      ]
+    },
+    {
+      "key": "zero-motorcycles",
+      "name": "Zero Motorcycles",
+      "families": [
+        "motorcycle"
       ]
     }
   ]
