@@ -3460,5 +3460,32 @@ html body .catalog-tools .catalog-head-actions .store-filter-toggle:active{trans
  .category-zone .cats button.cat{display:flex!important;position:relative!important;width:100%!important;min-width:0!important;max-width:100%!important;box-sizing:border-box!important;justify-self:stretch!important;}
  .category-zone .cats button.cat>img.aib-locked-category-photo{position:absolute!important;left:0!important;right:0!important;top:0!important;bottom:0!important;width:100%!important;height:100%!important;min-width:100%!important;max-width:none!important;object-fit:cover!important;}
 }
+
+/* Uniform mobile category tiles; keep the category name clearly anchored at the bottom. */
+@media(max-width:800px){
+ .category-zone .cats{align-items:stretch!important;grid-auto-rows:112px!important;}
+ .category-zone .cats button.cat{
+  height:112px!important;min-height:112px!important;max-height:112px!important;
+  padding:0!important;display:flex!important;flex-direction:column!important;
+  align-items:stretch!important;justify-content:flex-end!important;
+  position:relative!important;overflow:hidden!important;box-sizing:border-box!important;
+ }
+ .category-zone .cats button.cat>span.cat-icon{
+  position:absolute!important;top:7px!important;right:7px!important;z-index:3!important;
+  margin:0!important;
+ }
+ .category-zone .cats button.cat>span:last-child{
+  position:absolute!important;left:0!important;right:0!important;bottom:0!important;z-index:4!important;
+  display:flex!important;align-items:center!important;justify-content:center!important;
+  width:100%!important;max-width:100%!important;min-height:29px!important;
+  margin:0!important;padding:5px 4px!important;box-sizing:border-box!important;
+  white-space:nowrap!important;word-break:normal!important;overflow-wrap:normal!important;
+  overflow:visible!important;text-overflow:unset!important;text-wrap:nowrap!important;
+  background:rgba(5,13,20,.86)!important;color:#fff!important;
+  font-size:clamp(8px,2.1vw,10px)!important;font-weight:900!important;
+  line-height:1.25!important;text-align:center!important;
+  text-shadow:0 1px 3px rgba(0,0,0,.95)!important;
+ }
+}
 </style>
 </body></html>
