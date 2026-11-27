@@ -622,6 +622,10 @@ class AccountingLoginConfirmPayload(BaseModel):
 class AccountingPinSetupPayload(BaseModel):
     pin: str = Field(pattern=r"^\d{4}$")
 
+class AccountingPinChangePayload(BaseModel):
+    current_pin: str = Field(pattern=r"^\d{4}$")
+    new_pin: str = Field(pattern=r"^\d{4}$")
+
 class AccountingLoginResendPayload(BaseModel):
     challenge_id:int
 
@@ -873,6 +877,20 @@ def setup_accounting_pin(p:AccountingPinSetupPayload,request:Request,s:Session=D
     audit(s,u,"accounting_pin_created","user",u.id,{},request)
     s.commit()
     return {"ok":True,"message":"تم إعداد رمز الدخول الشخصي بنجاح.","access_token":token_for(u,email_otp_verified=True,pin_verified=False)}
+
+@app.post("/auth/pin/change")
+def change_accounting_pin(p:AccountingPinChangePayload,request:Request,s:Session=Depends(db),u:User=Depends(current_user)):
+    # current_user requires a PIN-verified session for this protected account action.
+    if not u.accounting_pin_hash or not password_hash.verify(p.current_pin,u.accounting_pin_hash):
+        audit(s,u,"accounting_pin_change_failed","user",u.id,{},request)
+        s.commit()
+        raise HTTPException(401,"رمز الدخول الحالي غير صحيح")
+    if p.current_pin == p.new_pin:
+        raise HTTPException(400,"اختر رمزاً جديداً مختلفاً عن الرمز الحالي")
+    u.accounting_pin_hash=password_hash.hash(p.new_pin)
+    audit(s,u,"accounting_pin_changed","user",u.id,{},request)
+    s.commit()
+    return {"ok":True,"message":"تم تغيير رمز الدخول بنجاح."}
 
 @app.get("/auth/me")
 def me(request:Request,u:User=Depends(current_user)):
