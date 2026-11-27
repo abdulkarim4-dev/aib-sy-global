@@ -7,7 +7,7 @@ from email.message import EmailMessage
 from urllib.request import Request as UrlRequest, urlopen
 from urllib.error import HTTPError, URLError
 import jwt
-from fastapi import FastAPI, Depends, HTTPException, Request, status, Form
+from fastapi import FastAPI, Depends, HTTPException, Request, status, Form, File, UploadFile
 from fastapi.responses import RedirectResponse, Response
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -1869,6 +1869,38 @@ class InventoryImagesPayload(BaseModel):
 
 class InventoryImageConvertPayload(BaseModel):
     image: str = Field(min_length=32, max_length=28*1024*1024)
+
+@app.post("/inventory/images/convert-upload")
+async def convert_inventory_image_upload(file:UploadFile=File(...), u:User=Depends(require_permission("inventory","edit"))):
+    # Accept the original camera file as multipart data. This avoids oversized
+    # base64 JSON requests and lets Pillow/pillow-heif decode phone formats.
+    raw=await file.read(20*1024*1024+1)
+    if not raw:
+        raise HTTPException(400,"ملف الصورة فارغ")
+    if len(raw)>20*1024*1024:
+        raise HTTPException(413,"حجم الصورة الأصلية يجب ألا يتجاوز 20 ميغابايت")
+    try:
+        with Image.open(io.BytesIO(raw)) as source:
+            image=ImageOps.exif_transpose(source).convert("RGB")
+            image.thumbnail((1800,1800),Image.Resampling.LANCZOS)
+            output=io.BytesIO()
+            quality=88
+            image.save(output,format="JPEG",quality=quality,optimize=True)
+            while output.tell()>4*1024*1024 and quality>40:
+                quality=max(40,quality-8)
+                output=io.BytesIO()
+                image.save(output,format="JPEG",quality=quality,optimize=True)
+            converted=output.getvalue()
+            if len(converted)>4*1024*1024:
+                raise HTTPException(413,"تعذر ضغط الصورة إلى الحجم المسموح")
+        return {"image":"data:image/jpeg;base64,"+base64.b64encode(converted).decode("ascii"),"content_type":"image/jpeg"}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logging.warning("Inventory multipart image conversion failed: filename=%r type=%r error=%s",file.filename,file.content_type,exc)
+        raise HTTPException(400,"تعذر قراءة صيغة هذه الصورة. جرّب اختيار الصورة الأصلية من معرض الهاتف مرة أخرى.")
+    finally:
+        await file.close()
 
 @app.post("/inventory/images/convert")
 def convert_inventory_image(p:InventoryImageConvertPayload, u:User=Depends(require_permission("inventory","edit"))):
