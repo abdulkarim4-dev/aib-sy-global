@@ -391,6 +391,100 @@ body{background-image:radial-gradient(ellipse at 88% -8%,rgba(55,133,181,.10),tr
 }
 </style>
 
+
+<!-- AIB public pages: visual alignment with the accounting workspace. Styling only; no markup, data, routes, or handlers changed. -->
+<style id="aib-accounting-aligned-public-theme">
+:root{
+ --aib-public-bg:#f4f6f8;--aib-public-surface:#fff;--aib-public-line:#e2e7ec;
+ --aib-public-text:#202a33;--aib-public-muted:#71808d;--aib-public-blue:#287fb6;
+ --aib-public-blue-dark:#17618f;--aib-public-orange:#e87936;
+ --aib-public-shadow:0 7px 22px rgba(28,43,58,.055);
+ color-scheme:light;
+}
+html,body{background:var(--aib-public-bg)!important;color:var(--aib-public-text)!important}
+body{background-image:radial-gradient(ellipse at 88% -8%,rgba(37,134,199,.075),transparent 38%)!important;font-family:Tahoma,Arial,sans-serif}
+h1,h2,h3,h4,b,strong{color:inherit}
+p,small{color:inherit}
+a{transition:color .16s ease,border-color .16s ease}
+button,input,select,textarea{font-family:Tahoma,Arial,sans-serif}
+.top{
+ background:rgba(255,255,255,.97)!important;color:var(--aib-public-text)!important;
+ border-bottom:1px solid var(--aib-public-line)!important;
+ box-shadow:0 4px 18px rgba(25,38,52,.055)!important;
+ backdrop-filter:blur(14px);
+}
+.top .brand b,.top .brand strong{color:var(--aib-public-text)!important}
+.top .brand small{color:var(--aib-public-muted)!important}
+.brand-logo-link img,.brand-mark{filter:drop-shadow(0 3px 7px rgba(20,35,48,.18))!important;mix-blend-mode:normal!important}
+.btn,.search-submit,.services-all-link{
+ border-radius:10px!important;font-weight:750!important;
+}
+.btn:not(.alt),.search-submit{
+ background:linear-gradient(135deg,#328fcf,#17618f)!important;
+ color:#fff!important;border:1px solid #2b80b7!important;
+ box-shadow:0 4px 12px rgba(28,112,164,.15)!important;
+}
+.btn.alt,.services-all-link{
+ background:#f5f8fa!important;color:#405363!important;
+ border:1px solid #dce4ea!important;box-shadow:none!important;
+}
+.btn:hover,.search-submit:hover,.services-all-link:hover{filter:brightness(1.035);transform:translateY(-1px)}
+.section-head h2,.catalog-tools-head h2,.products-heading h2{color:#202a33!important;font-weight:850!important}
+.section-head p,.catalog-tools-head p,.section-heading p{color:#71808d!important}
+.stat,.catalog-tools,.category-zone,.contact-premium,.store-service-card,
+.services .service,.engine-slide,.search-filters-panel,.search-suggestions,
+.modal-box,.cart-panel,.store-auth-panel{
+ background:#fff!important;color:#26323c!important;
+ border:1px solid var(--aib-public-line)!important;border-radius:15px!important;
+ box-shadow:var(--aib-public-shadow)!important;
+}
+.stat small,.muted,.hint{color:var(--aib-public-muted)!important}
+.stat strong{color:#245d82!important}
+input:not([type=checkbox]):not([type=radio]):not([type=file]),
+select,textarea{
+ background:#fff!important;color:#26323c!important;
+ border:1px solid #dce3e9!important;border-radius:10px!important;
+ box-shadow:inset 0 1px 2px rgba(20,35,50,.025)!important;
+}
+input::placeholder,textarea::placeholder{color:#9aa6b0!important;opacity:1!important}
+input:focus,select:focus,textarea:focus{
+ border-color:#70acd0!important;box-shadow:0 0 0 3px rgba(37,134,199,.12)!important;outline:none!important;
+}
+.contact-icon,.store-service-icon,.zone-icon{
+ background:#edf5fa!important;border-color:#d7e7f0!important;color:#287fb6!important;
+}
+.contact-brand-panel{background:linear-gradient(145deg,#1c2d3b,#101b25)!important;border-color:#385a72!important}
+.foot{color:#89949d!important;border-color:var(--aib-public-line)!important}
+@media(max-width:600px){
+ .top{background:rgba(255,255,255,.98)!important}
+}
+</style>
+
+<style id="aib-accounting-aligned-presentation">
+.hero{
+ border:1px solid #31536b!important;border-radius:20px!important;
+ box-shadow:0 18px 42px rgba(17,35,49,.16)!important;
+}
+.hero .eyebrow{color:#8cc8ed!important}
+.hero h1,.hero p{color:#fff!important}
+.hero .btn{background:linear-gradient(135deg,#328fcf,#17618f)!important;color:#fff!important;border-color:#4a9dcc!important}
+.hero .btn.alt{background:rgba(255,255,255,.96)!important;color:#263746!important;border-color:#fff!important}
+.cats .cat{
+ border:1px solid #dce4ea!important;border-radius:15px!important;
+ box-shadow:0 8px 20px rgba(22,39,53,.10)!important;
+}
+.cats .cat:after{background:linear-gradient(0deg,rgba(5,14,22,.88),rgba(5,14,22,.04) 76%)!important}
+.cats .cat span{color:#fff!important;text-shadow:0 2px 9px #000!important}
+.cats .cat:hover{border-color:#4a9dcc!important;box-shadow:0 13px 26px rgba(22,39,53,.16)!important}
+.store-service-card{color:#26323c!important}
+.store-service-copy b{color:#202a33!important}
+.store-service-copy small{color:#71808d!important}
+.store-service-copy em,.services-footer-note a{color:#287fb6!important}
+.services-footer-note{background:#f7f9fb!important;border-color:#e2e7ec!important}
+.contact-item strong,.social-block>strong{color:#202a33!important}
+.contact-item p,.contact-item a{color:#566673!important}
+@media(max-width:560px){.cats .cat{border-radius:12px!important}}
+</style>
 </head><body><header class="wrap top"><div class="brand"><a class="brand-logo-link" href="/" aria-label="العودة إلى الصفحة الرئيسية"><img class="brand-mark" src="/aib-logo.png?v=20261113-aib2" alt="شعار مجموعة AIB"></a><div><b>AIB GROUP</b><small>مجموعة AIB التجارية</small></div></div><div class="menu"><button class="hamb" id="menuToggle" type="button" aria-label="فتح القائمة الرئيسية" aria-expanded="false" aria-controls="mainMenu"><span></span><span></span><span></span></button></div></header><div class="menu-backdrop" id="menuBackdrop" onclick="closeMainMenu()" aria-hidden="true"></div><aside class="menu-drawer" id="mainMenu" aria-label="القائمة الرئيسية" aria-hidden="true"><div class="menu-drawer-head"><div><small>AIB TRADING GROUP</small><strong>القائمة الرئيسية</strong></div><button class="menu-close" type="button" onclick="closeMainMenu()" aria-label="إغلاق القائمة">×</button></div><div class="menu-welcome"><span class="menu-welcome-mark">AIB</span><div><strong>أهلاً بك في مجموعة AIB</strong><small>تجارة وخدمات متكاملة</small></div></div><nav class="menu-list"><a href="#categories" onclick="closeMainMenu()"><i>01</i><span><b>أقسام المتجر</b><small>السيارات وقطع الغيار والمعدات</small></span><em>‹</em></a><a href="#services" onclick="closeMainMenu()"><i>02</i><span><b>خدماتنا</b><small>الصيانة والتصليح والحلول الفنية</small></span><em>‹</em></a><a href="/shop"><i>03</i><span><b>متجر AIB</b><small>تصفح المنتجات والمخزون</small></span><em>‹</em></a><a href="#contact" onclick="closeMainMenu()"><i>04</i><span><b>تواصل معنا</b><small>الهاتف والبريد ووسائل التواصل</small></span><em>‹</em></a></nav><div class="menu-drawer-footer"><span>ثقة في التجارة · خبرة في قطع الغيار</span><a href="/accounting">بوابة المحاسبة <b>←</b></a></div></aside>
 <main class="wrap"><section class="hero"><div class="hero-in"><div class="eyebrow">AIB TRADING GROUP</div><h1>خبرة تجارية وخدمات متكاملة في عالم السيارات والمعدات</h1><p>مجموعة AIB التجارية تجمع بين تجارة السيارات والشاحنات والمحركات وقطع الغيار والمعدات الثقيلة، إلى جانب خدمات الصيانة والتصليح.</p><div class="hero-actions"><a class="btn" href="/shop">اكتشف متجر AIB</a><a class="btn alt" href="#services">تعرّف على خدماتنا</a></div></div></section>
 <section class="section" id="companyStatsSection"><div class="section-head"><div><h2>مجموعة AIB بالأرقام</h2><p>إحصائيات مباشرة من سجلات وفواتير الشركة</p></div></div><div class="stats"><div class="stat"><small>عدد العملاء المسجلين</small><strong id="customers">—</strong></div><div class="stat"><small>عمليات المبيع</small><strong id="sales">—</strong></div><div class="stat"><small>عمليات الشراء</small><strong id="purchases">—</strong></div></div></section>
