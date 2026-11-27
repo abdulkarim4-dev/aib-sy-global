@@ -1832,6 +1832,60 @@ body.customer-orders-page-open{overflow:hidden}
 }
 </style>
 
+
+<style id="aib-final-category-click-and-clean-labels">
+/* Decorative layers must never intercept taps on category buttons. */
+#trailerCategorySection .cats button.cat,
+#specialCategorySection .cats button.cat{
+ position:relative!important;isolation:isolate!important;cursor:pointer!important;
+ -webkit-tap-highlight-color:transparent;
+}
+#trailerCategorySection .cats button.cat>img,
+#specialCategorySection .cats button.cat>img{
+ pointer-events:none!important;user-select:none!important;
+}
+#trailerCategorySection .cats button.cat::before,
+#trailerCategorySection .cats button.cat::after,
+#specialCategorySection .cats button.cat::before,
+#specialCategorySection .cats button.cat::after{
+ pointer-events:none!important;
+}
+#trailerCategorySection .cats button.cat>span,
+#specialCategorySection .cats button.cat>span{
+ pointer-events:none!important;
+}
+/* Names remain directly over the photo: no badge, panel, or background. */
+.category-zone .cats button.cat>span:last-child,
+#trailerCategorySection .cats button.cat>span:last-child,
+#specialCategorySection .cats button.cat>span:last-child{
+ position:absolute!important;left:3px!important;right:3px!important;bottom:7px!important;
+ z-index:4!important;display:block!important;width:auto!important;max-width:none!important;
+ min-width:0!important;min-height:0!important;margin:0!important;padding:2px 0!important;
+ box-sizing:border-box!important;background:transparent!important;
+ color:#fff!important;text-align:center!important;font-weight:900!important;
+ text-shadow:0 2px 5px #000,0 0 9px #000!important;
+ white-space:normal!important;overflow:visible!important;text-overflow:clip!important;
+ line-height:1.25!important;font-size:clamp(9px,2.5vw,12px)!important;
+}
+/* Same compact geometry for trailers and generators as every other mobile category. */
+@media(max-width:800px){
+ #trailerCategorySection .cats,#specialCategorySection .cats{
+  display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  grid-auto-rows:112px!important;gap:8px!important;align-items:stretch!important;
+ }
+ #trailerCategorySection .cats button.cat,#specialCategorySection .cats button.cat{
+  display:flex!important;width:100%!important;height:112px!important;
+  min-height:112px!important;max-height:112px!important;min-width:0!important;
+  padding:0!important;margin:0!important;overflow:hidden!important;
+ }
+ #trailerCategorySection .cats button.cat>img,#specialCategorySection .cats button.cat>img{
+  position:absolute!important;inset:0!important;width:100%!important;height:100%!important;
+  max-width:none!important;max-height:none!important;object-fit:cover!important;
+  object-position:center!important;z-index:0!important;
+ }
+}
+</style>
+
 </head><body><header class="wrap top"><button class="aib-menu-trigger" type="button" onclick="openAibStoreMenu()" aria-label="فتح قائمة المتجر" aria-controls="aibStoreDrawer" aria-expanded="false">
  <span></span><span></span><span></span>
 </button><div class="brand"><a class="brand-logo-link" href="/shop" aria-label="العودة إلى الصفحة الرئيسية للمتجر"><img src="/aib-logo.png?v=20261113-aib2" alt="AIB" width="145" height="58" decoding="async" fetchpriority="high"></a><div><b>AIB GROUP</b><small>المتجر الإلكتروني الرسمي</small></div></div><button class="store-account-button" id="storeAccountButton" type="button" onclick="openStoreAuth()" aria-label="حساب العميل">جارٍ التحقق من الحساب…</button><button class="cart-open" type="button" onclick="openCart()" aria-label="فتح سلة التسوق">🛒 <span>سلة التسوق</span><b id="cartCount">0</b></button></header>
