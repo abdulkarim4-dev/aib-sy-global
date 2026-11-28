@@ -4216,3 +4216,44 @@ html body .aib-gemini-voice-status{
  @keyframes aibGeminiPanelIn{from{opacity:.75;transform:translateY(8px) scale(.99)}to{opacity:1;transform:translateY(0) scale(1)}}
 }
 </style>
+
+<style id="aib-trailer-category-label-position-fix">
+/* Trailer category names belong at the lower edge of each photo, not in its
+   center/top. Scope this correction to the trailer grid only. */
+#trailerCategorySection .cats button.cat>span:last-child{
+  position:absolute!important;
+  top:auto!important;
+  bottom:12px!important;
+  left:6px!important;
+  right:6px!important;
+  z-index:5!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  width:auto!important;
+  max-width:none!important;
+  min-width:0!important;
+  min-height:0!important;
+  margin:0!important;
+  padding:2px 4px!important;
+  box-sizing:border-box!important;
+  background:transparent!important;
+  color:#fff!important;
+  text-align:center!important;
+  font-family:Tahoma,Arial,sans-serif!important;
+  font-size:clamp(11px,1.05vw,14px)!important;
+  font-weight:900!important;
+  line-height:1.35!important;
+  white-space:normal!important;
+  overflow:visible!important;
+  text-overflow:clip!important;
+  text-shadow:0 2px 5px rgba(0,0,0,.98),0 0 9px rgba(0,0,0,.85)!important;
+  pointer-events:none!important;
+}
+@media(max-width:900px){
+  #trailerCategorySection .cats button.cat>span:last-child{
+    bottom:8px!important;
+    font-size:clamp(9px,2.4vw,12px)!important;
+  }
+}
+</style>
